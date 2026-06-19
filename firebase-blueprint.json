@@ -1,0 +1,57 @@
+{
+  "entities": {
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Invoice details and status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "number": { "type": "string" },
+        "date": { "type": "string" },
+        "clientName": { "type": "string" },
+        "amount": { "type": "number" },
+        "isPaid": { "type": "boolean" },
+        "hasStampDuty": { "type": "boolean" },
+        "driveFileId": { "type": "string" }
+      },
+      "required": ["id", "number", "amount", "isPaid"]
+    },
+    "F24Entry": {
+      "title": "F24Entry",
+      "description": "F24 payment detail",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "taxCode": { "type": "string" },
+        "amount": { "type": "number" }
+      },
+      "required": ["id", "date", "taxCode", "amount"]
+    },
+    "AccountingPosition": {
+      "title": "AccountingPosition",
+      "description": "Accounting profile and data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "driveFolderId": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/accountingPositions/{positionId}": {
+      "schema": "AccountingPosition",
+      "description": "Root accounting position document"
+    },
+    "/users/{userId}/accountingPositions/{positionId}/invoices/{invoiceId}": {
+      "schema": "Invoice",
+      "description": "Invoices belonging to an accounting position"
+    },
+    "/users/{userId}/accountingPositions/{positionId}/f24Entries/{entryId}": {
+      "schema": "F24Entry",
+      "description": "F24 entries belonging to an accounting position"
+    }
+  }
+}
