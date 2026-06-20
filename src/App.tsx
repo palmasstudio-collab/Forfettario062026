@@ -104,18 +104,23 @@ const DEFAULT_PROFILE: BusinessProfile = {
 
 import { ErrorBoundary } from './ErrorBoundary';
 
+import { initAuth, googleSignIn, logout as firebaseLogout, getAccessToken } from './lib/firebaseAuth';
+
 // In order to show the error boundary, I need to wrap the whole App layout in it... wait, it's better to wrap the main content area.
 const getInitialPositions = (): AccountingPosition[] => {
   const saved = localStorage.getItem(LOCAL_STORAGE_POSITIONS_KEY);
-  if (saved) {
+  console.log("Loading positions from localStorage:", saved);
+  if (saved && saved !== 'null' && saved !== 'undefined') {
     try {
       return JSON.parse(saved);
     } catch (e) {
-      console.error(e);
+      console.error("Failed to parse saved positions:", e);
+      // Return empty array to prevent overwriting with demo data
+      return []; 
     }
   }
 
-  // Fallback migration of old single-profile
+  // Fallback migration of old single-profile (only if key didn't exist)
   let oldProfile = DEFAULT_PROFILE;
   try {
     const savedProf = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
@@ -198,6 +203,7 @@ export default function App() {
 
   // Online/Offline detection states
   const [isOnline, setIsOnline] = useState<boolean>(() => typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [isFirestoreConnected, setIsFirestoreConnected] = useState<boolean>(true);
   const [showOfflineBanner, setShowOfflineBanner] = useState<boolean>(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
   const [syncRetryTrigger, setSyncRetryTrigger] = useState<number>(0);
 
@@ -238,58 +244,51 @@ export default function App() {
   const [sheetsSyncLogs, setSheetsSyncLogs] = useState<string[]>(['Inizializzato logger di sincronizzazione.']);
 
   // Google Drive integration state
-  const [googleUser, setGoogleUser] = useState<any>(() => {
-    try {
-      const saved = localStorage.getItem('forfettario_google_user_v1');
-      return saved ? JSON.parse(saved) : null;
-    } catch (_) {
-      return null;
-    }
-  });
-  const [googleAccessTokenState, setGoogleAccessTokenState] = useState<string | null>(() => {
-    try {
-      const saved = localStorage.getItem('forfettario_google_token_v1');
-      if (saved) {
-        setGoogleAccessToken(saved);
-      }
-      return saved;
-    } catch (_) {
-      return null;
-    }
-  });
+  const [googleUser, setGoogleUser] = useState<any>(null);
+  const [googleAccessTokenState, setGoogleAccessTokenState] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      if (googleUser) {
-        localStorage.setItem('forfettario_google_user_v1', JSON.stringify(googleUser));
-      } else {
-        localStorage.removeItem('forfettario_google_user_v1');
+    const unsubscribe = initAuth(
+      (user, token) => {
+        setGoogleUser({ email: user.email, photoURL: user.photoURL, uid: user.uid });
+        setGoogleAccessTokenState(token);
+      },
+      () => {
+        setGoogleUser(null);
+        setGoogleAccessTokenState(null);
       }
-    } catch (_) {}
-  }, [googleUser]);
-
-  useEffect(() => {
-    try {
-      if (googleAccessTokenState) {
-        localStorage.setItem('forfettario_google_token_v1', googleAccessTokenState);
-        setGoogleAccessToken(googleAccessTokenState);
-      } else {
-        localStorage.removeItem('forfettario_google_token_v1');
-        setGoogleAccessToken(null);
-      }
-    } catch (_) {}
-  }, [googleAccessTokenState]);
+    );
+    return () => unsubscribe();
+  }, []);
 
   const handleGoogleLogin = async () => {
-    safeAlert("La funzionalità di autenticazione Google è momentaneamente disabilitata per manutenzione.");
+    try {
+      addSyncLog("Autenticazione con Google in corso...");
+      const result = await googleSignIn();
+      if (result) {
+        setGoogleUser({ email: result.user.email, photoURL: result.user.photoURL, uid: result.user.uid });
+        setGoogleAccessTokenState(result.accessToken);
+        addSyncLog("✅ Google Drive connesso.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      safeAlert("Errore durante l'autenticazione: " + err.message);
+    }
   };
 
   const handleGoogleLogout = async () => {
-    //
+    try {
+      await firebaseLogout();
+      setGoogleUser(null);
+      setGoogleAccessTokenState(null);
+      addSyncLog("🔙 Disconnesso da Google Drive.");
+    } catch (err: any) {
+      safeAlert("Errore durante il logout: " + err.message);
+    }
   };
 
   const handleCreateFolderForActivePosition = async () => {
-    const token = getGoogleAccessToken() || googleAccessTokenState;
+    const token = googleAccessTokenState;
     if (!token) {
       addSyncLog("⚠️ Connetti prima Google Drive per creare la cartella.");
       return;
@@ -320,7 +319,7 @@ export default function App() {
   };
 
   const handleAssociateDriveFolder = async (folderId: string, folderUrl: string) => {
-    const token = getGoogleAccessToken() || googleAccessTokenState;
+    const token = googleAccessTokenState;
     if (!token) {
       addSyncLog("⚠️ Connetti prima Google Drive.");
       return;
@@ -368,7 +367,7 @@ export default function App() {
     if (!activePosition) {
       throw new Error("Nessuna posizione contabile attiva selezionata.");
     }
-    const token = getGoogleAccessToken() || googleAccessTokenState;
+    const token = googleAccessTokenState;
     if (!token) {
       throw new Error("Sincronizzazione Drive non attiva: Google Drive non connesso.");
     }
@@ -412,7 +411,7 @@ export default function App() {
       throw new Error("ID Cartella Drive principale non disponibile.");
     }
 
-    await uploadInvoiceXml(token, parentFolderId, file, targetFattureFolderId);
+    return await uploadInvoiceXml(token, parentFolderId, file, targetFattureFolderId);
   };
 
   const pickerCallback = async (data: any, token: string) => {
@@ -508,7 +507,7 @@ export default function App() {
     if (!activePosition) {
       throw new Error("Nessuna posizione contabile attiva selezionata.");
     }
-    const token = getGoogleAccessToken() || googleAccessTokenState;
+    const token = googleAccessTokenState;
     if (!token) {
       addSyncLog("⚠️ Connetti prima Google Drive per caricare i file F24.");
       throw new Error("Google Drive non connesso.");
@@ -582,7 +581,7 @@ export default function App() {
   };
 
   const handleDeleteF24Pdf = async (fileId: string) => {
-    const token = getGoogleAccessToken() || googleAccessTokenState;
+    const token = googleAccessTokenState;
     if (!token) {
       addSyncLog("⚠️ Connettiti a Google Drive per eliminare il file anche sul cloud.");
     }
@@ -731,7 +730,7 @@ export default function App() {
       newPosition.fileGenericiFolderId = folderInfo.fileGenericiFolderId;
       addSyncLog(`✅ Cartella principale "Forfettario ${newProfile.fullName}" e relative sottocartelle associate all'anagrafica.`);
     } else {
-      const token = getGoogleAccessToken();
+      const token = googleAccessTokenState;
       if (token) {
         addSyncLog(`📁 Connessione a Google Drive in corso per creare la cartella "Forfettario ${newProfile.fullName}"...`);
         try {
@@ -798,7 +797,7 @@ export default function App() {
   const handleDeleteInvoice = async (id: string) => {
     const invoiceToDelete = allInvoices.find((inv) => inv.id === id);
     if (invoiceToDelete?.driveFileId) {
-      const token = getGoogleAccessToken() || googleAccessTokenState;
+      const token = googleAccessTokenState;
       if (token) {
         try {
           await deleteDriveFile(token, invoiceToDelete.driveFileId);
@@ -1267,7 +1266,7 @@ export default function App() {
                   driveFolderCreated={!!activePosition?.driveFolderId}
                   isUnselected={!isPositionSelected}
                   onCreateDriveFolder={async () => {
-                    const token = getGoogleAccessToken() || googleAccessTokenState;
+                    const token = googleAccessTokenState;
                     if (!token) {
                       safeAlert("Connetti prima Google Drive dall'apposito pulsante nell'header in alto a destra.");
                       return;

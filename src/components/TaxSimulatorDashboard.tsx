@@ -48,7 +48,7 @@ interface TaxSimulatorDashboardProps {
   onDeleteInvoice?: (id: string) => void;
   onAddF24Entries?: (newEntries: any[]) => void;
   onDeleteF24Entry?: (id: string) => void;
-  onUploadInvoiceXmlToDrive?: (file: File) => Promise<void>;
+  onUploadInvoiceXmlToDrive?: (file: File) => Promise<{name: string, id: string, url: string, dateAdded: string}>;
 }
 
 export default function TaxSimulatorDashboard({ 
@@ -111,6 +111,19 @@ export default function TaxSimulatorDashboard({
           invoiceDate = `${selectedYear}-01-01`;
         }
 
+        let driveFileId: string | undefined;
+        let driveFileUrl: string | undefined;
+
+        if (onUploadInvoiceXmlToDrive) {
+          const safeNumber = parsed.number.replace(/[^a-zA-Z0-9]/g, '_');
+          const safeDate = invoiceDate.replace(/[^0-9-]/g, '');
+          const newName = `Fattura_${safeNumber}_${safeDate}.xml`;
+          const renamedFile = new File([file], newName, { type: file.type });
+          const uploadedFileResult = await onUploadInvoiceXmlToDrive(renamedFile);
+          driveFileId = uploadedFileResult.id;
+          driveFileUrl = uploadedFileResult.url;
+        }
+
         onAddInvoice({
           date: invoiceDate,
           number: parsed.number,
@@ -120,10 +133,9 @@ export default function TaxSimulatorDashboard({
           amount: parsed.amount,
           isPaid: true,
           notes: parsed.notes,
+          driveFileId: driveFileId,
+          driveFileUrl: driveFileUrl,
         });
-        if (onUploadInvoiceXmlToDrive) {
-          await onUploadInvoiceXmlToDrive(file);
-        }
       }
     } catch (err: any) {
       safeAlert("Errore validazione XML: " + err.message);

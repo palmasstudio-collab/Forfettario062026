@@ -61,6 +61,7 @@ export interface Invoice {
   hasStampDuty: boolean; // 2€ stamp duty (Marca da bollo) if amount > 77.47€
   notes?: string;
   driveFileId?: string;
+  driveFileUrl?: string;
 }
 
 export interface BusinessProfile {

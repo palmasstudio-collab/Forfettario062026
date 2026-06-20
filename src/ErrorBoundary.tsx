@@ -10,7 +10,7 @@ interface State {
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
+  public override state: State = {
     hasError: false,
     error: null
   };
@@ -38,6 +38,6 @@ export class ErrorBoundary extends Component<Props, State> {
         </div>
       );
     }
-    return (this.props as Props).children;
+    return (this as any).props.children;
   }
 }
