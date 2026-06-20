@@ -11,6 +11,8 @@ interface DriveFile {
   id: string;
   name: string;
   webViewLink?: string;
+  mimeType?: string;
+  url?: string;
 }
 
 // ID Fisso richiesto per la root cartella "forfettari"
@@ -433,3 +435,65 @@ export async function uploadInvoiceXml(
   }
 }
 
+
+export async function listFilesInFolder(accessToken: string, folderId: string): Promise<DriveFile[]> {
+  try {
+    const q = `'${folderId}' in parents and trashed = false`;
+    const url = new URL('https://www.googleapis.com/drive/v3/files');
+    url.searchParams.append('q', q);
+    url.searchParams.append('fields', 'files(id, name, webViewLink, mimeType, webContentLink)');
+
+    const res = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Errore reperimento file: ${await res.text()}`);
+    }
+
+    const data = await res.json();
+    return (data.files || []).map((f: any) => ({
+      id: f.id,
+      name: f.name,
+      url: f.webViewLink || f.webContentLink,
+      dateAdded: new Date().toISOString().split('T')[0],
+      mimeType: f.mimeType
+    }));
+  } catch (error) {
+    console.error("Error listing files in folder:", error);
+    throw error;
+  }
+}
+
+export async function downloadFileContent(accessToken: string, fileId: string): Promise<string> {
+  const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Errore nel download del file ${fileId}: ${await res.text()}`);
+  }
+
+  return await res.text();
+}
+
+export async function renameDriveFile(accessToken: string, fileId: string, newName: string): Promise<void> {
+  const url = `https://www.googleapis.com/drive/v3/files/${fileId}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name: newName }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Errore durante la rinominazione del file: ${await res.text()}`);
+  }
+}

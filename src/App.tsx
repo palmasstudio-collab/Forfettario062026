@@ -9,7 +9,8 @@ import BusinessProfileCard from './components/BusinessProfileCard';
 import TaxSimulatorDashboard from './components/TaxSimulatorDashboard';
 import AccountingPositionModal from './components/AccountingPositionModal';
 import DeletePositionModal from './components/DeletePositionModal';
-import { createAccountingPositionFolder, uploadF24Pdf, deleteDriveFile, uploadFirebaseBackupToDrive, findOrCreateFolder, uploadInvoiceXml, listDriveFolders } from './utils/googleDrive';
+import { createAccountingPositionFolder, uploadF24Pdf, deleteDriveFile, uploadFirebaseBackupToDrive, findOrCreateFolder, uploadInvoiceXml, listDriveFolders, listFilesInFolder, downloadFileContent, renameDriveFile } from './utils/googleDrive';
+import { parseInvoiceXml } from './utils/xmlInvoiceParser';
 import { calculateTaxReturn } from './calculateTaxReturn';
 import { findAtecoCode, findPensionFund } from './taxData';
 import { safeAlert, safeConfirm } from './utils/safeWindow';
@@ -703,6 +704,108 @@ export default function App() {
     localStorage.setItem(LOCAL_STORAGE_ACTIVE_POSITION_ID_KEY, activePositionId);
   }, [activePositionId]);
 
+  // Provide a boolean state to track sync
+  const [isSyncingDriveList, setIsSyncingDriveList] = useState(false);
+
+  const handleDriveInvoiceSync = async () => {
+    if (!activePosition) return;
+    const token = googleAccessTokenState;
+    if (!token) {
+      addSyncLog("⚠️ Non sei connesso a Google Drive, impossibile effettuare sync fatture.");
+      return;
+    }
+    const folderId = activePosition.fattureEmesseFolderId;
+    if (!folderId) {
+      addSyncLog("⚠️ La cartella Fatture Emesse Drive non è ancora creata. Carica una prima fattura da UI.");
+      return;
+    }
+
+    setIsSyncingDriveList(true);
+    addSyncLog("🔄 Scansione cartella Fatture su Drive in corso...");
+
+    try {
+      const driveFiles = await listFilesInFolder(token, folderId);
+      
+      const currentInvoices = activePosition.invoices || [];
+      const driveFilesMap = new Map(driveFiles.map(f => [f.id, f]));
+      const newInvoicesList: Invoice[] = [];
+      const unlinkedDriveFiles = [...driveFiles];
+
+      let changed = false;
+
+      for (const inv of currentInvoices) {
+        if (inv.driveFileId) {
+           if (!driveFilesMap.has(inv.driveFileId)) {
+             addSyncLog(`🗑️ Fattura "${inv.number}" eliminata da Drive, rimuovo da gestionale.`);
+             changed = true;
+           } else {
+             newInvoicesList.push(inv);
+             const unlinkedIndex = unlinkedDriveFiles.findIndex(f => f.id === inv.driveFileId);
+             if (unlinkedIndex > -1) unlinkedDriveFiles.splice(unlinkedIndex, 1);
+           }
+        } else {
+           newInvoicesList.push(inv);
+        }
+      }
+
+      for (const f of unlinkedDriveFiles) {
+        if (!f.mimeType.includes("xml")) {
+          // ignore non-xml added manually
+          continue; 
+        }
+        addSyncLog(`📄 Trovata nuova fattura su Drive: ${f.name}. Tento la lettura...`);
+        try {
+          const content = await downloadFileContent(token, f.id);
+          const parsed = parseInvoiceXml(content);
+          if (parsed) {
+             let invoiceDate = parsed.date;
+             if (invoiceDate && !invoiceDate.startsWith(selectedYear)) {
+               const parts = invoiceDate.split('-');
+               if (parts.length === 3) invoiceDate = `${selectedYear}-${parts[1]}-${parts[2]}`;
+             } else if (!invoiceDate) {
+               invoiceDate = `${selectedYear}-01-01`;
+             }
+
+             const safeNumber = parsed.number.replace(/[^a-zA-Z0-9]/g, '_');
+             const safeDate = invoiceDate.replace(/[^0-9-]/g, '');
+             const newName = `Fattura_${safeNumber}_${safeDate}.xml`;
+
+             if (f.name !== newName) {
+               await renameDriveFile(token, f.id, newName);
+               addSyncLog(`✏️ File rinominato automaticamente in ${newName}`);
+             }
+
+             newInvoicesList.push({
+               id: `inv-dr-${f.id}`,
+               date: invoiceDate,
+               number: parsed.number,
+               clientName: parsed.clientName,
+               clientVat: parsed.clientVat || '',
+               hasStampDuty: parsed.hasStampDuty || false,
+               amount: parsed.amount,
+               isPaid: true,
+               notes: parsed.notes,
+               driveFileId: f.id,
+               driveFileUrl: f.url
+             });
+             changed = true;
+          }
+        } catch (e: any) {
+          addSyncLog(`⚠️ Impossibile leggere il contenuto del file ${f.name}: ` + e.message);
+        }
+      }
+
+      if (changed) {
+        setInvoices(newInvoicesList);
+      }
+      addSyncLog("✅ Sincronizzazione cartella Fatture Drive completata!");
+    } catch(err: any) {
+      addSyncLog("❌ Errore durante la scansione di Drive: " + err.message);
+    } finally {
+      setIsSyncingDriveList(false);
+    }
+  };
+
   const handleCreatePosition = async (
     name: string, 
     newProfile: BusinessProfile, 
@@ -1312,6 +1415,8 @@ export default function App() {
                       onAddF24Entries={handleAddF24Entries}
                       onDeleteF24Entry={handleDeleteF24Entry}
                       onUploadInvoiceXmlToDrive={handleUploadInvoiceXmlToDrive}
+                      onSyncDriveInvoices={handleDriveInvoiceSync}
+                      isSyncingDriveInvoices={isSyncingDriveList}
                     />
                   </>
                 )}

@@ -26,7 +26,8 @@ import {
   AlertTriangle,
   ExternalLink,
   FolderOpen,
-  Key
+  Key,
+  RefreshCw
 } from 'lucide-react';
 import { generateTaxAndInvoicePDF } from '../utils/pdfGenerator';
 
@@ -49,6 +50,8 @@ interface TaxSimulatorDashboardProps {
   onAddF24Entries?: (newEntries: any[]) => void;
   onDeleteF24Entry?: (id: string) => void;
   onUploadInvoiceXmlToDrive?: (file: File) => Promise<{name: string, id: string, url: string, dateAdded: string}>;
+  onSyncDriveInvoices?: () => Promise<void>;
+  isSyncingDriveInvoices?: boolean;
 }
 
 export default function TaxSimulatorDashboard({ 
@@ -69,7 +72,9 @@ export default function TaxSimulatorDashboard({
   onDeleteInvoice,
   onAddF24Entries,
   onDeleteF24Entry,
-  onUploadInvoiceXmlToDrive
+  onUploadInvoiceXmlToDrive,
+  onSyncDriveInvoices,
+  isSyncingDriveInvoices = false
 }: TaxSimulatorDashboardProps) {
   // Calcolo dei contributi inseriti dagli F24 per l'anno selezionato
   const excludedTaxCodes = ['2501', '2524'];
@@ -90,55 +95,57 @@ export default function TaxSimulatorDashboard({
   const [yearOfActivity, setYearOfActivity] = useState<number>(1);
 
   const handleXmlUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !onAddInvoice) return;
+    const files = e.target.files;
+    if (!files || files.length === 0 || !onAddInvoice) return;
     setIsProcessingXml(true);
     try {
-      const text = await file.text();
-      const parsed = parseInvoiceXml(text);
-      if (parsed) {
-        // Safe check to verify if the invoice belongs to the selectedYear. 
-        // If not, we map/force its prefix to selectedYear so it counts in the current active simulation.
-        let invoiceDate = parsed.date;
-        if (invoiceDate && !invoiceDate.startsWith(selectedYear)) {
-          const parts = invoiceDate.split('-');
-          if (parts.length === 3) {
-            invoiceDate = `${selectedYear}-${parts[1]}-${parts[2]}`;
-          } else {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const text = await file.text();
+        const parsed = parseInvoiceXml(text);
+        if (parsed) {
+          // Safe check to verify if the invoice belongs to the selectedYear. 
+          let invoiceDate = parsed.date;
+          if (invoiceDate && !invoiceDate.startsWith(selectedYear)) {
+            const parts = invoiceDate.split('-');
+            if (parts.length === 3) {
+              invoiceDate = `${selectedYear}-${parts[1]}-${parts[2]}`;
+            } else {
+              invoiceDate = `${selectedYear}-01-01`;
+            }
+          } else if (!invoiceDate) {
             invoiceDate = `${selectedYear}-01-01`;
           }
-        } else if (!invoiceDate) {
-          invoiceDate = `${selectedYear}-01-01`;
+
+          let driveFileId: string | undefined;
+          let driveFileUrl: string | undefined;
+
+          if (onUploadInvoiceXmlToDrive) {
+            const safeNumber = parsed.number.replace(/[^a-zA-Z0-9]/g, '_');
+            const safeDate = invoiceDate.replace(/[^0-9-]/g, '');
+            const newName = `Fattura_${safeNumber}_${safeDate}.xml`;
+            const renamedFile = new File([file], newName, { type: file.type });
+            const uploadedFileResult = await onUploadInvoiceXmlToDrive(renamedFile);
+            driveFileId = uploadedFileResult.id;
+            driveFileUrl = uploadedFileResult.url;
+          }
+
+          onAddInvoice({
+            date: invoiceDate,
+            number: parsed.number,
+            clientName: parsed.clientName,
+            clientVat: parsed.clientVat || '',
+            hasStampDuty: parsed.hasStampDuty || false,
+            amount: parsed.amount,
+            isPaid: true,
+            notes: parsed.notes,
+            driveFileId: driveFileId,
+            driveFileUrl: driveFileUrl,
+          });
         }
-
-        let driveFileId: string | undefined;
-        let driveFileUrl: string | undefined;
-
-        if (onUploadInvoiceXmlToDrive) {
-          const safeNumber = parsed.number.replace(/[^a-zA-Z0-9]/g, '_');
-          const safeDate = invoiceDate.replace(/[^0-9-]/g, '');
-          const newName = `Fattura_${safeNumber}_${safeDate}.xml`;
-          const renamedFile = new File([file], newName, { type: file.type });
-          const uploadedFileResult = await onUploadInvoiceXmlToDrive(renamedFile);
-          driveFileId = uploadedFileResult.id;
-          driveFileUrl = uploadedFileResult.url;
-        }
-
-        onAddInvoice({
-          date: invoiceDate,
-          number: parsed.number,
-          clientName: parsed.clientName,
-          clientVat: parsed.clientVat || '',
-          hasStampDuty: parsed.hasStampDuty || false,
-          amount: parsed.amount,
-          isPaid: true,
-          notes: parsed.notes,
-          driveFileId: driveFileId,
-          driveFileUrl: driveFileUrl,
-        });
       }
     } catch (err: any) {
-      safeAlert("Errore validazione XML: " + err.message);
+      safeAlert("Errore elaborazione XML: " + err.message);
     } finally {
       setIsProcessingXml(false);
       if (xmlInputRef.current) xmlInputRef.current.value = '';
@@ -336,6 +343,7 @@ export default function TaxSimulatorDashboard({
                 <input
                   ref={xmlInputRef}
                   type="file"
+                  multiple
                   accept=".xml"
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed text-[0px]"
                   onChange={handleXmlUpload}
@@ -353,7 +361,23 @@ export default function TaxSimulatorDashboard({
               {/* Riepilogo Fatture Caricate */}
               <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100 flex-1 flex flex-col">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider">Fatture Caricate ({invoices.length})</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider">Fatture Caricate ({invoices.length})</h4>
+                    {googleConnected && onSyncDriveInvoices && (
+                      <button 
+                        onClick={onSyncDriveInvoices} 
+                        disabled={isSyncingDriveInvoices}
+                        className="text-slate-400 hover:text-sky-500 disabled:opacity-50 transition-colors"
+                        title="Sincronizza fatture con Google Drive"
+                      >
+                        {isSyncingDriveInvoices ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+                  </div>
                   <span className="text-xs font-mono font-bold text-slate-900 bg-sky-100/60 px-2 py-0.5 rounded-md">
                     Tot: € {invoices.reduce((sum, inv) => sum + inv.amount, 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
