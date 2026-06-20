@@ -35,6 +35,7 @@ interface TaxSimulatorDashboardProps {
   profile: BusinessProfile;
   revenue: number; // calculated from paid invoices
   invoices: Invoice[];
+  allInvoices?: Invoice[];
   googleConnected?: boolean;
   driveFolderId?: string;
   driveFolderUrl?: string;
@@ -44,6 +45,7 @@ interface TaxSimulatorDashboardProps {
   onConnectGoogle?: () => void;
   hideCalculationsBreakdown?: boolean;
   f24Entries?: F24Entry[];
+  allF24Entries?: F24Entry[];
   selectedYear: string;
   onAddInvoice?: (newInvoice: Omit<Invoice, 'id'>) => void;
   onDeleteInvoice?: (id: string) => void;
@@ -58,8 +60,10 @@ export default function TaxSimulatorDashboard({
   profile, 
   revenue, 
   invoices,
+  allInvoices = [],
   hideCalculationsBreakdown = false,
   f24Entries = [],
+  allF24Entries = [],
   selectedYear,
   onUploadF24,
   onDeleteF24,
@@ -99,21 +103,33 @@ export default function TaxSimulatorDashboard({
     if (!files || files.length === 0 || !onAddInvoice) return;
     setIsProcessingXml(true);
     try {
+      const recentlyAdded = new Set<string>();
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const text = await file.text();
         const parsed = parseInvoiceXml(text);
         if (parsed) {
+          const duplicateKey = `${parsed.number}-${parsed.clientVat || parsed.clientName}`;
+          let isDuplicate = invoices.some(inv => 
+             inv.number === parsed.number &&
+             (inv.clientVat === parsed.clientVat || inv.clientName === parsed.clientName)
+          );
+
+          if (!isDuplicate && recentlyAdded.has(duplicateKey)) {
+             isDuplicate = true;
+          }
+
+          if (isDuplicate) {
+             const confirm = safeConfirm(`Attenzione: La fattura N. ${parsed.number} intestata a ${parsed.clientName} sembra essere già presente in questo anno o in questo caricamento.\nVuoi caricarla comunque prima di procedere?`);
+             if (!confirm) continue;
+          }
+          
+          recentlyAdded.add(duplicateKey);
+
           // Safe check to verify if the invoice belongs to the selectedYear. 
           let invoiceDate = parsed.date;
-          if (invoiceDate && !invoiceDate.startsWith(selectedYear)) {
-            const parts = invoiceDate.split('-');
-            if (parts.length === 3) {
-              invoiceDate = `${selectedYear}-${parts[1]}-${parts[2]}`;
-            } else {
-              invoiceDate = `${selectedYear}-01-01`;
-            }
-          } else if (!invoiceDate) {
+          if (!invoiceDate) {
             invoiceDate = `${selectedYear}-01-01`;
           }
 
@@ -209,6 +225,37 @@ export default function TaxSimulatorDashboard({
   const contributionPercentage = revenue > 0 ? (results.currentYearContributions / revenue) * 100 : 0;
   const netPercentage = revenue > 0 ? (results.netIncome / revenue) * 100 : 100;
 
+  const handleGeneratePDFClick = () => {
+    const yearToExport = window.prompt("Seleziona l'anno di competenza per la generazione del report:", selectedYear);
+    if (!yearToExport) return;
+
+    if (yearToExport === selectedYear) {
+       generateTaxAndInvoicePDF(profile, invoices, results, selectedAteco, selectedFund, yearOfActivity);
+       return;
+    }
+
+    const filteredInvoices = allInvoices.filter((inv) => inv.date && inv.date.startsWith(yearToExport));
+    const filteredF24 = allF24Entries.filter((e) => e.date && e.date.startsWith(yearToExport));
+    
+    const targetRevenue = filteredInvoices.filter(i => i.isPaid).reduce((sum, inv) => sum + inv.amount, 0);
+    const targetPrevYearContributions = filteredF24.reduce((sum, e) => {
+       if (excludedTaxCodes.includes(e.taxCode)) return sum;
+       return sum + e.amount;
+    }, 0);
+
+    const targetInput: TaxInput = {
+       revenue: targetRevenue,
+       atecoCode: profile.atecoCode,
+       pensionFund: profile.pensionFund,
+       contributionsPaidPreviousYear: targetPrevYearContributions,
+       isStartup: profile.isStartup,
+       yearOfActivity
+    };
+    const targetResults = calculateTaxReturn(targetInput);
+
+    generateTaxAndInvoicePDF(profile, filteredInvoices, targetResults, selectedAteco, selectedFund, yearOfActivity);
+  };
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in" id="tax-simulator-dashboard">
       
@@ -224,7 +271,7 @@ export default function TaxSimulatorDashboard({
           </div>
         </div>
         <button
-          onClick={() => generateTaxAndInvoicePDF(profile, invoices, results, selectedAteco, selectedFund, yearOfActivity)}
+          onClick={handleGeneratePDFClick}
           className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm w-full sm:w-auto shrink-0"
           id="btn-export-pdf-main"
         >

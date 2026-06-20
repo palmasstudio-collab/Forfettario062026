@@ -99,16 +99,24 @@ export async function uploadF24Pdf(
   parentPositionFolderId: string,
   file: File,
   clientName?: string,
-  customF24FolderId?: string
+  customF24FolderId?: string,
+  year?: string
 ): Promise<{ name: string; id: string; url: string; dateAdded: string }> {
   try {
     if (accessToken.includes('mock-')) {
       throw new Error("Simulated auth token bypass");
     }
     // 1. Use existing or find/create the dedicated "F24" subfolder inside the position folder
-    const f24FolderId = customF24FolderId && customF24FolderId.trim() !== ''
-      ? customF24FolderId
-      : (await findOrCreateFolder(accessToken, 'F24', parentPositionFolderId)).id;
+    let f24FolderId = '';
+    if (year) {
+      const yearFolder = await findOrCreateFolder(accessToken, `Anno ${year}`, parentPositionFolderId);
+      const subFolder = await findOrCreateFolder(accessToken, 'F24', yearFolder.id);
+      f24FolderId = subFolder.id;
+    } else {
+      f24FolderId = customF24FolderId && customF24FolderId.trim() !== ''
+        ? customF24FolderId
+        : (await findOrCreateFolder(accessToken, 'F24', parentPositionFolderId)).id;
+    }
 
     // 2. Format the file name dynamically
     const safeDate = new Date().toISOString().split('T')[0];
@@ -217,10 +225,13 @@ export async function createAccountingPositionFolder(
     const finalFolderTitle = `Forfettario ${cleanedFullName || positionName.trim() || 'Senza Nome'}`;
     const childFolder = await findOrCreateFolder(accessToken, finalFolderTitle, parent);
 
-    // Create the 3 specific subfolders inside the main folder
-    const fattureFolder = await findOrCreateFolder(accessToken, 'Fatture Emesse', childFolder.id);
-    const f24Folder = await findOrCreateFolder(accessToken, 'F24', childFolder.id);
-    const fileGenericiFolder = await findOrCreateFolder(accessToken, 'File Generici', childFolder.id);
+    // Create the Year subfolder inside the main folder
+    const yearFolder = await findOrCreateFolder(accessToken, `Anno ${year}`, childFolder.id);
+
+    // Create the 3 specific subfolders inside the Year subfolder
+    const fattureFolder = await findOrCreateFolder(accessToken, 'Fatture Emesse', yearFolder.id);
+    const f24Folder = await findOrCreateFolder(accessToken, 'F24', yearFolder.id);
+    const fileGenericiFolder = await findOrCreateFolder(accessToken, 'File Generici', yearFolder.id);
 
     return {
       id: childFolder.id,
@@ -318,15 +329,17 @@ export async function uploadFirebaseBackupToDrive(
 export async function deleteDriveFile(accessToken: string, fileId: string): Promise<void> {
   const url = `https://www.googleapis.com/drive/v3/files/${fileId}`;
   const res = await fetch(url, {
-    method: 'DELETE',
+    method: 'PATCH',
     headers: {
       Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
     },
+    body: JSON.stringify({ trashed: true }),
   });
 
   if (!res.ok && res.status !== 404) {
     const errText = await res.text();
-    throw new Error(`Errore durante l'eliminazione del file su Drive: ${errText}`);
+    throw new Error(`Errore durante lo spostamento del file nel cestino di Drive: ${errText}`);
   }
 }
 
@@ -356,16 +369,24 @@ export async function uploadInvoiceXml(
   accessToken: string,
   parentPositionFolderId: string,
   file: File,
-  customFattureFolderId?: string
+  customFattureFolderId?: string,
+  year?: string
 ): Promise<{ name: string; id: string; url: string; dateAdded: string }> {
   try {
     if (accessToken.includes('mock-')) {
       throw new Error("Simulated auth token bypass");
     }
     // 1. Use existing or find/create the dedicated "Fatture Emesse" subfolder inside the position folder
-    const invoicesFolderId = customFattureFolderId && customFattureFolderId.trim() !== ''
-      ? customFattureFolderId
-      : (await findOrCreateFolder(accessToken, 'Fatture Emesse', parentPositionFolderId)).id;
+    let invoicesFolderId = '';
+    if (year) {
+      const yearFolder = await findOrCreateFolder(accessToken, `Anno ${year}`, parentPositionFolderId);
+      const subFolder = await findOrCreateFolder(accessToken, 'Fatture Emesse', yearFolder.id);
+      invoicesFolderId = subFolder.id;
+    } else {
+      invoicesFolderId = customFattureFolderId && customFattureFolderId.trim() !== ''
+        ? customFattureFolderId
+        : (await findOrCreateFolder(accessToken, 'Fatture Emesse', parentPositionFolderId)).id;
+    }
 
     // 2. Create the metadata
     const metadataUrl = 'https://www.googleapis.com/drive/v3/files?fields=id,name,webViewLink';

@@ -412,7 +412,7 @@ export default function App() {
       throw new Error("ID Cartella Drive principale non disponibile.");
     }
 
-    return await uploadInvoiceXml(token, parentFolderId, file, targetFattureFolderId);
+    return await uploadInvoiceXml(token, parentFolderId, file, targetFattureFolderId, selectedYear);
   };
 
   const pickerCallback = async (data: any, token: string) => {
@@ -555,7 +555,7 @@ export default function App() {
 
     addSyncLog(`⏱️ Inizio caricamento del file F24 "${file.name}" su Drive...`);
     try {
-      const uploadedFile = await uploadF24Pdf(token, parentFolderId, file, activePosition.profile.fullName, targetF24FolderId);
+      const uploadedFile = await uploadF24Pdf(token, parentFolderId, file, activePosition.profile.fullName, targetF24FolderId, selectedYear);
       
       // Update the active position's f24 list
       setPositions((prev) =>
@@ -714,14 +714,26 @@ export default function App() {
       addSyncLog("⚠️ Non sei connesso a Google Drive, impossibile effettuare sync fatture.");
       return;
     }
-    const folderId = activePosition.fattureEmesseFolderId;
+    let folderId = activePosition.fattureEmesseFolderId;
+    const parentFolderId = activePosition.driveFolderId;
+    if (parentFolderId) {
+      addSyncLog(`📁 Risoluzione automatica della cartella per l'anno ${selectedYear}...`);
+      try {
+        const yearFolder = await findOrCreateFolder(token, `Anno ${selectedYear}`, parentFolderId);
+        const subFolder = await findOrCreateFolder(token, 'Fatture Emesse', yearFolder.id);
+        folderId = subFolder.id;
+      } catch (err: any) {
+        console.warn("Utilizzo del fallback per la ricerca cartella:", err);
+      }
+    }
+
     if (!folderId) {
       addSyncLog("⚠️ La cartella Fatture Emesse Drive non è ancora creata. Carica una prima fattura da UI.");
       return;
     }
 
     setIsSyncingDriveList(true);
-    addSyncLog("🔄 Scansione cartella Fatture su Drive in corso...");
+    addSyncLog(`🔄 Scansione cartella Fatture (${selectedYear}) su Drive in corso...`);
 
     try {
       const driveFiles = await listFilesInFolder(token, folderId);
@@ -759,10 +771,7 @@ export default function App() {
           const parsed = parseInvoiceXml(content);
           if (parsed) {
              let invoiceDate = parsed.date;
-             if (invoiceDate && !invoiceDate.startsWith(selectedYear)) {
-               const parts = invoiceDate.split('-');
-               if (parts.length === 3) invoiceDate = `${selectedYear}-${parts[1]}-${parts[2]}`;
-             } else if (!invoiceDate) {
+             if (!invoiceDate) {
                invoiceDate = `${selectedYear}-01-01`;
              }
 
@@ -892,9 +901,19 @@ export default function App() {
   const handleAddInvoice = (newInvoice: Omit<Invoice, 'id'>) => {
     const invoiceWithId: Invoice = {
       ...newInvoice,
-      id: `inv-${Date.now()}`,
+      id: `inv-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
     };
-    setInvoices([invoiceWithId, ...allInvoices]);
+    
+    setPositions((prev) =>
+      prev.map((pos) => {
+        if (pos.id === activePositionId) {
+          const currentInvoices = pos.invoices || [];
+          // Verify it's not already added if there was a duplicate
+          return { ...pos, invoices: [invoiceWithId, ...currentInvoices] };
+        }
+        return pos;
+      })
+    );
   };
 
   const handleDeleteInvoice = async (id: string) => {
@@ -949,7 +968,7 @@ export default function App() {
     localStorage.setItem(LOCAL_STORAGE_POSITIONS_KEY, JSON.stringify(positions));
     localStorage.setItem(LOCAL_STORAGE_ACTIVE_POSITION_ID_KEY, activePositionId);
     setSyncRetryTrigger(prev => prev + 1);
-    if (typeof window !== 'undefined') window.location.reload();
+    safeAlert("Modifiche salvate con successo.");
   };
 
   const totalPaidRevenue = invoices
@@ -1401,6 +1420,7 @@ export default function App() {
                       profile={profile} 
                       revenue={totalPaidRevenue} 
                       invoices={invoices} 
+                      allInvoices={allInvoices}
                       googleConnected={!!googleUser}
                       driveFolderId={activePosition?.driveFolderId}
                       driveFolderUrl={activePosition?.driveFolderUrl}
@@ -1409,6 +1429,7 @@ export default function App() {
                       onDeleteF24={handleDeleteF24Pdf}
                       onConnectGoogle={handleGoogleLogin}
                       f24Entries={f24Entries}
+                      allF24Entries={allF24Entries}
                       selectedYear={selectedYear}
                       onAddInvoice={handleAddInvoice}
                       onDeleteInvoice={handleDeleteInvoice}
