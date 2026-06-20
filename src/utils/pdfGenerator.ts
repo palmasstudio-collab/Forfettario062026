@@ -168,8 +168,9 @@ export function generateTaxAndInvoicePDF(
   doc.text(`€ ${results.grossTaxableIncome.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - marginX - 5, boxY, { align: 'right' });
   doc.setFont('Helvetica', 'normal');
 
-  boxY += 6;
-  doc.text('Contributi Previdenziali Versati Anno Precedente (Dedotti):', marginX + 5, boxY);
+  boxY += 1;
+  boxY += 5;
+  doc.text("Contributi Previdenziali Versati nell'Anno (Cassa/Dedotti):", marginX + 5, boxY);
   doc.setFont('Helvetica', 'bold');
   doc.text(`- € ${results.deductibleContributions.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - marginX - 5, boxY, { align: 'right' });
   doc.setFont('Helvetica', 'normal');
@@ -233,9 +234,23 @@ export function generateTaxAndInvoicePDF(
   drawQuadroRow('Contributi previdenziali deducibili per cassa', 'LM35', `€ ${results.deductibleContributions.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
   drawQuadroRow('Reddito Imponibile Netto Autonomo', 'LM36', `€ ${results.netTaxableIncome.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
   drawQuadroRow(`Imposta Sostitutiva Dovuta (${(results.taxRate * 100).toFixed(0)}%)`, 'LM39 col. 1', `€ ${results.substituteTax.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
-  drawQuadroRow(`Cassa di Appartenenza con aliquota ${(selectedFund.rate * 100).toFixed(2)}%`, 'RR Sez. II', selectedFund.id);
-  drawQuadroRow('Base Imponibile dei Contributi Quadro RR', 'RR col. 4', `€ ${results.grossTaxableIncome.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
-  drawQuadroRow(`Quota di Contribuzione Previdenziale Corrente`, 'RR col. 5', `€ ${results.currentYearContributions.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
+  
+  if (results.isSectionI) {
+    drawQuadroRow('Reddito d\'impresa', 'RR2 col. 1', `€ ${results.rr2Col1?.toLocaleString('it-IT', { minimumFractionDigits: 2 }) || '0,00'}`);
+    drawQuadroRow('Reddito minimale', 'RR2 col. 2', `€ ${results.rr2Col2?.toLocaleString('it-IT', { minimumFractionDigits: 2 }) || '0,00'}`);
+    drawQuadroRow('Contributi IVS dovuti sul minimale', 'Contributi IVS', `€ ${results.contributiIVSMinimale?.toLocaleString('it-IT', { minimumFractionDigits: 2 }) || '0,00'}`);
+    
+    const excessIncome = results.redditoEccedenteMinimale || 0;
+    const excessContr = results.contributiEccedenteMinimale || 0;
+    
+    // Output empty or 0 if Gross Taxable Income is <= the 2025 minimale
+    drawQuadroRow('Reddito eccedente il minimale', 'Eccedenza col. 1', excessIncome > 0 ? `€ ${excessIncome.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : '0,00');
+    drawQuadroRow('Contributi eccedenti il minimale', 'Eccedenza col. 2', excessContr > 0 ? `€ ${excessContr.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : '0,00');
+  } else {
+    drawQuadroRow(`Cassa di Appartenenza con aliquota ${(selectedFund.rate * 100).toFixed(2)}%`, 'RR Sez. II', selectedFund.id);
+    drawQuadroRow('Base Imponibile dei Contributi Quadro RR', 'RR col. 4', `€ ${results.grossTaxableIncome.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
+    drawQuadroRow(`Quota di Contribuzione Previdenziale Corrente`, 'RR col. 5', `€ ${results.currentYearContributions.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
+  }
 
   // Footer visual template on page 1
   doc.setFont('Helvetica', 'normal');

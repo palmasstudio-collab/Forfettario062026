@@ -48,6 +48,13 @@ export interface TaxReturnCalculation {
   substituteTax: number; // Imposta Sostitutiva (Net Taxable * taxRate)
   currentYearContributions: number; // Contributi dovuti per l'anno corrente
   netIncome: number; // Net income after Taxes and Current Year contributions
+  isSectionI?: boolean;
+  inpsMinimale2025?: number;
+  rr2Col1?: number;
+  rr2Col2?: number;
+  contributiIVSMinimale?: number;
+  redditoEccedenteMinimale?: number | null;
+  contributiEccedenteMinimale?: number | null;
 }
 
 export interface Invoice {

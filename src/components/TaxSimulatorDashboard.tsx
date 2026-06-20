@@ -40,7 +40,7 @@ interface TaxSimulatorDashboardProps {
   driveFolderId?: string;
   driveFolderUrl?: string;
   f24Files?: { name: string; id: string; url: string; dateAdded: string }[];
-  onUploadF24?: (file: File) => Promise<void>;
+  onUploadF24?: (file: File, year?: string) => Promise<void>;
   onDeleteF24?: (id: string) => Promise<void>;
   onConnectGoogle?: () => void;
   hideCalculationsBreakdown?: boolean;
@@ -51,7 +51,7 @@ interface TaxSimulatorDashboardProps {
   onDeleteInvoice?: (id: string) => void;
   onAddF24Entries?: (newEntries: any[]) => void;
   onDeleteF24Entry?: (id: string) => void;
-  onUploadInvoiceXmlToDrive?: (file: File) => Promise<{name: string, id: string, url: string, dateAdded: string}>;
+  onUploadInvoiceXmlToDrive?: (file: File, year?: string) => Promise<{name: string, id: string, url: string, dateAdded: string}>;
   onSyncDriveInvoices?: () => Promise<void>;
   isSyncingDriveInvoices?: boolean;
 }
@@ -132,6 +132,7 @@ export default function TaxSimulatorDashboard({
           if (!invoiceDate) {
             invoiceDate = `${selectedYear}-01-01`;
           }
+          const invoiceYear = invoiceDate ? invoiceDate.split('-')[0] : selectedYear;
 
           let driveFileId: string | undefined;
           let driveFileUrl: string | undefined;
@@ -141,7 +142,7 @@ export default function TaxSimulatorDashboard({
             const safeDate = invoiceDate.replace(/[^0-9-]/g, '');
             const newName = `Fattura_${safeNumber}_${safeDate}.xml`;
             const renamedFile = new File([file], newName, { type: file.type });
-            const uploadedFileResult = await onUploadInvoiceXmlToDrive(renamedFile);
+            const uploadedFileResult = await onUploadInvoiceXmlToDrive(renamedFile, invoiceYear);
             driveFileId = uploadedFileResult.id;
             driveFileUrl = uploadedFileResult.url;
           }
@@ -173,16 +174,23 @@ export default function TaxSimulatorDashboard({
     if (!file || (!onAddF24Entries && !onUploadF24)) return;
     setIsProcessingF24(true);
     try {
+      let documentYear = selectedYear;
       if (onAddF24Entries) {
         const entries = await extractF24DataFromPdf(file);
         if (entries.length > 0) {
-          // Transform parsed F24 entries so they have expected schema and match selectedYear date
+          // Find first entry with an explicit year
+          const foundYear = entries.find(entry => entry.year)?.year;
+          if (foundYear) {
+            documentYear = foundYear;
+          }
+
+          // Transform parsed F24 entries so they have expected schema and match their parsed year or selectedYear date
           const transformedEntries = entries.map(entry => {
-            // Set a default date using current month-day or generic mid-year for the selected fiscal year
             const today = new Date();
             const monthStr = String(today.getMonth() + 1).padStart(2, '0');
             const dayStr = String(today.getDate()).padStart(2, '0');
-            const entryDate = `${selectedYear}-${monthStr}-${dayStr}`;
+            const entryYear = entry.year || selectedYear;
+            const entryDate = `${entryYear}-${monthStr}-${dayStr}`;
 
             return {
               taxCode: entry.taxCode,
@@ -196,7 +204,7 @@ export default function TaxSimulatorDashboard({
         }
       }
       if (onUploadF24) {
-        await onUploadF24(file);
+        await onUploadF24(file, documentYear);
       }
     } catch (err: any) {
       safeAlert("Errore elaborazione F24: " + err.message);
@@ -674,14 +682,55 @@ export default function TaxSimulatorDashboard({
               <div className="divide-y divide-slate-50 space-y-1.5">
                 <div className="flex justify-between py-1 items-center">
                   <span className="text-[10px] text-slate-500 font-bold">Cassa Previdenziale</span>
-                  <span className="font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 text-[9px] max-w-[120px] truncate">{selectedFund.id}</span>
+                  <span className="font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 text-[9px] max-w-[120px] truncate">{selectedFund.name}</span>
                 </div>
+                
+                {results.isSectionI ? (
+                  <>
+                    <div className="flex justify-between py-1 items-center">
+                      <span className="text-[10px] text-slate-500 font-bold">RR2 col. 1 (Reddito d'impresa)</span>
+                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.rr2Col1?.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between py-1 items-center">
+                      <span className="text-[10px] text-slate-500 font-bold">RR2 col. 2 (Reddito minimale)</span>
+                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.rr2Col2?.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between py-1 items-center">
+                      <span className="text-[10px] text-slate-500 font-bold">Contributi IVS dovuti sul minimale</span>
+                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.contributiIVSMinimale?.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between py-1 items-center">
+                      <span className="text-[10px] text-slate-500 font-bold">Reddito eccedente il minimale</span>
+                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">
+                        {results.redditoEccedenteMinimale && results.redditoEccedenteMinimale > 0 ? `€ ${results.redditoEccedenteMinimale.toFixed(0)}` : '€ 0'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1 items-center">
+                      <span className="text-[10px] text-slate-500 font-bold">Contributi eccedenti il minimale</span>
+                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">
+                        {results.contributiEccedenteMinimale && results.contributiEccedenteMinimale > 0 ? `€ ${results.contributiEccedenteMinimale.toFixed(0)}` : '€ 0'}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between py-1 items-center">
+                      <span className="text-[10px] text-slate-500 font-bold">RR Sez. II (Cassa)</span>
+                      <span className="font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 text-[9px]">{selectedFund.id}</span>
+                    </div>
+                    <div className="flex justify-between py-1 items-center">
+                      <span className="text-[10px] text-slate-500 font-bold">Base Imponibile RR (col. 4)</span>
+                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.grossTaxableIncome.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between py-1 items-center">
+                      <span className="text-[10px] text-slate-500 font-bold">Contributo Dovuto (col. 5)</span>
+                      <span className="font-bold text-blue-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.currentYearContributions.toFixed(0)}</span>
+                    </div>
+                  </>
+                )}
+                
                 <div className="flex justify-between py-1 items-center">
-                  <span className="text-[10px] text-slate-500 font-bold">Base Imponibile RR</span>
-                  <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.grossTaxableIncome.toFixed(0)}</span>
-                </div>
-                <div className="flex justify-between py-1 items-center">
-                  <span className="text-[10px] text-slate-500 font-bold">Contributo Dovuto</span>
+                  <span className="text-[10px] text-slate-500 font-bold">Totale Contributo Dovuto</span>
                   <span className="font-bold text-blue-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.currentYearContributions.toFixed(0)}</span>
                 </div>
               </div>

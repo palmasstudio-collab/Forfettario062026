@@ -364,7 +364,7 @@ export default function App() {
     }
   };
 
-  const handleUploadInvoiceXmlToDrive = async (file: File) => {
+  const handleUploadInvoiceXmlToDrive = async (file: File, year?: string) => {
     if (!activePosition) {
       throw new Error("Nessuna posizione contabile attiva selezionata.");
     }
@@ -375,12 +375,13 @@ export default function App() {
     
     let parentFolderId = activePosition.driveFolderId;
     let targetFattureFolderId = activePosition.fattureEmesseFolderId;
+    const uploadYear = year || selectedYear;
     
     // 1. If active position doesn't have a drive folder yet, create it automatically!
     if (!parentFolderId) {
       addSyncLog(`📁 Creazione automatica della cartella principale Drive per "${activePosition.name}" prima del caricamento dell'XML della fattura...`);
       try {
-        const folder = await createAccountingPositionFolder(token, activePosition.name, activePosition.profile.fullName, undefined, selectedYear);
+        const folder = await createAccountingPositionFolder(token, activePosition.name, activePosition.profile.fullName, undefined, uploadYear);
         parentFolderId = folder.id;
         targetFattureFolderId = folder.fattureEmesseFolderId;
         
@@ -412,7 +413,7 @@ export default function App() {
       throw new Error("ID Cartella Drive principale non disponibile.");
     }
 
-    return await uploadInvoiceXml(token, parentFolderId, file, targetFattureFolderId, selectedYear);
+    return await uploadInvoiceXml(token, parentFolderId, file, targetFattureFolderId, uploadYear);
   };
 
   const pickerCallback = async (data: any, token: string) => {
@@ -504,7 +505,7 @@ export default function App() {
     }
   };
 
-  const handleUploadF24Pdf = async (file: File) => {
+  const handleUploadF24Pdf = async (file: File, year?: string) => {
     if (!activePosition) {
       throw new Error("Nessuna posizione contabile attiva selezionata.");
     }
@@ -516,12 +517,13 @@ export default function App() {
 
     let parentFolderId = activePosition.driveFolderId;
     let targetF24FolderId = activePosition.f24FolderId;
+    const uploadYear = year || selectedYear;
     
     // 1. If active position doesn't have a drive folder yet, create it automatically!
     if (!parentFolderId) {
       addSyncLog(`📁 Creazione automatica della cartella principale Drive per "${activePosition.name}" prima del caricamento dell'F24...`);
       try {
-        const folder = await createAccountingPositionFolder(token, activePosition.name, activePosition.profile.fullName, undefined, selectedYear);
+        const folder = await createAccountingPositionFolder(token, activePosition.name, activePosition.profile.fullName, undefined, uploadYear);
         parentFolderId = folder.id;
         targetF24FolderId = folder.f24FolderId;
         
@@ -555,7 +557,7 @@ export default function App() {
 
     addSyncLog(`⏱️ Inizio caricamento del file F24 "${file.name}" su Drive...`);
     try {
-      const uploadedFile = await uploadF24Pdf(token, parentFolderId, file, activePosition.profile.fullName, targetF24FolderId, selectedYear);
+      const uploadedFile = await uploadF24Pdf(token, parentFolderId, file, activePosition.profile.fullName, targetF24FolderId, uploadYear);
       
       // Update the active position's f24 list
       setPositions((prev) =>
@@ -573,7 +575,7 @@ export default function App() {
           return pos;
         })
       );
-      addSyncLog(`✅ File F24 "${file.name}" caricato correttamente nella sottocartella "F24" di Google Drive!`);
+      addSyncLog(`✅ File F24 "${file.name}" caricato correttamente nella sottocartella "F24" dell'anno ${uploadYear} su Google Drive!`);
     } catch (err: any) {
       console.error(err);
       addSyncLog(`❌ Errore durante il caricamento di "${file.name}": ${err.message || err}`);
