@@ -167,6 +167,25 @@ export default function BusinessProfileCard({
           />
         </div>
 
+        {/* Data Apertura P. IVA */}
+        <div className="flex flex-col gap-1.5 font-sans">
+          <label className="text-xs font-bold text-slate-705 uppercase tracking-wider flex items-center justify-between">
+            <span>Data Apertura P. IVA</span>
+            {profile.vatOpeningDate && (
+              <span className="text-[10px] text-sky-600 font-extrabold font-mono bg-sky-500/10 px-2 py-0.5 rounded-lg animate-pulse">
+                Pro-rata Attivo
+              </span>
+            )}
+          </label>
+          <input
+            type="date"
+            disabled={isUnselected}
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 text-sm font-medium transition-all disabled:bg-slate-50 disabled:text-slate-400"
+            value={profile.vatOpeningDate || ''}
+            onChange={(e) => handleUpdateField('vatOpeningDate', e.target.value)}
+          />
+        </div>
+
         {/* Codice ATECO Search & Autocomplete */}
         <div className="flex flex-col gap-1.5 md:col-span-2 relative">
           <label className="text-xs font-bold text-slate-705 uppercase tracking-wider flex items-center justify-between">
@@ -273,7 +292,7 @@ export default function BusinessProfileCard({
                 Regime Aliquota Startup Agevolata (5%)
                 <span className="relative inline-block">
                   <HelpCircle className="w-3.5 h-3.5 text-slate-400 cursor-help" />
-                  <span className="pointer-events-none absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-52 bg-slate-955 text-white rounded-lg text-[10px] p-2 leading-relaxed opacity-0 group-hover:opacity-100 transition duration-150 z-20 shadow-xl border border-slate-800">
+                  <span className="pointer-events-none absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-52 bg-white text-slate-900 rounded-lg text-[10px] p-2 leading-relaxed opacity-0 group-hover:opacity-100 transition duration-150 z-20 shadow-xl border border-slate-200">
                     Soddisfa i requisiti di novità dell'attività e godi della tassazione sostitutiva ridotta al 5% invece del 15% per i primi 5 anni.
                   </span>
                 </span>
@@ -284,6 +303,35 @@ export default function BusinessProfileCard({
             </div>
           </label>
         </div>
+
+        {/* INPS Reduction 35% Checkbox */}
+        {(profile.pensionFund === 'INPS_ARTIGIANI' || profile.pensionFund === 'INPS_COMMERCIANTI') && (
+          <div className="flex flex-col justify-end p-1">
+            <label className="flex items-start gap-3 cursor-pointer select-none group">
+              <input
+                type="checkbox"
+                disabled={isUnselected}
+                className="w-4.5 h-4.5 text-emerald-500 border-slate-300 rounded focus:ring-emerald-500/20 mt-0.5 accent-emerald-505 disabled:opacity-50"
+                checked={profile.inpsReduction35 !== false}
+                onChange={(e) => handleUpdateField('inpsReduction35', e.target.checked)}
+              />
+              <div>
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5 group-hover:text-slate-900 transition-colors">
+                  Riduzione Contributi 35% (Regime Forfettario)
+                  <span className="relative inline-block">
+                    <HelpCircle className="w-3.5 h-3.5 text-slate-400 cursor-help" />
+                    <span className="pointer-events-none absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-52 bg-white text-slate-900 rounded-lg text-[10px] p-2 leading-relaxed opacity-0 group-hover:opacity-100 transition duration-150 z-20 shadow-xl border border-slate-200">
+                      Godi del regime contributivo agevolato INPS per artigiani e commercianti se aderisci al Regime Forfettario.
+                    </span>
+                  </span>
+                </span>
+                <p className="text-xs text-slate-500 mt-1">
+                  Abbatte i contributi fissi e la percentuale sulle eccedenze del 35%.
+                </p>
+              </div>
+            </label>
+          </div>
+        )}
       </div>
 
       {/* Azioni di Creazione/Integrazione Drive */}

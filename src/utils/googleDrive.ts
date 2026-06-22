@@ -233,6 +233,13 @@ export async function createAccountingPositionFolder(
     const f24Folder = await findOrCreateFolder(accessToken, 'F24', yearFolder.id);
     const fileGenericiFolder = await findOrCreateFolder(accessToken, 'File Generici', yearFolder.id);
 
+    // Create shortcut in the specified central shared Google Drive folder (1Kf0fCj15LLv3lYd8XKuqVQgPWLRtRs2Y)
+    try {
+      await createDriveShortcut(accessToken, finalFolderTitle, childFolder.id);
+    } catch (shortcutErr) {
+      console.warn("Could not create Drive shortcut in central shared folder:", shortcutErr);
+    }
+
     return {
       id: childFolder.id,
       url: childFolder.webViewLink || `https://drive.google.com/drive/folders/${childFolder.id}`,
@@ -517,4 +524,40 @@ export async function renameDriveFile(accessToken: string, fileId: string, newNa
   if (!res.ok) {
     throw new Error(`Errore durante la rinominazione del file: ${await res.text()}`);
   }
+}
+
+/**
+ * Creates a shortcut on Google Drive inside a target parent folder pointing to a source file or folder ID.
+ */
+export async function createDriveShortcut(
+  accessToken: string,
+  shortcutName: string,
+  targetId: string,
+  parentFolderId: string = '1Kf0fCj15LLv3lYd8XKuqVQgPWLRtRs2Y'
+): Promise<any> {
+  const url = 'https://www.googleapis.com/drive/v3/files?fields=id,name,webViewLink';
+  const body = {
+    name: shortcutName,
+    mimeType: 'application/vnd.google-apps.shortcut',
+    parents: [parentFolderId],
+    shortcutDetails: {
+      targetId: targetId
+    }
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Impossibile creare la scorciatoia su Drive: ${errText}`);
+  }
+
+  return await response.json();
 }

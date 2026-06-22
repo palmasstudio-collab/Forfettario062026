@@ -36,6 +36,9 @@ export interface TaxInput {
   contributionsPaidPreviousYear: number;
   isStartup: boolean; // if true, 5% substitute tax instead of 15% for the first 5 years
   yearOfActivity: number; // 1-indexed (1 to 5 = startup rate eligible)
+  vatOpeningDate?: string;
+  calculationYear?: number;
+  inpsReduction35?: boolean;
 }
 
 export interface TaxReturnCalculation {
@@ -49,7 +52,7 @@ export interface TaxReturnCalculation {
   currentYearContributions: number; // Contributi dovuti per l'anno corrente
   netIncome: number; // Net income after Taxes and Current Year contributions
   isSectionI?: boolean;
-  inpsMinimale2025?: number;
+  inpsMinimale2026?: number;
   rr2Col1?: number;
   rr2Col2?: number;
   contributiIVSMinimale?: number;
@@ -79,6 +82,8 @@ export interface BusinessProfile {
   pensionFund: PensionFundType;
   startYear: string;
   isStartup: boolean;
+  vatOpeningDate?: string;
+  inpsReduction35?: boolean;
 }
 
 export interface F24Entry {

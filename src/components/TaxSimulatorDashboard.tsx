@@ -221,7 +221,10 @@ export default function TaxSimulatorDashboard({
     pensionFund: profile.pensionFund,
     contributionsPaidPreviousYear: prevYearContributions,
     isStartup: profile.isStartup,
-    yearOfActivity
+    yearOfActivity,
+    vatOpeningDate: profile.vatOpeningDate,
+    calculationYear: parseInt(selectedYear, 10),
+    inpsReduction35: profile.inpsReduction35 !== false
   };
 
   const results: TaxReturnCalculation = calculateTaxReturn(taxInput);
@@ -238,7 +241,7 @@ export default function TaxSimulatorDashboard({
     if (!yearToExport) return;
 
     if (yearToExport === selectedYear) {
-       generateTaxAndInvoicePDF(profile, invoices, results, selectedAteco, selectedFund, yearOfActivity);
+       generateTaxAndInvoicePDF(profile, invoices, results, selectedAteco, selectedFund, yearOfActivity, selectedYear, f24Entries, f24Files);
        return;
     }
 
@@ -257,11 +260,14 @@ export default function TaxSimulatorDashboard({
        pensionFund: profile.pensionFund,
        contributionsPaidPreviousYear: targetPrevYearContributions,
        isStartup: profile.isStartup,
-       yearOfActivity
+       yearOfActivity,
+       vatOpeningDate: profile.vatOpeningDate,
+       calculationYear: parseInt(yearToExport, 10),
+       inpsReduction35: profile.inpsReduction35 !== false
     };
     const targetResults = calculateTaxReturn(targetInput);
 
-    generateTaxAndInvoicePDF(profile, filteredInvoices, targetResults, selectedAteco, selectedFund, yearOfActivity);
+    generateTaxAndInvoicePDF(profile, filteredInvoices, targetResults, selectedAteco, selectedFund, yearOfActivity, yearToExport, filteredF24, f24Files);
   };
 
   return (
@@ -312,7 +318,7 @@ export default function TaxSimulatorDashboard({
                 <span>Contributi Dedotti (Principio di Cassa)</span>
                 <span className="relative inline-block group">
                   <HelpCircle className="w-3.5 h-3.5 text-slate-400 cursor-help" />
-                  <span className="pointer-events-none absolute bottom-full mb-1 right-1/2 -translate-x-1/2 w-56 bg-slate-900 text-white rounded-lg text-[10px] p-2 leading-relaxed opacity-0 group-hover:opacity-100 transition duration-150 z-20 shadow-xl border border-slate-800">
+                  <span className="pointer-events-none absolute bottom-full mb-1 right-1/2 -translate-x-1/2 w-56 bg-white text-slate-900 rounded-lg text-[10px] p-2 leading-relaxed opacity-0 group-hover:opacity-100 transition duration-150 z-20 shadow-xl border border-slate-200">
                     Contributi previdenziali versati o addebitati tramite F24 nell'anno d'imposta selezionato. Vengono sottratti dal reddito imponibile lordo per calcolare la base imponibile netta.
                   </span>
                 </span>
@@ -359,7 +365,7 @@ export default function TaxSimulatorDashboard({
                 <span>Anzianità Di Impresa</span>
                 <span className="relative inline-block group">
                   <HelpCircle className="w-3.5 h-3.5 text-slate-400 cursor-help" />
-                  <span className="pointer-events-none absolute bottom-full mb-1 right-1/2 -translate-x-1/2 w-52 bg-slate-955 text-white rounded-lg text-[10px] p-2 leading-relaxed opacity-0 group-hover:opacity-100 transition duration-150 z-20 shadow-xl border border-slate-800">
+                  <span className="pointer-events-none absolute bottom-full mb-1 right-1/2 -translate-x-1/2 w-52 bg-white text-slate-900 rounded-lg text-[10px] p-2 leading-relaxed opacity-0 group-hover:opacity-100 transition duration-150 z-20 shadow-xl border border-slate-200">
                     L'aliquota sostitutiva startup al 5% si applica per i primi 5 anni dalla costituzione. Dal 6° anno in poi, l'aliquota sale al 15% ordinario.
                   </span>
                 </span>

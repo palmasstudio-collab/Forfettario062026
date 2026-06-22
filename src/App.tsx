@@ -99,7 +99,7 @@ const DEFAULT_PROFILE: BusinessProfile = {
   vatNumber: '01234567890',
   atecoCode: '62.01.00',
   pensionFund: 'INPS_GESTIONE_SEPARATA',
-  startYear: '2025',
+  startYear: '2026',
   isStartup: true,
 };
 
@@ -868,7 +868,22 @@ export default function App() {
     setActivePositionId(newId);
   };
 
-  const handleDeletePosition = (idToDelete: string) => {
+  const handleDeletePosition = async (idToDelete: string) => {
+    const positionToDelete = positions.find((p) => p.id === idToDelete);
+    if (positionToDelete && positionToDelete.driveFolderId) {
+      const token = googleAccessTokenState;
+      if (token) {
+        try {
+          addSyncLog(`🗑️ Rimozione in corso della cartella Google Drive per "${positionToDelete.name}"...`);
+          await deleteDriveFile(token, positionToDelete.driveFolderId);
+          addSyncLog(`✅ Cartella Google Drive di "${positionToDelete.name}" rimossa correttamente.`);
+        } catch (err: any) {
+          console.error("Errore rimozione cartella Drive della posizione:", err);
+          addSyncLog(`⚠️ Nota: Impossibile rimuovere la cartella principale da Drive (${err.message || err}).`);
+        }
+      }
+    }
+
     const remainingPositions = positions.filter((p) => p.id !== idToDelete);
     if (remainingPositions.length === 0) {
       // Re-create a clean slate default position
@@ -881,7 +896,7 @@ export default function App() {
           vatNumber: '',
           atecoCode: '62.01.00',
           pensionFund: 'INPS_GESTIONE_SEPARATA',
-          startYear: '2025',
+          startYear: '2026',
           isStartup: true,
         },
         invoices: [],

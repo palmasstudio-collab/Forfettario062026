@@ -34,7 +34,9 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
   const [atecoCode, setAtecoCode] = useState('62.01.00');
   const [pensionFund, setPensionFund] = useState<PensionFundType>('INPS_GESTIONE_SEPARATA');
   const [isStartup, setIsStartup] = useState(true);
+  const [inpsReduction35, setInpsReduction35] = useState(true);
   const [startYear, setStartYear] = useState('2026');
+  const [vatOpeningDate, setVatOpeningDate] = useState('');
 
   // Search local state for ATECO dropdown inside modal
   const [searchTerm, setSearchTerm] = useState('');
@@ -73,7 +75,9 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
       setAtecoCode('62.01.00');
       setPensionFund('INPS_GESTIONE_SEPARATA');
       setIsStartup(true);
+      setInpsReduction35(true);
       setStartYear('2026');
+      setVatOpeningDate('');
       setSearchTerm('');
       setShowAtecoDropdown(false);
 
@@ -192,7 +196,9 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
       atecoCode,
       pensionFund,
       startYear,
-      isStartup
+      isStartup,
+      vatOpeningDate: vatOpeningDate || undefined,
+      inpsReduction35
     };
 
     const folderInfo = folderCreated ? {
@@ -284,6 +290,17 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
                   placeholder="RSSMRA80A01F205Z"
                   value={fiscalCode}
                   onChange={(e) => setFiscalCode(e.target.value.toUpperCase())}
+                />
+              </div>
+
+              {/* Data Apertura Partita IVA */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Data Apertura P. IVA</label>
+                <input
+                  type="date"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 text-sm font-medium transition-all text-slate-800"
+                  value={vatOpeningDate}
+                  onChange={(e) => setVatOpeningDate(e.target.value)}
                 />
               </div>
 
@@ -386,6 +403,27 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
                   </div>
                 </label>
               </div>
+
+              {(pensionFund === 'INPS_ARTIGIANI' || pensionFund === 'INPS_COMMERCIANTI') && (
+                <div className="flex flex-col justify-center py-2 sm:col-span-2">
+                  <label className="flex items-start gap-3 cursor-pointer select-none group">
+                    <input
+                      type="checkbox"
+                      className="w-5 h-5 text-emerald-500 border-slate-300 rounded focus:ring-emerald-500/20 mt-0.5 accent-emerald-500"
+                      checked={inpsReduction35}
+                      onChange={(e) => setInpsReduction35(e.target.checked)}
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5 group-hover:text-slate-900 transition-colors">
+                        Richiedi Riduzione Contributi 35% (Regime Forfettario)
+                      </span>
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Consente di calcolare l'abbattimento ridotto sui minimi (Artigiani: €2.878,82 + €7,44 e Commercianti: €2.936,30 + €7,44) e sulle eccedenze (Artigiani: 15,60%, Commercianti: 15,91%).
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              )}
 
               {/* Selezione Cartella Contenitore */}
               <div className="flex flex-col gap-1.5 sm:col-span-2 border-t border-slate-100 pt-5 mt-3">

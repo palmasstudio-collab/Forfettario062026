@@ -149,18 +149,18 @@ export const PENSION_FUNDS: PensionFundConfig[] = [
     name: 'INPS Artigiani',
     rate: 0.24, // Aliquota base circa 24%
     hasMinimum: true,
-    minimumContribution: 4200, // Minimali fissi circa 4.200 € all'anno (coprono redditi fino a circa 18.000 €)
-    minimumThreshold: 18415,
-    description: 'Per imprese artigiane. Prevede un minimale annuo obbligatorio di circa 4.200 € indipendente dal fatturato, garantendo la copertura contributiva di base.'
+    minimumContribution: 4436.40, // Base 4428.96 + Maternità 7.44
+    minimumThreshold: 18423,
+    description: 'Per imprese artigiane. Prevede un minimale annuo obbligatorio di 4.436.40 € (fissi 4.428.96 € + 7.44 € maternità) per redditi fino a 18.423.00 €, con possibilità di riduzione del 35% nel regime forfettario.'
   },
   {
     id: 'INPS_COMMERCIANTI',
     name: 'INPS Commercianti',
     rate: 0.2448, // Aliquota base circa 24.48% o ridotta nel forfettario
     hasMinimum: true,
-    minimumContribution: 4290, // Fissi circa 4.290 €
-    minimumThreshold: 18415,
-    description: 'Per e-commerce e commerciati al dettaglio. Include minimale fisso. Nota: per i commercianti nel forfettario è possibile richiedere online all’INPS la riduzione del 35% dei contributi (fissi e variabili).'
+    minimumContribution: 4524.83, // Base 4517.39 + Maternità 7.44
+    minimumThreshold: 18423,
+    description: 'Per e-commerce e commerciati al dettaglio. Prevede un minimale annuo obbligatorio di 4.524.83 € (fissi 4.517.39 € + 7.44 € maternità) per redditi fino a 18.423.00 €, con possibilità di riduzione del 35% nel regime forfettario.'
   },
   {
     id: 'INARCASSA',

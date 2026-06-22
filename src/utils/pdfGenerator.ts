@@ -4,7 +4,7 @@
  */
 
 import { jsPDF } from 'jspdf';
-import { BusinessProfile, Invoice, TaxReturnCalculation, AtecoCode, PensionFundConfig } from '../types';
+import { BusinessProfile, Invoice, TaxReturnCalculation, AtecoCode, PensionFundConfig, F24Entry } from '../types';
 
 export function generateTaxAndInvoicePDF(
   profile: BusinessProfile,
@@ -12,7 +12,10 @@ export function generateTaxAndInvoicePDF(
   results: TaxReturnCalculation,
   selectedAteco: AtecoCode,
   selectedFund: PensionFundConfig,
-  yearOfActivity: number
+  yearOfActivity: number,
+  selectedYear: string = '2026',
+  f24Entries: F24Entry[] = [],
+  f24Files: { name: string; id: string; url: string; dateAdded: string }[] = []
 ) {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -127,7 +130,13 @@ export function generateTaxAndInvoicePDF(
   doc.setFont('Helvetica', 'normal');
   doc.text(`Cassa: ${selectedFund.name}`, rightColX + 4, infoY + 10);
   doc.text(`Regime: ${profile.isStartup ? 'Startup Agevolata (Aliquota 5%)' : 'Ordinario (Aliquota 15%)'}`, rightColX + 4, infoY + 16);
-  doc.text(`Anzianità d'Impresa: ${yearOfActivity}° Anno di Attività`, rightColX + 4, infoY + 22);
+  
+  let openingDateStr = '';
+  if (profile.vatOpeningDate) {
+    const d = new Date(profile.vatOpeningDate);
+    openingDateStr = ` - P.IVA Aperta il ${d.toLocaleDateString('it-IT')}`;
+  }
+  doc.text(`Anzianità d'Impresa: ${yearOfActivity}° Anno${openingDateStr}`, rightColX + 4, infoY + 22);
 
   currentY = infoY + 34;
 
@@ -237,15 +246,28 @@ export function generateTaxAndInvoicePDF(
   
   if (results.isSectionI) {
     drawQuadroRow('Reddito d\'impresa', 'RR2 col. 1', `€ ${results.rr2Col1?.toLocaleString('it-IT', { minimumFractionDigits: 2 }) || '0,00'}`);
-    drawQuadroRow('Reddito minimale', 'RR2 col. 2', `€ ${results.rr2Col2?.toLocaleString('it-IT', { minimumFractionDigits: 2 }) || '0,00'}`);
+    drawQuadroRow('Reddito minimale (riproporzionato se P.IVA aperta in corso d\'anno)', 'RR2 col. 2', `€ ${results.rr2Col2?.toLocaleString('it-IT', { minimumFractionDigits: 2 }) || '0,00'}`);
     drawQuadroRow('Contributi IVS dovuti sul minimale', 'Contributi IVS', `€ ${results.contributiIVSMinimale?.toLocaleString('it-IT', { minimumFractionDigits: 2 }) || '0,00'}`);
     
     const excessIncome = results.redditoEccedenteMinimale || 0;
     const excessContr = results.contributiEccedenteMinimale || 0;
     
-    // Output empty or 0 if Gross Taxable Income is <= the 2025 minimale
+    // Output empty or 0 if Gross Taxable Income is <= the minimale
     drawQuadroRow('Reddito eccedente il minimale', 'Eccedenza col. 1', excessIncome > 0 ? `€ ${excessIncome.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : '0,00');
     drawQuadroRow('Contributi eccedenti il minimale', 'Eccedenza col. 2', excessContr > 0 ? `€ ${excessContr.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : '0,00');
+    
+    // Add Note about Installments
+    currentY += 3;
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.text('* Nota sulle scadenze dei Contributi IVS minimali (Quadro RR Sez. I):', marginX + 1, currentY);
+    currentY += 4;
+    doc.text('I contributi IVS calcolati sul minimale sono versati tipicamente in 4 rate paritetiche alle seguenti scadenze:', marginX + 1, currentY);
+    currentY += 4;
+    doc.setFont('Helvetica', 'italic');
+    doc.text('- 16 Maggio, 20 Agosto, 16 Novembre, e 16 Febbraio dell\'anno successivo.', marginX + 1, currentY);
+    currentY += 2;
   } else {
     drawQuadroRow(`Cassa di Appartenenza con aliquota ${(selectedFund.rate * 100).toFixed(2)}%`, 'RR Sez. II', selectedFund.id);
     drawQuadroRow('Base Imponibile dei Contributi Quadro RR', 'RR col. 4', `€ ${results.grossTaxableIncome.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
@@ -256,15 +278,15 @@ export function generateTaxAndInvoicePDF(
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
-  doc.text(`Regime Forfettario 2026  |  Codice Backup Cloud: ${profile.vatNumber || 'Simulatore'}`, marginX, pageHeight - 10);
-  doc.text('Pagina 1 di 2', pageWidth - marginX, pageHeight - 10, { align: 'right' });
+  doc.text(`Regime Forfettario ${selectedYear}  |  Codice Backup Cloud: ${profile.vatNumber || 'Simulatore'}`, marginX, pageHeight - 10);
+  doc.text('Pagina 1 di 3', pageWidth - marginX, pageHeight - 10, { align: 'right' });
 
   // ==========================================
   // PAGE 2: ARCHIVIO GENERALE FATTURE EMESSE
   // ==========================================
   doc.addPage();
   currentY = 15;
-  addHeader('REGISTRO CRONOLOGICO FATTURE ATTIVE', `Storico Documenti Commerciali Anno 2026 - ${profile.fullName}`);
+  addHeader('REGISTRO CRONOLOGICO FATTURE ATTIVE', `Storico Documenti Commerciali Anno ${selectedYear} - ${profile.fullName}`);
 
   drawSectionTitle('Riepilogo Avanzato ed Efficacia Finanziaria');
   
@@ -320,7 +342,7 @@ export function generateTaxAndInvoicePDF(
         
         doc.addPage();
         currentY = 15;
-        addHeader('REGISTRO CRONOLOGICO (Continua)', `Storico Documenti Commerciali Anno 2026 - ${profile.fullName}`);
+        addHeader('REGISTRO CRONOLOGICO (Continua)', `Storico Documenti Commerciali Anno ${selectedYear} - ${profile.fullName}`);
         
         // Redraw table headers on new page
         doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -401,10 +423,155 @@ export function generateTaxAndInvoicePDF(
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
-  doc.text(`Regime Forfettario 2026  |  Esportazione Registro Fatture  | Unicamente per Archivio Personale.`, marginX, pageHeight - 10);
-  doc.text('Pagina 2 di 2', pageWidth - marginX, pageHeight - 10, { align: 'right' });
+  doc.text(`Regime Forfettario ${selectedYear}  |  Esportazione Registro Fatture  | Unicamente per Archivio Personale.`, marginX, pageHeight - 10);
+  doc.text('Pagina 2 di 3', pageWidth - marginX, pageHeight - 10, { align: 'right' });
+
+  // ==========================================
+  // PAGE 3: ARCHIVIO E STORICO VERSAMENTI F24
+  // ==========================================
+  doc.addPage();
+  currentY = 15;
+  addHeader('REGISTRO CONTRIBUENTE F24 E ARCHIVIO CLOUD', `Sezione Tributi, Contributi Dedotti e Registro Cloud - ${profile.fullName}`);
+
+  drawSectionTitle('Volume Previdenziale ed F24 Registrati');
+  
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(9.5);
+  
+  const totalF24Amount = f24Entries.reduce((sum, e) => sum + e.amount, 0);
+  
+  drawRow('Tributi e rate F24 catalogati in archivio:', `${f24Entries.length}`);
+  drawRow('Costo Previdenziale / F24 totale conguagliato:', `€ ${totalF24Amount.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  
+  currentY += 8;
+
+  drawSectionTitle('Riconciliazione Analitica dei Codici Tributo F24');
+
+  if (f24Entries.length === 0) {
+    doc.setFont('Helvetica', 'italic');
+    doc.setFontSize(9.5);
+    doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
+    doc.text('Non sono presenti codici tributo o rate F24 liquidate per questo anno d\'imposta.', marginX, currentY);
+    currentY += 10;
+  } else {
+    // Generate custom flat headers for F24 table
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(marginX, currentY, pageWidth - 2 * marginX, 6.5, 'F');
+    
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(255, 255, 255);
+    
+    let f24TableY = currentY + 4.5;
+    doc.text('DATA VERSAMENTO', marginX + 3, f24TableY);
+    doc.text('CODICE TRIBUTO', marginX + 40, f24TableY);
+    doc.text('DESCRIZIONE OPERAZIONE / NOTE', marginX + 75, f24TableY);
+    doc.text('CANALE', pageWidth - marginX - 35, f24TableY, { align: 'right' });
+    doc.text('IMPORTO (€)', pageWidth - marginX - 3, f24TableY, { align: 'right' });
+    
+    currentY += 6.5;
+
+    doc.setFontSize(8);
+    f24Entries.forEach((entry, idx) => {
+      if (currentY > pageHeight - 20) {
+        doc.addPage();
+        currentY = 15;
+        addHeader('REGISTRO F24 (Continua)', `Sezione Tributi e Contributi Dedotti - ${profile.fullName}`);
+        
+        doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.rect(marginX, currentY, pageWidth - 2 * marginX, 6.5, 'F');
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(255, 255, 255);
+        f24TableY = currentY + 4.5;
+        doc.text('DATA VERSAMENTO', marginX + 3, f24TableY);
+        doc.text('CODICE TRIBUTO', marginX + 40, f24TableY);
+        doc.text('DESCRIZIONE OPERAZIONE / NOTE', marginX + 75, f24TableY);
+        doc.text('CANALE', pageWidth - marginX - 35, f24TableY, { align: 'right' });
+        doc.text('IMPORTO (€)', pageWidth - marginX - 3, f24TableY, { align: 'right' });
+        currentY += 6.5;
+      }
+
+      doc.setDrawColor(241, 245, 249);
+      if (idx % 2 === 0) {
+        doc.setFillColor(252, 253, 254);
+      } else {
+        doc.setFillColor(248, 250, 252);
+      }
+      doc.rect(marginX, currentY, pageWidth - 2 * marginX, 7, 'F');
+      
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      f24TableY = currentY + 4.8;
+      
+      const formattedDate = entry.date ? new Date(entry.date).toLocaleDateString('it-IT') : '-';
+      doc.text(formattedDate, marginX + 3, f24TableY);
+      doc.text(entry.taxCode, marginX + 40, f24TableY);
+      
+      doc.setFont('Helvetica', 'normal');
+      let descText = entry.description || 'Conguaglio contributivo ordinario';
+      if (descText.length > 32) {
+        descText = descText.substring(0, 29) + '...';
+      }
+      doc.text(descText, marginX + 75, f24TableY);
+      doc.text(entry.source || 'Manuale', pageWidth - marginX - 35, f24TableY, { align: 'right' });
+      
+      doc.setFont('Helvetica', 'bold');
+      doc.text(`€ ${entry.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, pageWidth - marginX - 3, f24TableY, { align: 'right' });
+      
+      doc.setLineWidth(0.2);
+      doc.setDrawColor(230, 235, 241);
+      doc.line(marginX, currentY + 7, pageWidth - marginX, currentY + 7);
+      
+      currentY += 7;
+    });
+  }
+
+  currentY += 8;
+
+  // Sottosezione: File F24 archiviati su Google Drive
+  drawSectionTitle('Documenti F24 archiviati su Google Drive Cloud');
+  if (f24Files.length === 0) {
+    doc.setFont('Helvetica', 'italic');
+    doc.setFontSize(9.5);
+    doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
+    doc.text('Nessun file PDF F24 attualmente archiviato su Google Drive per questa posizione.', marginX, currentY);
+  } else {
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8);
+    f24Files.forEach((file, idx) => {
+      if (currentY > pageHeight - 15) {
+        doc.addPage();
+        currentY = 15;
+        addHeader('REGISTRO F24 - ARCHIVIO CLOUD (Continua)', `Fascicolo Digitale F24 - ${profile.fullName}`);
+      }
+      
+      doc.setDrawColor(241, 245, 249);
+      doc.setFillColor(252, 253, 254);
+      doc.rect(marginX, currentY, pageWidth - 2 * marginX, 6.5, 'F');
+      
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.text(`${idx + 1}. ${file.name}`, marginX + 3, currentY + 4.5);
+      
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
+      const dateText = file.dateAdded ? `Sincronizzato il: ${new Date(file.dateAdded).toLocaleDateString('it-IT')}` : '';
+      doc.text(dateText, pageWidth - marginX - 3, currentY + 4.5, { align: 'right' });
+      
+      doc.line(marginX, currentY + 6.5, pageWidth - marginX, currentY + 6.5);
+      currentY += 6.5;
+    });
+  }
+
+  // Final footer page 3
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
+  doc.text(`Regime Forfettario ${selectedYear}  |  Dossier Fiscale Posizione  |  Integrazione Google Drive Attiva.`, marginX, pageHeight - 10);
+  doc.text('Pagina 3 di 3', pageWidth - marginX, pageHeight - 10, { align: 'right' });
 
   // Save the PDF locally on trigger
   const safeName = (profile.fullName || 'professionista').replace(/\s+/g, '_').toLowerCase();
-  doc.save(`Riepilogo_Fiscale_2026_${safeName}.pdf`);
+  doc.save(`Fascicolo_Fiscale_Completo_${selectedYear}_${safeName}.pdf`);
 }
