@@ -30,6 +30,7 @@ export default function BusinessProfileCard({
 }: BusinessProfileCardProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAtecoDropdown, setShowAtecoDropdown] = useState(false);
+  const [isAtecoFocused, setIsAtecoFocused] = useState(false);
   const [isImportingAteco, setIsImportingAteco] = useState(false);
   const [hasImported, setHasImported] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -182,12 +183,21 @@ export default function BusinessProfileCard({
               type="text"
               disabled={isUnselected}
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 text-sm font-medium transition-all bg-slate-50/30 disabled:bg-slate-50 disabled:text-slate-400"
-              placeholder={isUnselected ? "Nessuna contabilità selezionata" : "Cerca per codice o descrizione (es: 62.01.00)..."}
-              value={isUnselected ? '' : (searchTerm || `${selectedAteco.code} - ${selectedAteco.description}`)}
+              placeholder={isUnselected ? "Nessuna contabilità selezionata" : "Cerca per codice o descrizione (es: 86.99.01)..."}
+              value={isUnselected ? '' : (isAtecoFocused ? searchTerm : `${selectedAteco.code} - ${selectedAteco.description}`)}
               onFocus={() => {
                 if (!isUnselected) {
                   setSearchTerm('');
+                  setIsAtecoFocused(true);
                   setShowAtecoDropdown(true);
+                }
+              }}
+              onBlur={() => {
+                if (!isUnselected) {
+                  setTimeout(() => {
+                    setIsAtecoFocused(false);
+                    setShowAtecoDropdown(false);
+                  }, 250);
                 }
               }}
               onChange={(e) => {
@@ -202,7 +212,7 @@ export default function BusinessProfileCard({
           {showAtecoDropdown && (
             <div className="absolute z-10 w-full mt-20 max-h-60 overflow-y-auto bg-white border border-slate-100 rounded-2xl shadow-lg divide-y divide-slate-50 overflow-hidden">
               {filteredAteco.length > 0 ? (
-                filteredAteco.map((item) => (
+                filteredAteco.slice(0, 50).map((item) => (
                   <button
                     key={item.code}
                     type="button"

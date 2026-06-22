@@ -39,6 +39,7 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
   // Search local state for ATECO dropdown inside modal
   const [searchTerm, setSearchTerm] = useState('');
   const [showAtecoDropdown, setShowAtecoDropdown] = useState(false);
+  const [isAtecoFocused, setIsAtecoFocused] = useState(false);
 
   // Google Drive destination folder state
   const [parentFolderId, setParentFolderId] = useState('');
@@ -302,11 +303,19 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
                     type="text"
                     required
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 text-sm font-medium transition-all bg-slate-50/20"
-                    placeholder="Cerca per codice o descrizione (es: 62.01.00)..."
-                    value={searchTerm || `${selectedAteco.code} - ${selectedAteco.description}`}
+                    placeholder="Cerca per codice o descrizione (es: 86.99.01)..."
+                    value={isAtecoFocused ? searchTerm : `${selectedAteco.code} - ${selectedAteco.description}`}
                     onFocus={() => {
                       setSearchTerm('');
+                      setIsAtecoFocused(true);
                       setShowAtecoDropdown(true);
+                    }}
+                    onBlur={() => {
+                      // Slight delay to allow clicking on dropdown items before closing
+                      setTimeout(() => {
+                        setIsAtecoFocused(false);
+                        setShowAtecoDropdown(false);
+                      }, 250);
                     }}
                     onChange={(e) => {
                       setSearchTerm(e.target.value);
@@ -318,7 +327,7 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
                 {showAtecoDropdown && (
                   <div className="absolute z-30 w-full mt-20 max-h-48 overflow-y-auto bg-white border border-slate-100 rounded-2xl shadow-xl divide-y divide-slate-100 overflow-hidden">
                     {filteredAteco.length > 0 ? (
-                      filteredAteco.map((item) => (
+                      filteredAteco.slice(0, 50).map((item) => (
                         <button
                           key={item.code}
                           type="button"
