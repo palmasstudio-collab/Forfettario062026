@@ -30,6 +30,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { generateTaxAndInvoicePDF } from '../utils/pdfGenerator';
+import { generateInvoicePDFDocument } from '../utils/pdfInvoiceBasic';
 
 interface TaxSimulatorDashboardProps {
   profile: BusinessProfile;
@@ -140,11 +141,19 @@ export default function TaxSimulatorDashboard({
           if (onUploadInvoiceXmlToDrive) {
             const safeNumber = parsed.number.replace(/[^a-zA-Z0-9]/g, '_');
             const safeDate = invoiceDate.replace(/[^0-9-]/g, '');
-            const newName = `Fattura_${safeNumber}_${safeDate}.xml`;
-            const renamedFile = new File([file], newName, { type: file.type });
+            const newNameXML = `Fattura_${safeNumber}_${safeDate}.xml`;
+            const renamedFile = new File([file], newNameXML, { type: file.type });
             const uploadedFileResult = await onUploadInvoiceXmlToDrive(renamedFile, invoiceYear);
             driveFileId = uploadedFileResult.id;
             driveFileUrl = uploadedFileResult.url;
+            
+            // Generate and upload PDF version alongside it
+            try {
+               const pdfFile = generateInvoicePDFDocument(parsed, newNameXML);
+               await onUploadInvoiceXmlToDrive(pdfFile, invoiceYear);
+            } catch (pdfErr) {
+               console.warn("PDF automatic generation/upload failed:", pdfErr);
+            }
           }
 
           onAddInvoice({

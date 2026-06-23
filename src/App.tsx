@@ -250,9 +250,41 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = initAuth(
-      (user, token) => {
+      async (user, token) => {
         setGoogleUser({ email: user.email, photoURL: user.photoURL, uid: user.uid });
         setGoogleAccessTokenState(token);
+        
+        try {
+          const { dbService } = await import('./lib/db');
+          const remotePositions = await dbService.getAccountingPositions(user.uid);
+          if (remotePositions && remotePositions.length > 0) {
+            setPositions(prev => {
+              const merged = [...prev];
+              remotePositions.forEach(rp => {
+                const existingIndex = merged.findIndex(p => p.id === rp.id);
+                // Simple merge: keep cloud version if it doesn't exist locally,
+                // or if cloud has more invoices/f24 tracking.
+                if (existingIndex >= 0) {
+                  // Prefer cloud data over local default empty positions
+                  const local = merged[existingIndex];
+                  const cloudInvoices = rp.invoices?.length || 0;
+                  const localInvoices = local.invoices?.length || 0;
+                  if (cloudInvoices >= localInvoices) {
+                    merged[existingIndex] = { ...local, ...rp };
+                  }
+                } else {
+                  merged.push(rp);
+                }
+              });
+              
+              // Remove the default dummy position if we have real data from cloud
+              const filtered = merged.filter(p => !(p.id === 'pos-default' && p.invoices.length === 0));
+              return filtered.length > 0 ? filtered : merged;
+            });
+          }
+        } catch (e) {
+          console.error("Firestore sync error:", e);
+        }
       },
       () => {
         setGoogleUser(null);
@@ -660,9 +692,22 @@ export default function App() {
   const allInvoices = activePosition ? (activePosition.invoices || []) : [];
   const allF24Entries = activePosition ? (activePosition.f24Entries || []) : [];
 
-  // Filter invoices and F24 belonging to the selected fiscal year
-  const invoices = allInvoices.filter((inv) => inv.date && inv.date.startsWith(selectedYear));
-  const f24Entries = allF24Entries.filter((e) => e.date && e.date.startsWith(selectedYear));
+  // Filter invoices and F24 belonging to the selected fiscal year and sort chronologically/numerically
+  const invoices = allInvoices
+    .filter((inv) => inv.date && inv.date.startsWith(selectedYear))
+    .sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      if (dateA !== dateB) return dateA - dateB;
+      const numA = parseInt(a.number.replace(/\D/g, '')) || 0;
+      const numB = parseInt(b.number.replace(/\D/g, '')) || 0;
+      if (numA !== numB) return numA - numB;
+      return a.number.localeCompare(b.number);
+    });
+    
+  const f24Entries = allF24Entries
+    .filter((e) => e.date && e.date.startsWith(selectedYear))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const setProfile = (newProfile: BusinessProfile) => {
     setPositions((prev) =>
@@ -696,10 +741,18 @@ export default function App() {
     );
   };
 
-  // Sync positions list to localStorage on change
+  // Sync positions list to localStorage and Firestore on change
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_POSITIONS_KEY, JSON.stringify(positions));
-  }, [positions]);
+    
+    if (googleUser && googleUser.uid) {
+      import('./lib/db').then(({ dbService }) => {
+        dbService.syncAllPositions(googleUser.uid, positions).catch(err => {
+          console.warn("Autosave to Firestore failed:", err);
+        });
+      });
+    }
+  }, [positions, googleUser]);
 
   // Sync active selection to localStorage on change
   useEffect(() => {
@@ -981,11 +1034,24 @@ export default function App() {
     );
   };
 
-  const handleGlobalSave = () => {
+  const handleGlobalSave = async () => {
     localStorage.setItem(LOCAL_STORAGE_POSITIONS_KEY, JSON.stringify(positions));
     localStorage.setItem(LOCAL_STORAGE_ACTIVE_POSITION_ID_KEY, activePositionId);
+    
+    if (googleUser && googleUser.uid) {
+      try {
+        const { dbService } = await import('./lib/db');
+        await dbService.syncAllPositions(googleUser.uid, positions);
+        safeAlert("Modifiche salvate con successo localmente e sul cloud Firebase.");
+      } catch (e) {
+        console.error("Manual cloud sync failed", e);
+        safeAlert("Modifiche salvate localmente. Errore durante il salvataggio sul cloud.");
+      }
+    } else {
+      safeAlert("Modifiche salvate localmente. (Effettua l'accesso Google per il salvataggio nel cloud).");
+    }
+    
     setSyncRetryTrigger(prev => prev + 1);
-    safeAlert("Modifiche salvate con successo.");
   };
 
   const totalPaidRevenue = invoices

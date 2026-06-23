@@ -405,14 +405,14 @@ export async function uploadInvoiceXml(
       },
       body: JSON.stringify({
         name: file.name,
-        mimeType: 'text/xml',
+        mimeType: file.type || 'application/octet-stream',
         parents: [invoicesFolderId],
       }),
     });
 
     if (!metadataRes.ok) {
       const errText = await metadataRes.text();
-      throw new Error(`Errore creazione metadata file XML: ${errText}`);
+      throw new Error(`Errore creazione metadata file: ${errText}`);
     }
 
     const metadata = await metadataRes.json();
@@ -424,7 +424,7 @@ export async function uploadInvoiceXml(
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'text/xml',
+        'Content-Type': file.type || 'application/octet-stream',
       },
       body: file,
     });
