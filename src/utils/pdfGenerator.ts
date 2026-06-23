@@ -15,7 +15,8 @@ export function generateTaxAndInvoicePDF(
   yearOfActivity: number,
   selectedYear: string = '2026',
   f24Entries: F24Entry[] = [],
-  f24Files: { name: string; id: string; url: string; dateAdded: string }[] = []
+  f24Files: { name: string; id: string; url: string; dateAdded: string }[] = [],
+  missingInvoiceNumbers: number[] = []
 ) {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -417,6 +418,29 @@ export function generateTaxAndInvoicePDF(
       
       currentY += 7;
     });
+
+    if (missingInvoiceNumbers && missingInvoiceNumbers.length > 0) {
+      if (currentY > pageHeight - 30) {
+         doc.addPage();
+         currentY = 15;
+      } else {
+         currentY += 8;
+      }
+      
+      doc.setFillColor(254, 242, 242); // very light red
+      doc.setDrawColor(252, 165, 165); // light red border
+      doc.setLineWidth(0.5);
+      doc.rect(marginX, currentY, pageWidth - 2 * marginX, 10, 'FD');
+      
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(185, 28, 28); // Strong red text
+      
+      const missingText = `ATTENZIONE: Analisi sequenza numerica - Mancano le fatture numero: ${missingInvoiceNumbers.join(', ')}`;
+      doc.text(missingText, marginX + 5, currentY + 6.5);
+      
+      currentY += 15;
+    }
   }
 
   // Final footer page 2

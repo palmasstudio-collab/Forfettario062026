@@ -32,6 +32,27 @@ import {
 import { generateTaxAndInvoicePDF } from '../utils/pdfGenerator';
 import { generateInvoicePDFDocument } from '../utils/pdfInvoiceBasic';
 
+export const getMissingInvoiceNumbers = (invoices: Invoice[], year: string): number[] => {
+  const seqNos = invoices.map(inv => {
+    const withoutYear = inv.number.replace(new RegExp(year, 'g'), '');
+    const match = withoutYear.match(/\d+/);
+    return match ? parseInt(match[0], 10) : null;
+  }).filter((n): n is number => n !== null);
+  
+  if (seqNos.length === 0) return [];
+  
+  const maxSeq = Math.max(...seqNos);
+  if (maxSeq > 1000) return []; // safety net against format mismatch
+  
+  const missing = [];
+  for (let i = 1; i < maxSeq; i++) {
+    if (!seqNos.includes(i)) {
+      missing.push(i);
+    }
+  }
+  return missing;
+};
+
 interface TaxSimulatorDashboardProps {
   profile: BusinessProfile;
   revenue: number; // calculated from paid invoices
@@ -91,6 +112,8 @@ export default function TaxSimulatorDashboard({
   const [manualContributions, setManualContributions] = useState<number>(0);
   const [isProcessingXml, setIsProcessingXml] = useState(false);
   const [isProcessingF24, setIsProcessingF24] = useState(false);
+  const [showManualF24Form, setShowManualF24Form] = useState(false);
+  const [manualF24Data, setManualF24Data] = useState({ date: `${selectedYear}-01-01`, amount: '', code: 'INPS', description: 'Inserimento manuale' });
   const xmlInputRef = useRef<HTMLInputElement>(null);
   const f24InputRef = useRef<HTMLInputElement>(null);
 
@@ -223,6 +246,20 @@ export default function TaxSimulatorDashboard({
     }
   };
 
+  const handleManualF24Add = () => {
+    if (!manualF24Data.amount || isNaN(parseFloat(manualF24Data.amount))) return;
+    if (onAddF24Entries) {
+      onAddF24Entries([{
+        date: manualF24Data.date,
+        amount: parseFloat(manualF24Data.amount),
+        taxCode: manualF24Data.code,
+        source: 'MANUALE'
+      }]);
+      setManualF24Data({ date: `${selectedYear}-01-01`, amount: '', code: 'INPS', description: 'Inserimento manuale' });
+      setShowManualF24Form(false);
+    }
+  };
+
   // Costruisce i dati di input per il motore di calcolo
   const taxInput: TaxInput = {
     revenue,
@@ -239,6 +276,8 @@ export default function TaxSimulatorDashboard({
   const results: TaxReturnCalculation = calculateTaxReturn(taxInput);
   const selectedAteco = findAtecoCode(profile.atecoCode);
   const selectedFund = findPensionFund(profile.pensionFund);
+  
+  const missingInvoiceNumbers = getMissingInvoiceNumbers(invoices, selectedYear);
 
   // Calcolo delle percentuali di impatto
   const taxPercentage = revenue > 0 ? (results.substituteTax / revenue) * 100 : 0;
@@ -250,12 +289,13 @@ export default function TaxSimulatorDashboard({
     if (!yearToExport) return;
 
     if (yearToExport === selectedYear) {
-       generateTaxAndInvoicePDF(profile, invoices, results, selectedAteco, selectedFund, yearOfActivity, selectedYear, f24Entries, f24Files);
+       generateTaxAndInvoicePDF(profile, invoices, results, selectedAteco, selectedFund, yearOfActivity, selectedYear, f24Entries, f24Files, missingInvoiceNumbers);
        return;
     }
 
     const filteredInvoices = allInvoices.filter((inv) => inv.date && inv.date.startsWith(yearToExport));
     const filteredF24 = allF24Entries.filter((e) => e.date && e.date.startsWith(yearToExport));
+    const missingForExport = getMissingInvoiceNumbers(filteredInvoices, yearToExport);
     
     const targetRevenue = filteredInvoices.filter(i => i.isPaid).reduce((sum, inv) => sum + inv.amount, 0);
     const targetPrevYearContributions = filteredF24.reduce((sum, e) => {
@@ -276,7 +316,7 @@ export default function TaxSimulatorDashboard({
     };
     const targetResults = calculateTaxReturn(targetInput);
 
-    generateTaxAndInvoicePDF(profile, filteredInvoices, targetResults, selectedAteco, selectedFund, yearOfActivity, yearToExport, filteredF24, f24Files);
+    generateTaxAndInvoicePDF(profile, filteredInvoices, targetResults, selectedAteco, selectedFund, yearOfActivity, yearToExport, filteredF24, f24Files, missingForExport);
   };
 
   return (
@@ -452,6 +492,17 @@ export default function TaxSimulatorDashboard({
                     Tot: € {invoices.reduce((sum, inv) => sum + inv.amount, 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
+                
+                {missingInvoiceNumbers.length > 0 && (
+                  <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5">
+                    <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    <div className="text-xs text-red-800">
+                      <strong className="block mb-0.5 font-bold">Attenzione, buco di numerazione rilevato.</strong>
+                      Mancano le fatture numero: <b>{missingInvoiceNumbers.join(', ')}</b>
+                    </div>
+                  </div>
+                )}
+                
                 {invoices.length === 0 ? (
                   <div className="text-center py-8 text-xs text-slate-400 font-medium">
                     Nessuna fattura XML caricata per il {selectedYear}
@@ -557,6 +608,68 @@ export default function TaxSimulatorDashboard({
                     ))}
                   </div>
                 )}
+                
+                {/* Manual F24 Entry Form */}
+                <div className="mt-3">
+                  {!showManualF24Form ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowManualF24Form(true)}
+                      className="w-full py-2 text-[10px] font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 border border-dashed border-slate-300 hover:text-slate-800 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>+ Inserisci Contributo Manualmente</span>
+                    </button>
+                  ) : (
+                    <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-sm animate-in fade-in slide-in-from-top-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Nuovo Contributo</span>
+                        <button type="button" onClick={() => setShowManualF24Form(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer text-xs font-bold px-1 py-0.5 border rounded">
+                          X
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 uppercase">Data Versamento</label>
+                          <input 
+                            type="date" 
+                            className="w-full p-1.5 text-xs rounded bg-slate-50 border border-slate-200"
+                            value={manualF24Data.date}
+                            onChange={e => setManualF24Data({...manualF24Data, date: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 uppercase">Importo (€)</label>
+                          <input 
+                            type="number" 
+                            min="0"
+                            className="w-full p-1.5 text-xs rounded bg-slate-50 border border-slate-200 font-mono"
+                            placeholder="0.00"
+                            value={manualF24Data.amount}
+                            onChange={e => setManualF24Data({...manualF24Data, amount: e.target.value})}
+                          />
+                        </div>
+                      </div>
+                      <div className="mb-2">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase">Codice Tributo / Cassa</label>
+                        <input 
+                          type="text" 
+                          className="w-full p-1.5 text-xs rounded bg-slate-50 border border-slate-200 font-mono uppercase"
+                          placeholder="es. INPS, INARCASSA, 4001"
+                          value={manualF24Data.code}
+                          onChange={e => setManualF24Data({...manualF24Data, code: e.target.value.toUpperCase()})}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleManualF24Add}
+                        disabled={!manualF24Data.amount}
+                        className="w-full py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                      >
+                        Aggiungi
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
