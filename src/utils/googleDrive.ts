@@ -91,6 +91,79 @@ export async function findOrCreateFolder(
 }
 
 /**
+ * Resolves the nested folder structure for a given fiscal year.
+ * Flexible: searches for 'Anno 2026' or '2026', and finds or creates the subfolder (e.g. 'Fatture Emesse' or 'F24').
+ */
+export async function resolveYearFolderAndSubfolder(
+  accessToken: string,
+  parentFolderId: string,
+  selectedYear: string,
+  subfolderName: string,
+  autoCreate: boolean = true
+): Promise<{ yearFolderId: string; subfolderId: string }> {
+  // 1. Cerca la cartella dell'anno (può chiamarsi "Anno 2026" o semplicemente "2026")
+  const query = `mimeType = 'application/vnd.google-apps.folder' and (name = 'Anno ${selectedYear}' or name = '${selectedYear}') and '${parentFolderId}' in parents and trashed = false`;
+  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`;
+  
+  let yearFolderId = '';
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.files && data.files.length > 0) {
+        yearFolderId = data.files[0].id;
+      }
+    }
+  } catch (err) {
+    console.warn("Errore ricerca cartella anno:", err);
+  }
+
+  if (!yearFolderId) {
+    if (autoCreate) {
+      const created = await findOrCreateFolder(accessToken, `Anno ${selectedYear}`, parentFolderId);
+      yearFolderId = created.id;
+    } else {
+      return { yearFolderId: '', subfolderId: '' };
+    }
+  }
+
+  // 2. Cerca la sottocartella specifica (es. "Fatture Emesse", "Fatture", "F24")
+  const subNames = subfolderName === 'Fatture Emesse' ? ["Fatture Emesse", "Fatture"] : [subfolderName];
+  const nameCondition = subNames.map(n => `name = '${n}'`).join(' or ');
+  const subQuery = `mimeType = 'application/vnd.google-apps.folder' and (${nameCondition}) and '${yearFolderId}' in parents and trashed = false`;
+  const subUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(subQuery)}&fields=files(id,name)`;
+  
+  let subfolderId = '';
+  try {
+    const res = await fetch(subUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.files && data.files.length > 0) {
+        subfolderId = data.files[0].id;
+      }
+    }
+  } catch (err) {
+    console.warn("Errore ricerca sottocartella:", err);
+  }
+
+  if (!subfolderId) {
+    if (autoCreate) {
+      const createdSub = await findOrCreateFolder(accessToken, subfolderName, yearFolderId);
+      subfolderId = createdSub.id;
+    } else {
+      // Se non trova la sottocartella e autoCreate è false, scansioniamo direttamente la cartella dell'anno
+      subfolderId = yearFolderId;
+    }
+  }
+
+  return { yearFolderId, subfolderId };
+}
+
+/**
  * Uploads a PDF file to a dedicated folder inside the specified accounting position folder on Google Drive.
  * First finds/creates a subfolder named 'F24' inside the parent position folder, then uploads the PDF.
  */
@@ -109,9 +182,8 @@ export async function uploadF24Pdf(
     // 1. Use existing or find/create the dedicated "F24" subfolder inside the position folder
     let f24FolderId = '';
     if (year) {
-      const yearFolder = await findOrCreateFolder(accessToken, `Anno ${year}`, parentPositionFolderId);
-      const subFolder = await findOrCreateFolder(accessToken, 'F24', yearFolder.id);
-      f24FolderId = subFolder.id;
+      const resolved = await resolveYearFolderAndSubfolder(accessToken, parentPositionFolderId, year, 'F24', true);
+      f24FolderId = resolved.subfolderId;
     } else {
       f24FolderId = customF24FolderId && customF24FolderId.trim() !== ''
         ? customF24FolderId
@@ -386,9 +458,8 @@ export async function uploadInvoiceXml(
     // 1. Use existing or find/create the dedicated "Fatture Emesse" subfolder inside the position folder
     let invoicesFolderId = '';
     if (year) {
-      const yearFolder = await findOrCreateFolder(accessToken, `Anno ${year}`, parentPositionFolderId);
-      const subFolder = await findOrCreateFolder(accessToken, 'Fatture Emesse', yearFolder.id);
-      invoicesFolderId = subFolder.id;
+      const resolved = await resolveYearFolderAndSubfolder(accessToken, parentPositionFolderId, year, 'Fatture Emesse', true);
+      invoicesFolderId = resolved.subfolderId;
     } else {
       invoicesFolderId = customFattureFolderId && customFattureFolderId.trim() !== ''
         ? customFattureFolderId

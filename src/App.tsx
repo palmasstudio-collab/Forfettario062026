@@ -9,7 +9,7 @@ import BusinessProfileCard from './components/BusinessProfileCard';
 import TaxSimulatorDashboard from './components/TaxSimulatorDashboard';
 import AccountingPositionModal from './components/AccountingPositionModal';
 import DeletePositionModal from './components/DeletePositionModal';
-import { createAccountingPositionFolder, uploadF24Pdf, deleteDriveFile, uploadFirebaseBackupToDrive, findOrCreateFolder, uploadInvoiceXml, listDriveFolders, listFilesInFolder, downloadFileContent, renameDriveFile } from './utils/googleDrive';
+import { createAccountingPositionFolder, uploadF24Pdf, deleteDriveFile, uploadFirebaseBackupToDrive, findOrCreateFolder, uploadInvoiceXml, listDriveFolders, listFilesInFolder, downloadFileContent, renameDriveFile, resolveYearFolderAndSubfolder } from './utils/googleDrive';
 import { parseInvoiceXml } from './utils/xmlInvoiceParser';
 import { calculateTaxReturn } from './calculateTaxReturn';
 import { findAtecoCode, findPensionFund } from './taxData';
@@ -774,9 +774,8 @@ export default function App() {
     if (parentFolderId) {
       addSyncLog(`📁 Risoluzione automatica della cartella per l'anno ${selectedYear}...`);
       try {
-        const yearFolder = await findOrCreateFolder(token, `Anno ${selectedYear}`, parentFolderId);
-        const subFolder = await findOrCreateFolder(token, 'Fatture Emesse', yearFolder.id);
-        folderId = subFolder.id;
+        const resolved = await resolveYearFolderAndSubfolder(token, parentFolderId, selectedYear, 'Fatture Emesse', false);
+        folderId = resolved.subfolderId;
       } catch (err: any) {
         console.warn("Utilizzo del fallback per la ricerca cartella:", err);
       }
@@ -869,6 +868,13 @@ export default function App() {
       setIsSyncingDriveList(false);
     }
   };
+
+  // Trigger automatic synchronization when selectedYear, activePositionId or Google Connection changes
+  useEffect(() => {
+    if (googleAccessTokenState && activePosition && activePosition.driveFolderId) {
+      handleDriveInvoiceSync();
+    }
+  }, [selectedYear, activePositionId, googleAccessTokenState]);
 
   const handleCreatePosition = async (
     name: string, 
@@ -1521,6 +1527,7 @@ export default function App() {
                       onUploadInvoiceXmlToDrive={handleUploadInvoiceXmlToDrive}
                       onSyncDriveInvoices={handleDriveInvoiceSync}
                       isSyncingDriveInvoices={isSyncingDriveList}
+                      onChangeProfile={setProfile}
                     />
                   </>
                 )}

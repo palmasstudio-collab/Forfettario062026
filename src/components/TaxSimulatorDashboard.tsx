@@ -76,6 +76,7 @@ interface TaxSimulatorDashboardProps {
   onUploadInvoiceXmlToDrive?: (file: File, year?: string) => Promise<{name: string, id: string, url: string, dateAdded: string}>;
   onSyncDriveInvoices?: () => Promise<void>;
   isSyncingDriveInvoices?: boolean;
+  onChangeProfile?: (profile: BusinessProfile) => void;
 }
 
 export default function TaxSimulatorDashboard({ 
@@ -100,7 +101,8 @@ export default function TaxSimulatorDashboard({
   onDeleteF24Entry,
   onUploadInvoiceXmlToDrive,
   onSyncDriveInvoices,
-  isSyncingDriveInvoices = false
+  isSyncingDriveInvoices = false,
+  onChangeProfile
 }: TaxSimulatorDashboardProps) {
   // Calcolo dei contributi inseriti dagli F24 per l'anno selezionato
   const excludedTaxCodes = ['2501', '2524'];
@@ -108,8 +110,29 @@ export default function TaxSimulatorDashboard({
     .filter(e => !excludedTaxCodes.includes(e.taxCode))
     .reduce((sum, e) => sum + e.amount, 0);
 
-  const [useAutomaticF24, setUseAutomaticF24] = useState<boolean>(true);
-  const [manualContributions, setManualContributions] = useState<number>(0);
+  const useAutomaticF24 = profile.useAutomaticF24ByYear?.[selectedYear] ?? true;
+  const manualContributions = profile.manualContributionsByYear?.[selectedYear] ?? 0;
+
+  const handleUpdateContributions = (val: number) => {
+    if (onChangeProfile) {
+      const updatedManual = { ...profile.manualContributionsByYear, [selectedYear]: val };
+      onChangeProfile({
+        ...profile,
+        manualContributionsByYear: updatedManual
+      });
+    }
+  };
+
+  const handleToggleAutomatic = (val: boolean) => {
+    if (onChangeProfile) {
+      const updatedAuto = { ...profile.useAutomaticF24ByYear, [selectedYear]: val };
+      onChangeProfile({
+        ...profile,
+        useAutomaticF24ByYear: updatedAuto
+      });
+    }
+  };
+
   const [isProcessingXml, setIsProcessingXml] = useState(false);
   const [isProcessingF24, setIsProcessingF24] = useState(false);
   const [showManualF24Form, setShowManualF24Form] = useState(false);
@@ -119,8 +142,31 @@ export default function TaxSimulatorDashboard({
 
   const prevYearContributions = useAutomaticF24 ? autoContributions : manualContributions;
   
-  // Anno di attività (da 1 a 5 per verificare i requisiti dell'aliquota startup al 5%)
+  // Anno di attività (da 1 a 10 per verificare i requisiti dell'aliquota startup al 5%)
   const [yearOfActivity, setYearOfActivity] = useState<number>(1);
+
+  // Automatically compute and sync year of activity on selectedYear or vatOpeningDate changes
+  React.useEffect(() => {
+    if (profile.vatOpeningDate && selectedYear) {
+      let openingYear = 0;
+      if (profile.vatOpeningDate.includes('/')) {
+        const parts = profile.vatOpeningDate.split('/');
+        if (parts.length === 3) {
+          if (parts[2].length === 4) openingYear = parseInt(parts[2], 10);
+          else if (parts[0].length === 4) openingYear = parseInt(parts[0], 10);
+        }
+      } else if (profile.vatOpeningDate.includes('-')) {
+        const parts = profile.vatOpeningDate.split('-');
+        if (parts.length >= 3) {
+          openingYear = parseInt(parts[0], 10);
+        }
+      }
+      if (openingYear > 0) {
+        const diff = parseInt(selectedYear, 10) - openingYear + 1;
+        setYearOfActivity(Math.max(1, Math.min(10, diff)));
+      }
+    }
+  }, [profile.vatOpeningDate, selectedYear]);
 
   const handleXmlUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -384,13 +430,13 @@ export default function TaxSimulatorDashboard({
                       : 'bg-white text-slate-800 border-slate-200'
                   }`}
                   value={prevYearContributions}
-                  onChange={(e) => setManualContributions(Math.max(0, parseFloat(e.target.value) || 0))}
+                  onChange={(e) => handleUpdateContributions(Math.max(0, parseFloat(e.target.value) || 0))}
                 />
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-1">
                 <button
                   type="button"
-                  onClick={() => setUseAutomaticF24(!useAutomaticF24)}
+                  onClick={() => handleToggleAutomatic(!useAutomaticF24)}
                   className={`text-[9.5px] font-bold px-2 py-0.5 rounded-md border transition-all self-start cursor-pointer ${
                     useAutomaticF24 
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'

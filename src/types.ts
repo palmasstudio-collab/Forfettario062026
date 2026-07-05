@@ -84,6 +84,8 @@ export interface BusinessProfile {
   isStartup: boolean;
   vatOpeningDate?: string;
   inpsReduction35?: boolean;
+  manualContributionsByYear?: Record<string, number>;
+  useAutomaticF24ByYear?: Record<string, boolean>;
 }
 
 export interface F24Entry {
