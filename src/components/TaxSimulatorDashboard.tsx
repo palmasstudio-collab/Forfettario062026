@@ -63,6 +63,7 @@ interface TaxSimulatorDashboardProps {
   driveFolderUrl?: string;
   f24Files?: { name: string; id: string; url: string; dateAdded: string }[];
   onUploadF24?: (file: File, year?: string) => Promise<void>;
+  onUploadF24s?: (files: File[], year?: string) => Promise<any>;
   onDeleteF24?: (id: string) => Promise<void>;
   onConnectGoogle?: () => void;
   hideCalculationsBreakdown?: boolean;
@@ -70,6 +71,7 @@ interface TaxSimulatorDashboardProps {
   allF24Entries?: F24Entry[];
   selectedYear: string;
   onAddInvoice?: (newInvoice: Omit<Invoice, 'id'>) => void;
+  onAddInvoices?: (newInvoices: Omit<Invoice, 'id'>[]) => void;
   onDeleteInvoice?: (id: string) => void;
   onAddF24Entries?: (newEntries: any[]) => void;
   onDeleteF24Entry?: (id: string) => void;
@@ -89,6 +91,7 @@ export default function TaxSimulatorDashboard({
   allF24Entries = [],
   selectedYear,
   onUploadF24,
+  onUploadF24s,
   onDeleteF24,
   onConnectGoogle,
   driveFolderId,
@@ -96,6 +99,7 @@ export default function TaxSimulatorDashboard({
   f24Files = [],
   googleConnected,
   onAddInvoice,
+  onAddInvoices,
   onDeleteInvoice,
   onAddF24Entries,
   onDeleteF24Entry,
@@ -170,75 +174,115 @@ export default function TaxSimulatorDashboard({
 
   const handleXmlUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || files.length === 0 || !onAddInvoice) return;
+    if (!files || files.length === 0) return;
     setIsProcessingXml(true);
     try {
+      const filesArray = Array.from(files) as File[];
+      const parsedInvoices: any[] = [];
+      const duplicateDetectedList: string[] = [];
       const recentlyAdded = new Set<string>();
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const text = await file.text();
-        const parsed = parseInvoiceXml(text);
-        if (parsed) {
-          const duplicateKey = `${parsed.number}-${parsed.clientVat || parsed.clientName}`;
-          let isDuplicate = invoices.some(inv => 
-             inv.number === parsed.number &&
-             (inv.clientVat === parsed.clientVat || inv.clientName === parsed.clientName)
-          );
+      for (const file of filesArray) {
+        try {
+          const text = await file.text();
+          const parsed = parseInvoiceXml(text);
+          if (parsed) {
+            const duplicateKey = `${parsed.number}-${parsed.clientVat || parsed.clientName}`;
+            let isDuplicate = invoices.some(inv => 
+               inv.number === parsed.number &&
+               (inv.clientVat === parsed.clientVat || inv.clientName === parsed.clientName)
+            );
 
-          if (!isDuplicate && recentlyAdded.has(duplicateKey)) {
-             isDuplicate = true;
-          }
+            if (!isDuplicate && recentlyAdded.has(duplicateKey)) {
+               isDuplicate = true;
+            }
 
-          if (isDuplicate) {
-             const confirm = safeConfirm(`Attenzione: La fattura N. ${parsed.number} intestata a ${parsed.clientName} sembra essere già presente in questo anno o in questo caricamento.\nVuoi caricarla comunque prima di procedere?`);
-             if (!confirm) continue;
+            if (isDuplicate) {
+              duplicateDetectedList.push(`N. ${parsed.number} - ${parsed.clientName}`);
+            }
+            recentlyAdded.add(duplicateKey);
+            parsedInvoices.push({ file, parsed });
           }
+        } catch (parseErr: any) {
+          console.error("Errore di parsing file:", file.name, parseErr);
+        }
+      }
+
+      if (parsedInvoices.length === 0) {
+        safeAlert("Nessuna fattura XML valida trovata nei file selezionati.");
+        return;
+      }
+
+      let proceedWithUpload = true;
+      if (duplicateDetectedList.length > 0) {
+        const confirmMsg = `Attenzione: Sono state rilevate ${duplicateDetectedList.length} fatture già caricate o duplicate nel caricamento attuale:\n` +
+          duplicateDetectedList.slice(0, 5).map(item => `• ${item}`).join('\n') + 
+          (duplicateDetectedList.length > 5 ? `\n• ...e altre ${duplicateDetectedList.length - 5} fatture.` : '') +
+          `\n\nVuoi procedere comunque e registrarle tutte?`;
+        proceedWithUpload = safeConfirm(confirmMsg);
+      }
+
+      if (!proceedWithUpload) {
+        safeAlert("Operazione di caricamento massivo annullata.");
+        return;
+      }
+
+      const invoicesToRegister: Omit<Invoice, 'id'>[] = [];
+
+      for (const { file, parsed } of parsedInvoices) {
+        let invoiceDate = parsed.date || `${selectedYear}-01-01`;
+        const invoiceYear = invoiceDate ? invoiceDate.split('-')[0] : selectedYear;
+
+        let driveFileId: string | undefined;
+        let driveFileUrl: string | undefined;
+
+        if (onUploadInvoiceXmlToDrive) {
+          const safeNumber = parsed.number.replace(/[^a-zA-Z0-9]/g, '_');
+          const safeDate = invoiceDate.replace(/[^0-9-]/g, '');
+          const newNameXML = `Fattura_${safeNumber}_${safeDate}.xml`;
+          const renamedFile = new File([file], newNameXML, { type: file.type });
           
-          recentlyAdded.add(duplicateKey);
-
-          // Safe check to verify if the invoice belongs to the selectedYear. 
-          let invoiceDate = parsed.date;
-          if (!invoiceDate) {
-            invoiceDate = `${selectedYear}-01-01`;
-          }
-          const invoiceYear = invoiceDate ? invoiceDate.split('-')[0] : selectedYear;
-
-          let driveFileId: string | undefined;
-          let driveFileUrl: string | undefined;
-
-          if (onUploadInvoiceXmlToDrive) {
-            const safeNumber = parsed.number.replace(/[^a-zA-Z0-9]/g, '_');
-            const safeDate = invoiceDate.replace(/[^0-9-]/g, '');
-            const newNameXML = `Fattura_${safeNumber}_${safeDate}.xml`;
-            const renamedFile = new File([file], newNameXML, { type: file.type });
+          try {
             const uploadedFileResult = await onUploadInvoiceXmlToDrive(renamedFile, invoiceYear);
             driveFileId = uploadedFileResult.id;
             driveFileUrl = uploadedFileResult.url;
             
-            // Generate and upload PDF version alongside it
             try {
                const pdfFile = generateInvoicePDFDocument(parsed, newNameXML);
                await onUploadInvoiceXmlToDrive(pdfFile, invoiceYear);
             } catch (pdfErr) {
-               console.warn("PDF automatic generation/upload failed:", pdfErr);
+               console.warn("Generazione/Upload PDF automatico fallito:", pdfErr);
             }
+          } catch (uploadErr: any) {
+            console.error("Errore upload file:", file.name, uploadErr);
           }
+        }
 
-          onAddInvoice({
-            date: invoiceDate,
-            number: parsed.number,
-            clientName: parsed.clientName,
-            clientVat: parsed.clientVat || '',
-            hasStampDuty: parsed.hasStampDuty || false,
-            amount: parsed.amount,
-            isPaid: true,
-            notes: parsed.notes,
-            driveFileId: driveFileId,
-            driveFileUrl: driveFileUrl,
-          });
+        invoicesToRegister.push({
+          date: invoiceDate,
+          number: parsed.number,
+          clientName: parsed.clientName,
+          clientVat: parsed.clientVat || '',
+          hasStampDuty: parsed.hasStampDuty || false,
+          amount: parsed.amount,
+          isPaid: true,
+          notes: parsed.notes,
+          driveFileId: driveFileId,
+          driveFileUrl: driveFileUrl,
+        });
+      }
+
+      if (invoicesToRegister.length > 0) {
+        if (onAddInvoices) {
+          onAddInvoices(invoicesToRegister);
+        } else if (onAddInvoice) {
+          for (const inv of invoicesToRegister) {
+            onAddInvoice(inv);
+          }
         }
       }
+
+      safeAlert(`Caricamento massivo completato con successo: ${invoicesToRegister.length} fatture elaborate.`);
     } catch (err: any) {
       safeAlert("Errore elaborazione XML: " + err.message);
     } finally {
@@ -248,42 +292,63 @@ export default function TaxSimulatorDashboard({
   };
 
   const handleF24Upload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || (!onAddF24Entries && !onUploadF24)) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
     setIsProcessingF24(true);
     try {
-      let documentYear = selectedYear;
-      if (onAddF24Entries) {
-        const entries = await extractF24DataFromPdf(file);
-        if (entries.length > 0) {
-          // Find first entry with an explicit year
-          const foundYear = entries.find(entry => entry.year)?.year;
-          if (foundYear) {
-            documentYear = foundYear;
+      const filesArray = Array.from(files) as File[];
+      const allTransformedEntries: any[] = [];
+      
+      if (onUploadF24s) {
+        // Use optimized batch uploader on App.tsx which does single structural verify and single state update!
+        await onUploadF24s(filesArray, selectedYear);
+      } else {
+        // Graceful sequential fallback
+        for (let i = 0; i < filesArray.length; i++) {
+          const file = filesArray[i];
+          let documentYear = selectedYear;
+
+          if (onAddF24Entries) {
+            try {
+              const entries = await extractF24DataFromPdf(file);
+              if (entries.length > 0) {
+                const foundYear = entries.find(entry => entry.year)?.year;
+                if (foundYear) {
+                  documentYear = foundYear;
+                }
+
+                const transformedEntries = entries.map(entry => {
+                  const today = new Date();
+                  const monthStr = String(today.getMonth() + 1).padStart(2, '0');
+                  const dayStr = String(today.getDate()).padStart(2, '0');
+                  const entryYear = entry.year || selectedYear;
+                  const entryDate = `${entryYear}-${monthStr}-${dayStr}`;
+
+                  return {
+                    taxCode: entry.taxCode,
+                    amount: entry.amount,
+                    date: entryDate,
+                    description: `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
+                    source: 'PDF'
+                  };
+                });
+                allTransformedEntries.push(...transformedEntries);
+              }
+            } catch (errParse) {
+              console.warn("F24 parsing error:", errParse);
+            }
           }
+          if (onUploadF24) {
+            await onUploadF24(file, documentYear);
+          }
+        }
 
-          // Transform parsed F24 entries so they have expected schema and match their parsed year or selectedYear date
-          const transformedEntries = entries.map(entry => {
-            const today = new Date();
-            const monthStr = String(today.getMonth() + 1).padStart(2, '0');
-            const dayStr = String(today.getDate()).padStart(2, '0');
-            const entryYear = entry.year || selectedYear;
-            const entryDate = `${entryYear}-${monthStr}-${dayStr}`;
-
-            return {
-              taxCode: entry.taxCode,
-              amount: entry.amount,
-              date: entryDate,
-              description: `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
-              source: 'PDF'
-            };
-          });
-          onAddF24Entries(transformedEntries);
+        if (allTransformedEntries.length > 0 && onAddF24Entries) {
+          onAddF24Entries(allTransformedEntries);
         }
       }
-      if (onUploadF24) {
-        await onUploadF24(file, documentYear);
-      }
+
+      safeAlert(`Caricamento massivo F24 completato con successo: ${filesArray.length} file elaborati.`);
     } catch (err: any) {
       safeAlert("Errore elaborazione F24: " + err.message);
     } finally {
@@ -595,6 +660,7 @@ export default function TaxSimulatorDashboard({
                 <input
                   ref={f24InputRef}
                   type="file"
+                  multiple
                   accept=".pdf"
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed text-[0px]"
                   onChange={handleF24Upload}

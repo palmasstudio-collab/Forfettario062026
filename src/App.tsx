@@ -9,8 +9,9 @@ import BusinessProfileCard from './components/BusinessProfileCard';
 import TaxSimulatorDashboard from './components/TaxSimulatorDashboard';
 import AccountingPositionModal from './components/AccountingPositionModal';
 import DeletePositionModal from './components/DeletePositionModal';
-import { createAccountingPositionFolder, uploadF24Pdf, deleteDriveFile, uploadFirebaseBackupToDrive, findOrCreateFolder, uploadInvoiceXml, listDriveFolders, listFilesInFolder, downloadFileContent, renameDriveFile, resolveYearFolderAndSubfolder } from './utils/googleDrive';
+import { createAccountingPositionFolder, uploadF24Pdf, deleteDriveFile, uploadFirebaseBackupToDrive, findOrCreateFolder, uploadInvoiceXml, listDriveFolders, listFilesInFolder, downloadFileContent, renameDriveFile, resolveYearFolderAndSubfolder, verifyAndRecreateFolderStructure } from './utils/googleDrive';
 import { parseInvoiceXml } from './utils/xmlInvoiceParser';
+import { extractF24DataFromPdf } from './utils/pdfF24Parser';
 import { calculateTaxReturn } from './calculateTaxReturn';
 import { findAtecoCode, findPensionFund } from './taxData';
 import { safeAlert, safeConfirm } from './utils/safeWindow';
@@ -201,6 +202,7 @@ export default function App() {
   const [isPositionModalOpen, setIsPositionModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isCreatingDriveFolder, setIsCreatingDriveFolder] = useState(false);
+  const [isRecreatingDriveFolder, setIsRecreatingDriveFolder] = useState(false);
 
   // Online/Offline detection states
   const [isOnline, setIsOnline] = useState<boolean>(() => typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -405,47 +407,45 @@ export default function App() {
       throw new Error("Sincronizzazione Drive non attiva: Google Drive non connesso.");
     }
     
-    let parentFolderId = activePosition.driveFolderId;
-    let targetFattureFolderId = activePosition.fattureEmesseFolderId;
     const uploadYear = year || selectedYear;
-    
-    // 1. If active position doesn't have a drive folder yet, create it automatically!
-    if (!parentFolderId) {
-      addSyncLog(`📁 Creazione automatica della cartella principale Drive per "${activePosition.name}" prima del caricamento dell'XML della fattura...`);
-      try {
-        const folder = await createAccountingPositionFolder(token, activePosition.name, activePosition.profile.fullName, undefined, uploadYear);
-        parentFolderId = folder.id;
-        targetFattureFolderId = folder.fattureEmesseFolderId;
-        
-        // Update positions state locally with the new folder id/url so we can proceed
-        setPositions((prev) =>
-          prev.map((pos) => {
-            if (pos.id === activePositionId) {
-              return {
-                ...pos,
-                driveFolderId: folder.id,
-                driveFolderUrl: folder.url,
-                fattureEmesseFolderId: folder.fattureEmesseFolderId,
-                f24FolderId: folder.f24FolderId,
-                fileGenericiFolderId: folder.fileGenericiFolderId,
-              };
-            }
-            return pos;
-          })
-        );
-        addSyncLog(`✅ Cartella principale "Forfettario ${activePosition.profile.fullName}" creata con successo.`);
-      } catch (err: any) {
-        console.error(err);
-        addSyncLog(`❌ Impossibile creare la cartella principale del cliente: ${err.message || err}`);
-        throw new Error(`Impossibile creare cartella principale su Drive: ${err.message}`);
-      }
-    }
+    addSyncLog(`🔍 Verifica preventiva obbligatoria dell'esistenza delle cartelle di archiviazione per "${activePosition.profile.fullName || 'Cliente'}"...`);
 
-    if (!parentFolderId) {
-      throw new Error("ID Cartella Drive principale non disponibile.");
-    }
+    try {
+      // Verify existing structure or recreate if missing
+      const healedFolder = await verifyAndRecreateFolderStructure(
+        token,
+        activePosition.name,
+        activePosition.profile.fullName,
+        activePosition.driveFolderId,
+        uploadYear
+      );
 
-    return await uploadInvoiceXml(token, parentFolderId, file, targetFattureFolderId, uploadYear);
+      // Save healed structure in the state
+      setPositions((prev) =>
+        prev.map((pos) => {
+          if (pos.id === activePositionId) {
+            return {
+              ...pos,
+              driveFolderId: healedFolder.id,
+              driveFolderUrl: healedFolder.url,
+              fattureEmesseFolderId: healedFolder.fattureEmesseFolderId,
+              f24FolderId: healedFolder.f24FolderId,
+              fileGenericiFolderId: healedFolder.fileGenericiFolderId,
+            };
+          }
+          return pos;
+        })
+      );
+
+      addSyncLog(`✅ Struttura cartelle verificata e pronta per l'archiviazione della fattura.`);
+      
+      // Proceed to upload the XML into the verified invoices folder
+      return await uploadInvoiceXml(token, healedFolder.id, file, healedFolder.fattureEmesseFolderId, uploadYear);
+    } catch (err: any) {
+      console.error(err);
+      addSyncLog(`❌ Errore durante la verifica/ripristino preventivo delle cartelle: ${err.message || err}`);
+      throw new Error(`Archiviazione sospesa per sicurezza: ${err.message || err}`);
+    }
   };
 
   const pickerCallback = async (data: any, token: string) => {
@@ -483,6 +483,59 @@ export default function App() {
       } finally {
         setIsCreatingDriveFolder(false);
       }
+    }
+  };
+
+  const handleRecreateDriveFolder = async () => {
+    if (!activePosition) {
+      safeAlert("Nessuna posizione contabile attiva selezionata.");
+      return;
+    }
+    const token = googleAccessTokenState;
+    if (!token) {
+      safeAlert("Connetti prima Google Drive dall'apposito pulsante nell'header in alto a destra.");
+      return;
+    }
+
+    setIsRecreatingDriveFolder(true);
+    addSyncLog(`🛠️ Avvio della procedura di ripristino di emergenza per "${activePosition.profile.fullName || 'Cliente'}"...`);
+    addSyncLog(`🔍 Verifica preventiva dell'esistenza delle cartelle su Google Drive per l'anno ${selectedYear}...`);
+
+    try {
+      const healedFolder = await verifyAndRecreateFolderStructure(
+        token,
+        activePosition.name,
+        activePosition.profile.fullName,
+        activePosition.driveFolderId,
+        selectedYear
+      );
+
+      // Aggiorna lo stato locale
+      setPositions((prev) =>
+        prev.map((pos) => {
+          if (pos.id === activePositionId) {
+            return {
+              ...pos,
+              driveFolderId: healedFolder.id,
+              driveFolderUrl: healedFolder.url,
+              fattureEmesseFolderId: healedFolder.fattureEmesseFolderId,
+              f24FolderId: healedFolder.f24FolderId,
+              fileGenericiFolderId: healedFolder.fileGenericiFolderId,
+            };
+          }
+          return pos;
+        })
+      );
+
+      addSyncLog(`✅ Struttura cartelle ripristinata e allineata correttamente su Google Drive!`);
+      addSyncLog(`📁 Cartella principale: ${healedFolder.url}`);
+      safeAlert(`La struttura di cartelle per "${activePosition.profile.fullName}" è stata verificata e ricreata con successo su Google Drive!`);
+    } catch (err: any) {
+      console.error(err);
+      addSyncLog(`❌ Errore durante il ripristino o ricreazione delle cartelle: ${err.message || err}`);
+      safeAlert(`Errore durante il ripristino delle cartelle: ${err.message || err}`);
+    } finally {
+      setIsRecreatingDriveFolder(false);
     }
   };
 
@@ -547,49 +600,41 @@ export default function App() {
       throw new Error("Google Drive non connesso.");
     }
 
-    let parentFolderId = activePosition.driveFolderId;
-    let targetF24FolderId = activePosition.f24FolderId;
     const uploadYear = year || selectedYear;
-    
-    // 1. If active position doesn't have a drive folder yet, create it automatically!
-    if (!parentFolderId) {
-      addSyncLog(`📁 Creazione automatica della cartella principale Drive per "${activePosition.name}" prima del caricamento dell'F24...`);
-      try {
-        const folder = await createAccountingPositionFolder(token, activePosition.name, activePosition.profile.fullName, undefined, uploadYear);
-        parentFolderId = folder.id;
-        targetF24FolderId = folder.f24FolderId;
-        
-        // Update positions state locally with the new folder id/url temporarily so we can proceed
-        setPositions((prev) =>
-          prev.map((pos) => {
-            if (pos.id === activePositionId) {
-              return {
-                ...pos,
-                driveFolderId: folder.id,
-                driveFolderUrl: folder.url,
-                fattureEmesseFolderId: folder.fattureEmesseFolderId,
-                f24FolderId: folder.f24FolderId,
-                fileGenericiFolderId: folder.fileGenericiFolderId,
-              };
-            }
-            return pos;
-          })
-        );
-        addSyncLog(`✅ Cartella principale creata con successo.`);
-      } catch (err: any) {
-        console.error(err);
-        addSyncLog(`❌ Impossibile creare la cartella principale del cliente: ${err.message || err}`);
-        throw new Error(`Impossibile creare cartella principale su Drive: ${err.message}`);
-      }
-    }
+    addSyncLog(`🔍 Verifica preventiva obbligatoria dell'esistenza delle cartelle di archiviazione per "${activePosition.profile.fullName || 'Cliente'}"...`);
 
-    if (!parentFolderId) {
-      throw new Error("ID Cartella Drive principale non disponibile.");
-    }
-
-    addSyncLog(`⏱️ Inizio caricamento del file F24 "${file.name}" su Drive...`);
     try {
-      const uploadedFile = await uploadF24Pdf(token, parentFolderId, file, activePosition.profile.fullName, targetF24FolderId, uploadYear);
+      // 1. Verify and automatically recreate any missing folders in the hierarchy
+      const healedFolder = await verifyAndRecreateFolderStructure(
+        token,
+        activePosition.name,
+        activePosition.profile.fullName,
+        activePosition.driveFolderId,
+        uploadYear
+      );
+
+      // Save healed structure in the state
+      setPositions((prev) =>
+        prev.map((pos) => {
+          if (pos.id === activePositionId) {
+            return {
+              ...pos,
+              driveFolderId: healedFolder.id,
+              driveFolderUrl: healedFolder.url,
+              fattureEmesseFolderId: healedFolder.fattureEmesseFolderId,
+              f24FolderId: healedFolder.f24FolderId,
+              fileGenericiFolderId: healedFolder.fileGenericiFolderId,
+            };
+          }
+          return pos;
+        })
+      );
+
+      addSyncLog(`✅ Struttura cartelle verificata e pronta per il caricamento dell'F24.`);
+      addSyncLog(`⏱️ Inizio caricamento del file F24 "${file.name}" su Drive...`);
+
+      // 2. Upload the F24 PDF into the verified F24 subfolder
+      const uploadedFile = await uploadF24Pdf(token, healedFolder.id, file, activePosition.profile.fullName, healedFolder.f24FolderId, uploadYear);
       
       // Update the active position's f24 list
       setPositions((prev) =>
@@ -599,9 +644,10 @@ export default function App() {
             return {
               ...pos,
               f24Files: [uploadedFile, ...currentF24s],
-              // Ensure metadata is set (it might be set already if we just created the folder)
-              driveFolderId: parentFolderId,
-              f24FolderId: targetF24FolderId,
+              driveFolderId: healedFolder.id,
+              f24FolderId: healedFolder.f24FolderId,
+              fattureEmesseFolderId: healedFolder.fattureEmesseFolderId,
+              fileGenericiFolderId: healedFolder.fileGenericiFolderId,
             };
           }
           return pos;
@@ -610,7 +656,108 @@ export default function App() {
       addSyncLog(`✅ File F24 "${file.name}" caricato correttamente nella sottocartella "F24" dell'anno ${uploadYear} su Google Drive!`);
     } catch (err: any) {
       console.error(err);
-      addSyncLog(`❌ Errore durante il caricamento di "${file.name}": ${err.message || err}`);
+      addSyncLog(`❌ Errore durante la verifica preventiva o il caricamento di "${file.name}": ${err.message || err}`);
+      throw err;
+    }
+  };
+
+  const handleUploadF24s = async (files: File[], year?: string) => {
+    if (!activePosition) {
+      throw new Error("Nessuna posizione contabile attiva selezionata.");
+    }
+    const token = googleAccessTokenState;
+    if (!token) {
+      addSyncLog("⚠️ Connetti prima Google Drive per caricare i file F24.");
+      throw new Error("Google Drive non connesso.");
+    }
+
+    const uploadYear = year || selectedYear;
+    addSyncLog(`🔍 [Massivo] Verifica preventiva obbligatoria delle cartelle per "${activePosition.profile.fullName || 'Cliente'}"...`);
+
+    try {
+      // 1. Verify structure once
+      const healedFolder = await verifyAndRecreateFolderStructure(
+        token,
+        activePosition.name,
+        activePosition.profile.fullName,
+        activePosition.driveFolderId,
+        uploadYear
+      );
+
+      addSyncLog(`✅ Struttura cartelle verificata per caricamento massivo.`);
+      
+      const uploadedFiles: any[] = [];
+      const allExtractedEntries: any[] = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        addSyncLog(`⏱️ [${i+1}/${files.length}] Caricamento file F24 "${file.name}" su Drive...`);
+        try {
+          const uploadedFile = await uploadF24Pdf(token, healedFolder.id, file, activePosition.profile.fullName, healedFolder.f24FolderId, uploadYear);
+          uploadedFiles.push(uploadedFile);
+          addSyncLog(`✅ [${i+1}/${files.length}] File F24 "${file.name}" caricato.`);
+          
+          // Try to parse F24 data from PDF
+          try {
+            const entries = await extractF24DataFromPdf(file);
+            if (entries.length > 0) {
+              const transformed = entries.map(entry => {
+                const today = new Date();
+                const monthStr = String(today.getMonth() + 1).padStart(2, '0');
+                const dayStr = String(today.getDate()).padStart(2, '0');
+                const entryYear = entry.year || uploadYear;
+                const entryDate = `${entryYear}-${monthStr}-${dayStr}`;
+                return {
+                  taxCode: entry.taxCode,
+                  amount: entry.amount,
+                  date: entryDate,
+                  description: `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
+                  source: 'PDF',
+                  driveFileId: uploadedFile.id
+                };
+              });
+              allExtractedEntries.push(...transformed);
+            }
+          } catch (parseErr: any) {
+            console.warn(`Extraction failed for ${file.name}:`, parseErr);
+          }
+        } catch (uploadErr: any) {
+          console.error(`Upload failed for ${file.name}:`, uploadErr);
+          addSyncLog(`❌ [${i+1}/${files.length}] Errore durante il caricamento di "${file.name}": ${uploadErr.message || uploadErr}`);
+        }
+      }
+
+      // 2. Perform a single atomic state update
+      setPositions((prev) =>
+        prev.map((pos) => {
+          if (pos.id === activePositionId) {
+            const currentF24Files = pos.f24Files || [];
+            const currentF24Entries = pos.f24Entries || [];
+            
+            const entriesWithIds = allExtractedEntries.map(e => ({
+              ...e,
+              id: `f24-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+            }));
+
+            return {
+              ...pos,
+              f24Files: [...uploadedFiles, ...currentF24Files],
+              f24Entries: [...currentF24Entries, ...entriesWithIds],
+              driveFolderId: healedFolder.id,
+              f24FolderId: healedFolder.f24FolderId,
+              fattureEmesseFolderId: healedFolder.fattureEmesseFolderId,
+              fileGenericiFolderId: healedFolder.fileGenericiFolderId,
+            };
+          }
+          return pos;
+        })
+      );
+
+      addSyncLog(`✅ Caricamento massivo completato: ${uploadedFiles.length} file elaborati.`);
+      return uploadedFiles;
+    } catch (err: any) {
+      console.error(err);
+      addSyncLog(`❌ Errore caricamento massivo F24: ${err.message || err}`);
       throw err;
     }
   };
@@ -766,76 +913,92 @@ export default function App() {
     if (!activePosition) return;
     const token = googleAccessTokenState;
     if (!token) {
-      addSyncLog("⚠️ Non sei connesso a Google Drive, impossibile effettuare sync fatture.");
-      return;
-    }
-    let folderId = activePosition.fattureEmesseFolderId;
-    const parentFolderId = activePosition.driveFolderId;
-    if (parentFolderId) {
-      addSyncLog(`📁 Risoluzione automatica della cartella per l'anno ${selectedYear}...`);
-      try {
-        const resolved = await resolveYearFolderAndSubfolder(token, parentFolderId, selectedYear, 'Fatture Emesse', false);
-        folderId = resolved.subfolderId;
-      } catch (err: any) {
-        console.warn("Utilizzo del fallback per la ricerca cartella:", err);
-      }
-    }
-
-    if (!folderId) {
-      addSyncLog("⚠️ La cartella Fatture Emesse Drive non è ancora creata. Carica una prima fattura da UI.");
+      addSyncLog("⚠️ Non sei connesso a Google Drive, impossibile effettuare la sincronizzazione.");
       return;
     }
 
     setIsSyncingDriveList(true);
-    addSyncLog(`🔄 Scansione cartella Fatture (${selectedYear}) su Drive in corso...`);
+    addSyncLog(`🔄 Sincronizzazione in tempo reale per l'Esercizio ${selectedYear}...`);
+
+    let fattureFolderId = activePosition.fattureEmesseFolderId;
+    let f24FolderId = activePosition.f24FolderId;
+    const parentFolderId = activePosition.driveFolderId;
+
+    if (parentFolderId) {
+      addSyncLog(`📁 Risoluzione automatica dei percorsi Drive per l'anno ${selectedYear}...`);
+      try {
+        const [resolvedFatture, resolvedF24] = await Promise.all([
+          resolveYearFolderAndSubfolder(token, parentFolderId, selectedYear, 'Fatture Emesse', false).catch(() => null),
+          resolveYearFolderAndSubfolder(token, parentFolderId, selectedYear, 'F24', false).catch(() => null)
+        ]);
+        if (resolvedFatture) {
+          fattureFolderId = resolvedFatture.subfolderId;
+        }
+        if (resolvedF24) {
+          f24FolderId = resolvedF24.subfolderId;
+        }
+      } catch (err: any) {
+        console.warn("Risoluzione delle cartelle Drive fallita, utilizzo i valori predefiniti:", err);
+      }
+    }
 
     try {
-      const driveFiles = await listFilesInFolder(token, folderId);
-      
-      const currentInvoices = activePosition.invoices || [];
-      const driveFilesMap = new Map(driveFiles.map(f => [f.id, f]));
+      // 1. Fetch files in parallel from both folders on Drive
+      const [driveInvoices, driveF24s] = await Promise.all([
+        fattureFolderId ? listFilesInFolder(token, fattureFolderId).catch(() => []) : Promise.resolve([]),
+        f24FolderId ? listFilesInFolder(token, f24FolderId).catch(() => []) : Promise.resolve([])
+      ]);
+
+      const allInvoices = activePosition.invoices || [];
+      const allF24Files = activePosition.f24Files || [];
+      const allF24Entries = activePosition.f24Entries || [];
+
+      // --- INVOICE SYNC ---
+      const driveInvoicesMap = new Map(driveInvoices.map(f => [f.id, f]));
       const newInvoicesList: Invoice[] = [];
-      const unlinkedDriveFiles = [...driveFiles];
+      const unlinkedDriveInvoices = [...driveInvoices];
+      let invoicesChanged = false;
 
-      let changed = false;
-
-      for (const inv of currentInvoices) {
-        if (inv.driveFileId) {
-           if (!driveFilesMap.has(inv.driveFileId)) {
-             addSyncLog(`🗑️ Fattura "${inv.number}" eliminata da Drive, rimuovo da gestionale.`);
-             changed = true;
-           } else {
-             newInvoicesList.push(inv);
-             const unlinkedIndex = unlinkedDriveFiles.findIndex(f => f.id === inv.driveFileId);
-             if (unlinkedIndex > -1) unlinkedDriveFiles.splice(unlinkedIndex, 1);
-           }
+      for (const inv of allInvoices) {
+        const invYear = inv.date ? inv.date.substring(0, 4) : selectedYear;
+        // Apply sync only to invoices belonging to the selected year
+        if (invYear === selectedYear) {
+          if (inv.driveFileId) {
+            if (!driveInvoicesMap.has(inv.driveFileId)) {
+              addSyncLog(`🗑️ Fattura "${inv.number}" dell'anno ${selectedYear} rimossa da Drive, rimuovo da locale.`);
+              invoicesChanged = true;
+            } else {
+              newInvoicesList.push(inv);
+              const idx = unlinkedDriveInvoices.findIndex(f => f.id === inv.driveFileId);
+              if (idx > -1) unlinkedDriveInvoices.splice(idx, 1);
+            }
+          } else {
+            newInvoicesList.push(inv);
+          }
         } else {
-           newInvoicesList.push(inv);
+          // Keep other years completely untouched
+          newInvoicesList.push(inv);
         }
       }
 
-      for (const f of unlinkedDriveFiles) {
-        if (!f.mimeType.includes("xml")) {
-          // ignore non-xml added manually
+      // Download and parse new XML invoices from Drive
+      for (const f of unlinkedDriveInvoices) {
+        if (!f.mimeType.includes("xml") && !f.name.endsWith(".xml")) {
           continue; 
         }
-        addSyncLog(`📄 Trovata nuova fattura su Drive: ${f.name}. Tento la lettura...`);
+        addSyncLog(`📄 Trovata nuova fattura su Drive per l'anno ${selectedYear}: ${f.name}. Tento la lettura...`);
         try {
           const content = await downloadFileContent(token, f.id);
           const parsed = parseInvoiceXml(content);
           if (parsed) {
-             let invoiceDate = parsed.date;
-             if (!invoiceDate) {
-               invoiceDate = `${selectedYear}-01-01`;
-             }
-
+             let invoiceDate = parsed.date || `${selectedYear}-01-01`;
              const safeNumber = parsed.number.replace(/[^a-zA-Z0-9]/g, '_');
              const safeDate = invoiceDate.replace(/[^0-9-]/g, '');
              const newName = `Fattura_${safeNumber}_${safeDate}.xml`;
 
              if (f.name !== newName) {
                await renameDriveFile(token, f.id, newName);
-               addSyncLog(`✏️ File rinominato automaticamente in ${newName}`);
+               addSyncLog(`✏️ File rinominato in ${newName}`);
              }
 
              newInvoicesList.push({
@@ -851,18 +1014,128 @@ export default function App() {
                driveFileId: f.id,
                driveFileUrl: f.url
              });
-             changed = true;
+             invoicesChanged = true;
           }
         } catch (e: any) {
-          addSyncLog(`⚠️ Impossibile leggere il contenuto del file ${f.name}: ` + e.message);
+          addSyncLog(`⚠️ Impossibile leggere il file XML ${f.name}: ` + e.message);
         }
       }
 
-      if (changed) {
-        setInvoices(newInvoicesList);
+      // --- F24 SYNC ---
+      const driveF24sMap = new Map(driveF24s.map(f => [f.id, f]));
+      const newF24FilesList: any[] = [];
+      const unlinkedDriveF24s = [...driveF24s];
+      let f24FilesChanged = false;
+
+      for (const f24f of allF24Files) {
+        // Find if this F24 matches the current selectedYear scope
+        const hasEntriesInSelectedYear = allF24Entries.some(e => e.driveFileId === f24f.id && e.date.startsWith(selectedYear));
+        const fileMatchesYear = f24f.name.includes(selectedYear) || f24f.dateAdded?.startsWith(selectedYear) || hasEntriesInSelectedYear;
+
+        if (fileMatchesYear) {
+          if (!driveF24sMap.has(f24f.id)) {
+            addSyncLog(`🗑️ Quietanza F24 "${f24f.name}" rimossa da Drive, rimuovo dal gestionale.`);
+            f24FilesChanged = true;
+          } else {
+            newF24FilesList.push(f24f);
+            const idx = unlinkedDriveF24s.findIndex(f => f.id === f24f.id);
+            if (idx > -1) unlinkedDriveF24s.splice(idx, 1);
+          }
+        } else {
+          // Keep other years' F24 files untouched
+          newF24FilesList.push(f24f);
+        }
       }
-      addSyncLog("✅ Sincronizzazione cartella Fatture Drive completata!");
-    } catch(err: any) {
+
+      let f24EntriesChanged = false;
+      let newF24EntriesList = [...allF24Entries];
+
+      // Remove F24 entries associated with deleted F24 PDF files
+      if (f24FilesChanged) {
+        const keptFileIds = new Set(newF24FilesList.map(f => f.id));
+        const filteredEntries = allF24Entries.filter(entry => {
+          if (entry.source === 'PDF' && entry.driveFileId) {
+            if (!keptFileIds.has(entry.driveFileId) && entry.date.startsWith(selectedYear)) {
+              f24EntriesChanged = true;
+              return false;
+            }
+          }
+          return true;
+        });
+        newF24EntriesList = filteredEntries;
+      }
+
+      // Download and parse new F24 PDFs from Drive
+      for (const f of unlinkedDriveF24s) {
+        if (!f.mimeType.includes("pdf") && !f.name.endsWith(".pdf")) {
+          continue; 
+        }
+        addSyncLog(`📄 Trovata nuova quietanza F24 su Drive per l'anno ${selectedYear}: ${f.name}. Analisi PDF...`);
+        try {
+          const blobUrl = `https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`;
+          const blobRes = await fetch(blobUrl, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (blobRes.ok) {
+            const blob = await blobRes.blob();
+            const pdfFile = new File([blob], f.name, { type: 'application/pdf' });
+            
+            const extracted = await extractF24DataFromPdf(pdfFile);
+            if (extracted && extracted.length > 0) {
+              const transformedEntries = extracted.map(entry => {
+                const today = new Date();
+                const monthStr = String(today.getMonth() + 1).padStart(2, '0');
+                const dayStr = String(today.getDate()).padStart(2, '0');
+                const entryYear = entry.year || selectedYear;
+                const entryDate = `${entryYear}-${monthStr}-${dayStr}`;
+
+                return {
+                  id: `f24-dr-${f.id}-${Math.random().toString(36).substring(2, 9)}`,
+                  taxCode: entry.taxCode,
+                  amount: entry.amount,
+                  date: entryDate,
+                  description: `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
+                  source: 'PDF',
+                  driveFileId: f.id
+                };
+              });
+
+              newF24EntriesList = [...newF24EntriesList, ...transformedEntries];
+              f24EntriesChanged = true;
+              addSyncLog(`✅ Estratti ${extracted.length} codici tributo dal file ${f.name}.`);
+            }
+
+            newF24FilesList.push({
+              id: f.id,
+              name: f.name,
+              url: f.url,
+              dateAdded: new Date().toISOString().split('T')[0]
+            });
+            f24FilesChanged = true;
+          }
+        } catch (pdfErr: any) {
+          addSyncLog(`⚠️ Errore di lettura per F24 "${f.name}": ${pdfErr.message || pdfErr}`);
+        }
+      }
+
+      // 3. Atomically update the parent positions state so React catches all changes simultaneously
+      if (invoicesChanged || f24FilesChanged || f24EntriesChanged) {
+        setPositions((prev) =>
+          prev.map((pos) => {
+            if (pos.id === activePositionId) {
+              return {
+                ...pos,
+                invoices: invoicesChanged ? newInvoicesList : pos.invoices,
+                f24Files: f24FilesChanged ? newF24FilesList : pos.f24Files,
+                f24Entries: f24EntriesChanged ? newF24EntriesList : pos.f24Entries,
+              };
+            }
+            return pos;
+          })
+        );
+      }
+      addSyncLog(`✅ Sincronizzazione in tempo reale completata con successo per l'anno ${selectedYear}!`);
+    } catch (err: any) {
       addSyncLog("❌ Errore durante la scansione di Drive: " + err.message);
     } finally {
       setIsSyncingDriveList(false);
@@ -986,6 +1259,23 @@ export default function App() {
           const currentInvoices = pos.invoices || [];
           // Verify it's not already added if there was a duplicate
           return { ...pos, invoices: [invoiceWithId, ...currentInvoices] };
+        }
+        return pos;
+      })
+    );
+  };
+
+  const handleAddInvoices = (newInvoices: Omit<Invoice, 'id'>[]) => {
+    const withIds = newInvoices.map((inv) => ({
+      ...inv,
+      id: `inv-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+    }));
+    
+    setPositions((prev) =>
+      prev.map((pos) => {
+        if (pos.id === activePositionId) {
+          const currentInvoices = pos.invoices || [];
+          return { ...pos, invoices: [...withIds, ...currentInvoices] };
         }
         return pos;
       })
@@ -1485,6 +1775,8 @@ export default function App() {
                     
                     handleOpenFolderPicker(token);
                   }}
+                  onRecreateDriveFolder={handleRecreateDriveFolder}
+                  isRecreatingFolder={isRecreatingDriveFolder}
                   onSaveAnagrafica={() => {
                       safeAlert("Anagrafica configurata e salvata correttamente!");
                   }}
@@ -1515,12 +1807,14 @@ export default function App() {
                       driveFolderUrl={activePosition?.driveFolderUrl}
                       f24Files={activePosition?.f24Files || []}
                       onUploadF24={handleUploadF24Pdf}
+                      onUploadF24s={handleUploadF24s}
                       onDeleteF24={handleDeleteF24Pdf}
                       onConnectGoogle={handleGoogleLogin}
                       f24Entries={f24Entries}
                       allF24Entries={allF24Entries}
                       selectedYear={selectedYear}
                       onAddInvoice={handleAddInvoice}
+                      onAddInvoices={handleAddInvoices}
                       onDeleteInvoice={handleDeleteInvoice}
                       onAddF24Entries={handleAddF24Entries}
                       onDeleteF24Entry={handleDeleteF24Entry}

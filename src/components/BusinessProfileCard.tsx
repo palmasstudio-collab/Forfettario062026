@@ -6,7 +6,7 @@
 import React, { useState, useRef } from 'react';
 import { BusinessProfile, PensionFundType } from '../types';
 import { ATECO_CODES, PENSION_FUNDS, importAtecoRegistryFromPdf, findAtecoCode } from '../taxData';
-import { Building, Search, Info, HelpCircle, HardDriveDownload, Loader2, FolderPlus, Check, Save } from 'lucide-react';
+import { Building, Search, Info, HelpCircle, HardDriveDownload, Loader2, FolderPlus, Check, Save, RefreshCw } from 'lucide-react';
 import { safeAlert } from '../utils/safeWindow';
 
 interface BusinessProfileCardProps {
@@ -15,6 +15,8 @@ interface BusinessProfileCardProps {
   isCreatingFolder?: boolean;
   driveFolderCreated?: boolean;
   onCreateDriveFolder?: () => void;
+  onRecreateDriveFolder?: () => void;
+  isRecreatingFolder?: boolean;
   onSaveAnagrafica?: () => void;
   isUnselected?: boolean;
 }
@@ -25,6 +27,8 @@ export default function BusinessProfileCard({
   isCreatingFolder = false,
   driveFolderCreated = false,
   onCreateDriveFolder,
+  onRecreateDriveFolder,
+  isRecreatingFolder = false,
   onSaveAnagrafica,
   isUnselected = false
 }: BusinessProfileCardProps) {
@@ -336,7 +340,7 @@ export default function BusinessProfileCard({
 
       {/* Azioni di Creazione/Integrazione Drive */}
       <div className="flex flex-col gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-200 mt-6 md:col-span-2">
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-4">
           {/* Pulsante Creazione Cartella Drive */}
           <button
             type="button"
@@ -353,6 +357,23 @@ export default function BusinessProfileCard({
             )}
             <span className="text-center">{driveFolderCreated ? 'Cartella e Struttura Generate!' : 'Creazione Cartella Drive'}</span>
           </button>
+
+          {/* Pulsante Ricrea Cartella (Ripristino Emergenza) */}
+          {driveFolderCreated && (
+            <button
+              type="button"
+              disabled={isUnselected || isRecreatingFolder}
+              onClick={onRecreateDriveFolder}
+              className="flex-1 py-3 px-4 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 disabled:opacity-50 rounded-xl text-[11px] font-bold transition-all shadow-sm flex flex-col items-center justify-center gap-1.5 min-h-[80px] cursor-pointer"
+            >
+              {isRecreatingFolder ? (
+                <Loader2 className="w-5 h-5 animate-spin text-amber-600" />
+              ) : (
+                <RefreshCw className="w-5 h-5 text-amber-600" />
+              )}
+              <span className="text-center">{isRecreatingFolder ? 'Ripristino in corso...' : 'Ricrea Cartella'}</span>
+            </button>
+          )}
 
           {/* Pulsante Crea Anagrafica */}
           <button
