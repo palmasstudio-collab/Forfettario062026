@@ -103,6 +103,13 @@ export function calculateTaxReturn(input: TaxInput): TaxReturnCalculation {
   let redditoEccedenteMinimale: number | null = null;
   let contributiEccedenteMinimale: number | null = null;
 
+  let inpsGestioneSeparataBase: number | undefined;
+  let inpsGestioneSeparataRate: number | undefined;
+  let inpsGestioneSeparataDue: number | undefined;
+  let inpsGestioneSeparataAcconto1: number | undefined;
+  let inpsGestioneSeparataAcconto2: number | undefined;
+  let inpsGestioneSeparataAccontiTotale: number | undefined;
+
   if (isSectionI) {
     const isArtigiani = fund.id === 'INPS_ARTIGIANI';
     
@@ -142,7 +149,16 @@ export function calculateTaxReturn(input: TaxInput): TaxReturnCalculation {
     }
   } else if (fund.id === 'INPS_GESTIONE_SEPARATA') {
     // La gestione separata calcola il contributo sul Reddito Imponibile Lordo (senza sottrarre i contributi dell'anno scorso per il contributivo, si applica direttamente sull'imponibile)
-    currentYearContributions = grossTaxableIncome * fund.rate;
+    const massimaleGS = calculationYear === 2024 ? 113520 : 119650;
+    inpsGestioneSeparataBase = Math.min(grossTaxableIncome, massimaleGS);
+    inpsGestioneSeparataRate = fund.rate; // 0.2607
+    inpsGestioneSeparataDue = inpsGestioneSeparataBase * inpsGestioneSeparataRate;
+    currentYearContributions = inpsGestioneSeparataDue;
+
+    // Acconti per l'anno successivo (80% del dovuto, suddivisi in 1° acconto 40% e 2° acconto 40%)
+    inpsGestioneSeparataAcconto1 = inpsGestioneSeparataDue * 0.40;
+    inpsGestioneSeparataAcconto2 = inpsGestioneSeparataDue * 0.40;
+    inpsGestioneSeparataAccontiTotale = inpsGestioneSeparataDue * 0.80;
   } else if (fund.hasMinimum && fund.minimumContribution !== undefined && fund.minimumThreshold !== undefined) {
     // Casse con minimale fisso (Artigiani/Commercianti fallback, if not INPS Art/Com)
     let threshold = fund.minimumThreshold;
@@ -186,6 +202,12 @@ export function calculateTaxReturn(input: TaxInput): TaxReturnCalculation {
     rr2Col2,
     contributiIVSMinimale,
     redditoEccedenteMinimale,
-    contributiEccedenteMinimale
+    contributiEccedenteMinimale,
+    inpsGestioneSeparataBase,
+    inpsGestioneSeparataRate,
+    inpsGestioneSeparataDue,
+    inpsGestioneSeparataAcconto1,
+    inpsGestioneSeparataAcconto2,
+    inpsGestioneSeparataAccontiTotale
   };
 }

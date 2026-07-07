@@ -1830,6 +1830,7 @@ export default function App() {
                     </div>
 
                     <TaxSimulatorDashboard 
+                      key={`${activePosition?.id || 'none'}-${selectedYear}`}
                       profile={profile} 
                       revenue={totalPaidRevenue} 
                       invoices={invoices} 

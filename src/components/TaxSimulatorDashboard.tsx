@@ -54,6 +54,7 @@ export const getMissingInvoiceNumbers = (invoices: Invoice[], year: string): num
 };
 
 interface TaxSimulatorDashboardProps {
+  key?: string;
   profile: BusinessProfile;
   revenue: number; // calculated from paid invoices
   invoices: Invoice[];
@@ -148,6 +149,16 @@ export default function TaxSimulatorDashboard({
   
   // Anno di attività (da 1 a 10 per verificare i requisiti dell'aliquota startup al 5%)
   const [yearOfActivity, setYearOfActivity] = useState<number>(1);
+
+  // Modalità di calcolo del fatturato (Cassa / Emesso)
+  const [revenueMode, setRevenueMode] = useState<'paid' | 'issued'>(() => {
+    return (localStorage.getItem('forfettario_revenue_mode') as 'paid' | 'issued') || 'paid';
+  });
+
+  const handleSetRevenueMode = (mode: 'paid' | 'issued') => {
+    setRevenueMode(mode);
+    localStorage.setItem('forfettario_revenue_mode', mode);
+  };
 
   // Automatically compute and sync year of activity on selectedYear or vatOpeningDate changes
   React.useEffect(() => {
@@ -372,8 +383,11 @@ export default function TaxSimulatorDashboard({
   };
 
   // Costruisce i dati di input per il motore di calcolo
+  const totalIssuedInvoicesAmount = invoices.reduce((sum, inv) => sum + inv.amount, 0);
+  const activeRevenue = revenueMode === 'issued' ? totalIssuedInvoicesAmount : revenue;
+
   const taxInput: TaxInput = {
-    revenue,
+    revenue: activeRevenue,
     atecoCode: profile.atecoCode,
     pensionFund: profile.pensionFund,
     contributionsPaidPreviousYear: prevYearContributions,
@@ -391,9 +405,9 @@ export default function TaxSimulatorDashboard({
   const missingInvoiceNumbers = getMissingInvoiceNumbers(invoices, selectedYear);
 
   // Calcolo delle percentuali di impatto
-  const taxPercentage = revenue > 0 ? (results.substituteTax / revenue) * 100 : 0;
-  const contributionPercentage = revenue > 0 ? (results.currentYearContributions / revenue) * 100 : 0;
-  const netPercentage = revenue > 0 ? (results.netIncome / revenue) * 100 : 100;
+  const taxPercentage = activeRevenue > 0 ? (results.substituteTax / activeRevenue) * 100 : 0;
+  const contributionPercentage = activeRevenue > 0 ? (results.currentYearContributions / activeRevenue) * 100 : 0;
+  const netPercentage = activeRevenue > 0 ? (results.netIncome / activeRevenue) * 100 : 100;
 
   const handleGeneratePDFClick = () => {
     const yearToExport = window.prompt("Seleziona l'anno di competenza per la generazione del report:", selectedYear);
@@ -469,6 +483,42 @@ export default function TaxSimulatorDashboard({
               <h3 className="text-lg font-extrabold text-theme-text tracking-tight">Parametri Avanzati di Calcolo</h3>
               <p className="text-xs text-theme-text-muted">Regola le deduzioni passive e lo scaglione temporale della tua attività</p>
             </div>
+          </div>
+
+          {/* Selettore della Base Imponibile */}
+          <div className="mt-6 p-4 bg-theme-bg/60 rounded-2xl border border-theme-border/60">
+            <label className="text-xs font-bold text-theme-text-muted uppercase tracking-wider block mb-2.5">
+              Base di Calcolo delle Imposte e Contributi
+            </label>
+            <div className="grid grid-cols-2 gap-2 bg-theme-bg p-1 rounded-xl border border-theme-border/80">
+              <button
+                type="button"
+                onClick={() => handleSetRevenueMode('paid')}
+                className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  revenueMode === 'paid'
+                    ? 'bg-emerald-500 text-white shadow-sm'
+                    : 'text-theme-text-muted hover:text-theme-text hover:bg-theme-border/40'
+                }`}
+              >
+                Fatturato Incassato (Cassa: € {revenue.toLocaleString('it-IT')})
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetRevenueMode('issued')}
+                className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  revenueMode === 'issued'
+                    ? 'bg-emerald-500 text-white shadow-sm'
+                    : 'text-theme-text-muted hover:text-theme-text hover:bg-theme-border/40'
+                }`}
+              >
+                Fatturato Emesso (Totale: € {totalIssuedInvoicesAmount.toLocaleString('it-IT')})
+              </button>
+            </div>
+            <p className="text-[10px] text-theme-text-muted mt-2 leading-relaxed">
+              {revenueMode === 'paid'
+                ? "💡 Stai simulando secondo il Principio di Cassa (regola ufficiale del Regime Forfettario): tasse e contributi si calcolano solo sulle fatture effettivamente incassate."
+                : "💡 Stai simulando sul Totale delle Fatture Emesse (anche non incassate): utile per simulare l'impatto fiscale comprensivo dei crediti in corso."}
+            </p>
           </div>
  
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
@@ -866,7 +916,7 @@ export default function TaxSimulatorDashboard({
               </div>
             </div>
 
-            {results.netIncome === 0 && revenue > 0 && (
+            {results.netIncome === 0 && activeRevenue > 0 && (
               <div className="mt-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-[11px] text-rose-300 leading-normal flex gap-2">
                 <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
                 <div>
@@ -907,7 +957,7 @@ export default function TaxSimulatorDashboard({
                 </div>
                 <div className="flex justify-between py-1 items-center">
                   <span className="text-[10px] text-slate-500 font-bold">LM22 col. 3 (Ricavi)</span>
-                  <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {revenue.toFixed(0)}</span>
+                  <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {activeRevenue.toFixed(0)}</span>
                 </div>
                 <div className="flex justify-between py-1 items-center">
                   <span className="text-[10px] text-slate-500 font-bold">LM34 (Reddito Lordo)</span>
@@ -963,6 +1013,40 @@ export default function TaxSimulatorDashboard({
                       <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">
                         {results.contributiEccedenteMinimale && results.contributiEccedenteMinimale > 0 ? `€ ${results.contributiEccedenteMinimale.toFixed(0)}` : '€ 0'}
                       </span>
+                    </div>
+                  </>
+                ) : profile.pensionFund === 'INPS_GESTIONE_SEPARATA' ? (
+                  <>
+                    <div className="flex justify-between py-1 items-center">
+                      <span className="text-[10px] text-slate-500 font-bold">RR Sez. II (Codice Cassa)</span>
+                      <span className="font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 text-[9px]">INPS G.S. (Professionisti)</span>
+                    </div>
+                    <div className="flex justify-between py-1 items-center">
+                      <span className="text-[10px] text-slate-500 font-bold">Base Imponibile col. 4 (LM34)</span>
+                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.inpsGestioneSeparataBase?.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between py-1 items-center">
+                      <span className="text-[10px] text-slate-500 font-bold">Aliquota Gestione Separata</span>
+                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">{(results.inpsGestioneSeparataRate ? results.inpsGestioneSeparataRate * 100 : 26.07).toFixed(2)}%</span>
+                    </div>
+                    <div className="flex justify-between py-1 items-center">
+                      <span className="text-[10px] text-slate-500 font-bold">Contributo Dovuto (col. 5)</span>
+                      <span className="font-bold text-blue-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.inpsGestioneSeparataDue?.toFixed(2)}</span>
+                    </div>
+                    <div className="p-2 bg-theme-bg/80 rounded-xl space-y-1.5 border border-theme-border/40 mt-1">
+                      <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Pianificazione F24 Anno Successivo</div>
+                      <div className="flex justify-between text-[10px] text-slate-600 font-medium">
+                        <span>1° Acconto 40% (Giugno)</span>
+                        <span className="font-mono font-bold text-slate-700">€ {results.inpsGestioneSeparataAcconto1?.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-[10px] text-slate-600 font-medium">
+                        <span>2° Acconto 40% (Novembre)</span>
+                        <span className="font-mono font-bold text-slate-700">€ {results.inpsGestioneSeparataAcconto2?.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-[10px] text-slate-600 font-medium border-t border-theme-border/20 pt-1">
+                        <span>Totale Acconti (80%)</span>
+                        <span className="font-mono font-bold text-slate-700">€ {results.inpsGestioneSeparataAccontiTotale?.toFixed(2)}</span>
+                      </div>
                     </div>
                   </>
                 ) : (

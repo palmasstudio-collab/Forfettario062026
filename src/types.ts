@@ -58,6 +58,12 @@ export interface TaxReturnCalculation {
   contributiIVSMinimale?: number;
   redditoEccedenteMinimale?: number | null;
   contributiEccedenteMinimale?: number | null;
+  inpsGestioneSeparataBase?: number;
+  inpsGestioneSeparataRate?: number;
+  inpsGestioneSeparataDue?: number;
+  inpsGestioneSeparataAcconto1?: number;
+  inpsGestioneSeparataAcconto2?: number;
+  inpsGestioneSeparataAccontiTotale?: number;
 }
 
 export interface Invoice {
