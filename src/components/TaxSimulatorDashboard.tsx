@@ -972,9 +972,50 @@ export default function TaxSimulatorDashboard({
                   <span className="text-[10px] text-slate-500 font-bold">LM36 (Reddito Netto)</span>
                   <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.netTaxableIncome.toFixed(0)}</span>
                 </div>
-                <div className="flex justify-between py-1 items-center">
-                  <span className="text-[10px] text-slate-500 font-bold">LM39 col. 1 (Imposta)</span>
-                  <span className="font-bold text-rose-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.substituteTax.toFixed(0)}</span>
+                <div className="py-2 border-t border-slate-100">
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-[10px] text-slate-500 font-bold">LM39 col. 1 (Imposta Sostitutiva)</span>
+                    <span className="font-bold text-rose-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.substituteTax.toFixed(2)}</span>
+                  </div>
+                  {results.substituteTax > 0 ? (
+                    <div className="bg-rose-50/40 p-2 rounded-xl border border-rose-200/40 space-y-1.5 mt-1">
+                      <div className="text-[8px] font-black text-rose-600 uppercase tracking-wider flex items-center gap-1">
+                        <FileText className="w-2.5 h-2.5 text-rose-500" />
+                        <span>Genera Modelli F24 Imposta Sostitutiva</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => generateF24PDF(profile, results.substituteTax, 'imposta', 'saldo', selectedYear)}
+                          className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-rose-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
+                          title="Genera F24 Saldo"
+                        >
+                          <span className="text-[7px] text-slate-500 uppercase font-bold">Saldo</span>
+                          <span className="font-mono text-[9px]">€ {results.substituteTax.toFixed(0)}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => generateF24PDF(profile, results.substituteTax * 0.4, 'imposta', 'acconto1', selectedYear)}
+                          className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-rose-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
+                          title="Genera F24 1° Acconto (40%)"
+                        >
+                          <span className="text-[7px] text-slate-500 uppercase font-bold">I° Acc (40%)</span>
+                          <span className="font-mono text-[9px]">€ {(results.substituteTax * 0.4).toFixed(0)}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => generateF24PDF(profile, results.substituteTax * 0.6, 'imposta', 'acconto2', selectedYear)}
+                          className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-rose-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
+                          title="Genera F24 2° Acconto (60%)"
+                        >
+                          <span className="text-[7px] text-slate-500 uppercase font-bold">II° Acc (60%)</span>
+                          <span className="font-mono text-[9px]">€ {(results.substituteTax * 0.6).toFixed(0)}</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-[8.5px] text-slate-400 italic mt-0.5">Nessun importo d'imposta dovuto per la generazione di F24.</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -993,30 +1034,85 @@ export default function TaxSimulatorDashboard({
                   <>
                     <div className="flex justify-between py-1 items-center">
                       <span className="text-[10px] text-slate-500 font-bold">RR2 col. 1 (Reddito d'impresa)</span>
-                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.rr2Col1?.toFixed(0)}</span>
+                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 font-mono">€ {results.rr2Col1?.toFixed(0)}</span>
                     </div>
                     <div className="flex justify-between py-1 items-center">
                       <span className="text-[10px] text-slate-500 font-bold">RR2 col. 2 (Reddito minimale)</span>
-                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.rr2Col2?.toFixed(0)}</span>
+                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 font-mono">€ {results.rr2Col2?.toFixed(0)}</span>
                     </div>
-                    <div className="flex justify-between py-1 items-center">
-                      <span className="text-[10px] text-slate-500 font-bold">Contributi IVS dovuti sul minimale</span>
-                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.contributiIVSMinimale?.toFixed(0)}</span>
+                    <div className="py-2 border-t border-slate-50">
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-[10px] text-slate-500 font-bold">Contributi IVS sul minimale</span>
+                        <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 font-mono">€ {results.contributiIVSMinimale?.toFixed(2)}</span>
+                      </div>
+                      {results.contributiIVSMinimale && results.contributiIVSMinimale > 0 ? (
+                        <div className="bg-slate-50 p-2 rounded-xl border border-slate-200/40 flex justify-between items-center">
+                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Quota Fissa Trimestrale</span>
+                          <button
+                            type="button"
+                            onClick={() => generateF24PDF(profile, (results.contributiIVSMinimale || 0) / 4, 'contributi', 'minimale', selectedYear, selectedFund.id)}
+                            className="p-1 px-2 text-[8px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 border border-blue-200/60 rounded transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+                            title="Genera F24 Rata Trimestrale Minimale (1/4 del totale)"
+                          >
+                            <FileText className="w-3 h-3 text-blue-500" />
+                            <span>Genera F24 Rata (€ {((results.contributiIVSMinimale || 0) / 4).toFixed(0)})</span>
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
-                    <div className="flex justify-between py-1 items-center">
+                    <div className="flex justify-between py-1 items-center border-t border-slate-50">
                       <span className="text-[10px] text-slate-500 font-bold">Reddito eccedente il minimale</span>
-                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">
+                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 font-mono">
                         {results.redditoEccedenteMinimale && results.redditoEccedenteMinimale > 0 ? `€ ${results.redditoEccedenteMinimale.toFixed(0)}` : '€ 0'}
                       </span>
                     </div>
-                    <div className="flex justify-between py-1 items-center">
-                      <span className="text-[10px] text-slate-500 font-bold">Contributi eccedenti il minimale</span>
-                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">
-                        {results.contributiEccedenteMinimale && results.contributiEccedenteMinimale > 0 ? `€ ${results.contributiEccedenteMinimale.toFixed(0)}` : '€ 0'}
-                      </span>
+                    <div className="py-2 border-t border-slate-50">
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-[10px] text-slate-500 font-bold">Contributi eccedenti il minimale</span>
+                        <span className="font-bold text-blue-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 font-mono">
+                          {results.contributiEccedenteMinimale && results.contributiEccedenteMinimale > 0 ? `€ ${results.contributiEccedenteMinimale.toFixed(2)}` : '€ 0,00'}
+                        </span>
+                      </div>
+                      {results.contributiEccedenteMinimale && results.contributiEccedenteMinimale > 0 ? (
+                        <div className="bg-blue-50/40 p-2 rounded-xl border border-blue-200/40 space-y-1.5 mt-1">
+                          <div className="text-[8px] font-black text-blue-600 uppercase tracking-wider flex items-center gap-1">
+                            <FileText className="w-2.5 h-2.5 text-blue-500" />
+                            <span>F24 Contributi Eccedenti il Minimale</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1">
+                            <button
+                              type="button"
+                              onClick={() => generateF24PDF(profile, results.contributiEccedenteMinimale || 0, 'contributi', 'saldo', selectedYear, selectedFund.id)}
+                              className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
+                              title="F24 Saldo eccedenza"
+                            >
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">Saldo</span>
+                              <span className="font-mono text-[9px]">€ {results.contributiEccedenteMinimale.toFixed(0)}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => generateF24PDF(profile, (results.contributiEccedenteMinimale || 0) * 0.4, 'contributi', 'acconto1', selectedYear, selectedFund.id)}
+                              className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
+                              title="F24 I° Acconto eccedenza (40%)"
+                            >
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">I° Acc (40%)</span>
+                              <span className="font-mono text-[9px]">€ {(results.contributiEccedenteMinimale * 0.4).toFixed(0)}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => generateF24PDF(profile, (results.contributiEccedenteMinimale || 0) * 0.4, 'contributi', 'acconto2', selectedYear, selectedFund.id)}
+                              className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
+                              title="F24 II° Acconto eccedenza (40%)"
+                            >
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">II° Acc (40%)</span>
+                              <span className="font-mono text-[9px]">€ {(results.contributiEccedenteMinimale * 0.4).toFixed(0)}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </>
-                ) : profile.pensionFund === 'INPS_GESTIONE_SEPARATA' ? (
+                ) : selectedFund.id === 'INPS_GESTIONE_SEPARATA' ? (
                   <>
                     <div className="flex justify-between py-1 items-center">
                       <span className="text-[10px] text-slate-500 font-bold">RR Sez. II (Codice Cassa)</span>
@@ -1024,94 +1120,115 @@ export default function TaxSimulatorDashboard({
                     </div>
                     <div className="flex justify-between py-1 items-center">
                       <span className="text-[10px] text-slate-500 font-bold">Base Imponibile col. 4 (LM34)</span>
-                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.inpsGestioneSeparataBase?.toFixed(0)}</span>
+                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 font-mono">€ {results.inpsGestioneSeparataBase?.toFixed(0)}</span>
                     </div>
                     <div className="flex justify-between py-1 items-center">
                       <span className="text-[10px] text-slate-500 font-bold">Aliquota Gestione Separata</span>
-                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">{(results.inpsGestioneSeparataRate ? results.inpsGestioneSeparataRate * 100 : 26.07).toFixed(2)}%</span>
+                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 font-mono">{(results.inpsGestioneSeparataRate ? results.inpsGestioneSeparataRate * 100 : 26.07).toFixed(2)}%</span>
                     </div>
-                    <div className="flex justify-between py-1 items-center">
-                      <span className="text-[10px] text-slate-500 font-bold">Contributo Dovuto (col. 5)</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-blue-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.inpsGestioneSeparataDue?.toFixed(2)}</span>
-                        {results.inpsGestioneSeparataDue && results.inpsGestioneSeparataDue > 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataDue || 0, 'saldo', selectedYear)}
-                            className="p-1 px-1.5 text-[9px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 border border-blue-200 rounded transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-                            title="Scarica F24 Saldo"
-                          >
-                            <FileText className="w-3 h-3 text-blue-500" />
-                            <span>F24 Saldo</span>
-                          </button>
-                        ) : null}
+                    <div className="py-2 border-t border-slate-50">
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-[10px] text-slate-500 font-bold">Contributo Dovuto (col. 5)</span>
+                        <span className="font-bold text-blue-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 font-mono">€ {results.inpsGestioneSeparataDue?.toFixed(2)}</span>
                       </div>
-                    </div>
-                    <div className="p-2 bg-theme-bg/80 rounded-xl space-y-1.5 border border-theme-border/40 mt-1">
-                      <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Pianificazione F24 Anno Successivo</div>
-                      
-                      <div className="flex justify-between items-center text-[10px] text-slate-600 font-medium py-0.5">
-                        <span>1° Acconto 40% (Giugno)</span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-bold text-slate-700">€ {results.inpsGestioneSeparataAcconto1?.toFixed(2)}</span>
-                          {results.inpsGestioneSeparataAcconto1 && results.inpsGestioneSeparataAcconto1 > 0 ? (
+                      {results.inpsGestioneSeparataDue && results.inpsGestioneSeparataDue > 0 ? (
+                        <div className="bg-blue-50/40 p-2 rounded-xl border border-blue-200/40 space-y-1.5 mt-1">
+                          <div className="text-[8px] font-black text-blue-600 uppercase tracking-wider flex items-center gap-1">
+                            <FileText className="w-2.5 h-2.5 text-blue-500" />
+                            <span>Genera Modelli F24 Gestione Separata</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1">
                             <button
                               type="button"
-                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto1 || 0, 'acconto1', selectedYear)}
-                              className="p-1 px-1.5 text-[8px] font-bold bg-slate-100/80 hover:bg-slate-200/80 text-slate-700 hover:text-slate-800 border border-slate-300/40 rounded transition-colors cursor-pointer flex items-center gap-0.5 shrink-0"
-                              title="Scarica F24 I° Acconto"
+                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataDue || 0, 'contributi', 'saldo', selectedYear, 'INPS_GESTIONE_SEPARATA')}
+                              className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
+                              title="Genera F24 Saldo"
                             >
-                              <FileText className="w-2.5 h-2.5 text-slate-500" />
-                              <span>F24 Acc. I</span>
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">Saldo</span>
+                              <span className="font-mono text-[9px]">€ {results.inpsGestioneSeparataDue.toFixed(0)}</span>
                             </button>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between items-center text-[10px] text-slate-600 font-medium py-0.5">
-                        <span>2° Acconto 40% (Novembre)</span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-bold text-slate-700">€ {results.inpsGestioneSeparataAcconto2?.toFixed(2)}</span>
-                          {results.inpsGestioneSeparataAcconto2 && results.inpsGestioneSeparataAcconto2 > 0 ? (
                             <button
                               type="button"
-                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto2 || 0, 'acconto2', selectedYear)}
-                              className="p-1 px-1.5 text-[8px] font-bold bg-slate-100/80 hover:bg-slate-200/80 text-slate-700 hover:text-slate-800 border border-slate-300/40 rounded transition-colors cursor-pointer flex items-center gap-0.5 shrink-0"
-                              title="Scarica F24 II° Acconto"
+                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto1 || 0, 'contributi', 'acconto1', selectedYear, 'INPS_GESTIONE_SEPARATA')}
+                              className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
+                              title="Genera F24 I° Acconto (40%)"
                             >
-                              <FileText className="w-2.5 h-2.5 text-slate-500" />
-                              <span>F24 Acc. II</span>
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">I° Acc (40%)</span>
+                              <span className="font-mono text-[9px]">€ {(results.inpsGestioneSeparataAcconto1 || 0).toFixed(0)}</span>
                             </button>
-                          ) : null}
+                            <button
+                              type="button"
+                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto2 || 0, 'contributi', 'acconto2', selectedYear, 'INPS_GESTIONE_SEPARATA')}
+                              className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
+                              title="Genera F24 2° Acconto (40%)"
+                            >
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">II° Acc (40%)</span>
+                              <span className="font-mono text-[9px]">€ {(results.inpsGestioneSeparataAcconto2 || 0).toFixed(0)}</span>
+                            </button>
+                          </div>
                         </div>
-                      </div>
-
-                      <div className="flex justify-between text-[10px] text-slate-600 font-medium border-t border-theme-border/20 pt-1.5">
-                        <span>Totale Acconti (80%)</span>
-                        <span className="font-mono font-bold text-slate-700">€ {results.inpsGestioneSeparataAccontiTotale?.toFixed(2)}</span>
-                      </div>
+                      ) : null}
                     </div>
                   </>
                 ) : (
                   <>
                     <div className="flex justify-between py-1 items-center">
-                      <span className="text-[10px] text-slate-500 font-bold">RR Sez. II (Cassa)</span>
+                      <span className="text-[10px] text-slate-500 font-bold">Sez. Altri Enti (Cassa)</span>
                       <span className="font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 text-[9px]">{selectedFund.id}</span>
                     </div>
                     <div className="flex justify-between py-1 items-center">
-                      <span className="text-[10px] text-slate-500 font-bold">Base Imponibile RR (col. 4)</span>
-                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.grossTaxableIncome.toFixed(0)}</span>
+                      <span className="text-[10px] text-slate-500 font-bold">Base Imponibile Calcolo</span>
+                      <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 font-mono">€ {results.grossTaxableIncome.toFixed(0)}</span>
                     </div>
-                    <div className="flex justify-between py-1 items-center">
-                      <span className="text-[10px] text-slate-500 font-bold">Contributo Dovuto (col. 5)</span>
-                      <span className="font-bold text-blue-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.currentYearContributions.toFixed(0)}</span>
+                    <div className="py-2 border-t border-slate-50">
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-[10px] text-slate-500 font-bold">Contributo Dovuto (Stima)</span>
+                        <span className="font-bold text-blue-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 font-mono">€ {results.currentYearContributions.toFixed(2)}</span>
+                      </div>
+                      {results.currentYearContributions && results.currentYearContributions > 0 ? (
+                        <div className="bg-blue-50/40 p-2 rounded-xl border border-blue-200/40 space-y-1.5 mt-1">
+                          <div className="text-[8px] font-black text-blue-600 uppercase tracking-wider flex items-center gap-1">
+                            <FileText className="w-2.5 h-2.5 text-blue-500" />
+                            <span>Genera F24 Cassa {selectedFund.id.replace('_', ' ')}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1">
+                            <button
+                              type="button; "
+                              onClick={() => generateF24PDF(profile, results.currentYearContributions, 'contributi', 'saldo', selectedYear, selectedFund.id)}
+                              className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
+                              title="Genera F24 Saldo"
+                            >
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">Saldo</span>
+                              <span className="font-mono text-[9px]">€ {results.currentYearContributions.toFixed(0)}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => generateF24PDF(profile, results.currentYearContributions * 0.4, 'contributi', 'acconto1', selectedYear, selectedFund.id)}
+                              className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
+                              title="Genera F24 1° Acconto (40%)"
+                            >
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">I° Acc (40%)</span>
+                              <span className="font-mono text-[9px]">€ {(results.currentYearContributions * 0.4).toFixed(0)}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => generateF24PDF(profile, results.currentYearContributions * 0.4, 'contributi', 'acconto2', selectedYear, selectedFund.id)}
+                              className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
+                              title="Genera F24 2° Acconto (40%)"
+                            >
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">II° Acc (40%)</span>
+                              <span className="font-mono text-[9px]">€ {(results.currentYearContributions * 0.4).toFixed(0)}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </>
                 )}
-                
-                <div className="flex justify-between py-1 items-center">
+
+                <div className="flex justify-between py-1 items-center border-t border-slate-100">
                   <span className="text-[10px] text-slate-500 font-bold">Totale Contributo Dovuto</span>
-                  <span className="font-bold text-blue-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.currentYearContributions.toFixed(0)}</span>
+                  <span className="font-bold text-blue-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 font-mono">€ {results.currentYearContributions.toFixed(2)}</span>
                 </div>
               </div>
             </div>

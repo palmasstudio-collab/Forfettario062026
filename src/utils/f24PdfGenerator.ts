@@ -6,16 +6,19 @@
 import { jsPDF } from 'jspdf';
 import { BusinessProfile } from '../types';
 
-export type F24PaymentType = 'saldo' | 'acconto1' | 'acconto2';
+export type F24Category = 'imposta' | 'contributi';
+export type F24PaymentType = 'saldo' | 'acconto1' | 'acconto2' | 'minimale';
 
 /**
- * Generates an authentic, printable Modello F24 PDF for Gestione Separata payment
+ * Generates an authentic, printable Modello F24 PDF for Italian Taxes (Imposta Sostitutiva) and Pension Contributions
  */
 export function generateF24PDF(
   profile: BusinessProfile,
   amount: number,
-  type: F24PaymentType,
-  year: string
+  category: F24Category,
+  paymentType: F24PaymentType,
+  year: string,
+  fundId?: string
 ) {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -33,6 +36,87 @@ export function generateF24PDF(
   const f24LightBlue = [230, 242, 250]; // Light shading for alternating columns/totals
   const textDark = [30, 41, 59]; // Text color (almost black)
   const lineGray = [180, 180, 180]; // Grid lines
+
+  // Label formatting helper
+  const calcYearInt = parseInt(year, 10);
+  let taxCode = '';
+  let paymentLabel = '';
+  let sectionToFill: 'erario' | 'inps' | 'altre_casse' = 'erario';
+  let refPeriodStart = '';
+  let refPeriodEnd = '';
+  let rateCode = '0101';
+
+  if (category === 'imposta') {
+    sectionToFill = 'erario';
+    if (paymentType === 'saldo') {
+      taxCode = '1790';
+      paymentLabel = `Saldo Imposta Sostitutiva ${year}`;
+    } else if (paymentType === 'acconto1') {
+      taxCode = '1791';
+      paymentLabel = `I° Acconto Imposta Sostitutiva ${calcYearInt + 1}`;
+    } else {
+      taxCode = '1792';
+      paymentLabel = `II° Acconto Imposta Sostitutiva ${calcYearInt + 1}`;
+    }
+  } else {
+    // Pension Contributions
+    const actualFundId = fundId || profile.pensionFund;
+    if (actualFundId === 'INPS_GESTIONE_SEPARATA') {
+      sectionToFill = 'inps';
+      taxCode = 'P10';
+      if (paymentType === 'saldo') {
+        paymentLabel = `Saldo Gestione Separata INPS ${year}`;
+        refPeriodStart = `01/${year}`;
+        refPeriodEnd = `12/${year}`;
+      } else if (paymentType === 'acconto1') {
+        paymentLabel = `I° Acconto Gestione Separata INPS ${calcYearInt + 1}`;
+        refPeriodStart = `01/${calcYearInt + 1}`;
+        refPeriodEnd = `12/${calcYearInt + 1}`;
+      } else {
+        paymentLabel = `II° Acconto Gestione Separata INPS ${calcYearInt + 1}`;
+        refPeriodStart = `01/${calcYearInt + 1}`;
+        refPeriodEnd = `12/${calcYearInt + 1}`;
+      }
+    } else if (actualFundId === 'INPS_ARTIGIANI' || actualFundId === 'INPS_COMMERCIANTI') {
+      sectionToFill = 'inps';
+      const isArtigiani = actualFundId === 'INPS_ARTIGIANI';
+      
+      if (paymentType === 'minimale') {
+        taxCode = isArtigiani ? 'AF' : 'CF';
+        paymentLabel = `Rata Minimale IVS ${year}`;
+        refPeriodStart = `01/${year}`;
+        refPeriodEnd = `12/${year}`;
+      } else {
+        taxCode = isArtigiani ? 'API' : 'CPI'; // Excess rates
+        if (paymentType === 'saldo') {
+          paymentLabel = `Saldo Contributi IVS Eccedenti il Minimale ${year}`;
+          refPeriodStart = `01/${year}`;
+          refPeriodEnd = `12/${year}`;
+        } else if (paymentType === 'acconto1') {
+          paymentLabel = `I° Acconto Contributi IVS Eccedenti il Minimale ${calcYearInt + 1}`;
+          refPeriodStart = `01/${calcYearInt + 1}`;
+          refPeriodEnd = `12/${calcYearInt + 1}`;
+        } else {
+          paymentLabel = `II° Acconto Contributi IVS Eccedenti il Minimale ${calcYearInt + 1}`;
+          refPeriodStart = `01/${calcYearInt + 1}`;
+          refPeriodEnd = `12/${calcYearInt + 1}`;
+        }
+      }
+    } else {
+      // Professional funds (Inarcassa, Cassa Forense, etc.)
+      sectionToFill = 'altre_casse';
+      taxCode = actualFundId.substring(0, 5).toUpperCase();
+      if (paymentType === 'saldo') {
+        paymentLabel = `Saldo Contributo ${actualFundId.replace('_', ' ')} ${year}`;
+      } else if (paymentType === 'acconto1') {
+        paymentLabel = `I° Acconto Contributo ${actualFundId.replace('_', ' ')} ${calcYearInt + 1}`;
+      } else if (paymentType === 'acconto2') {
+        paymentLabel = `II° Acconto Contributo ${actualFundId.replace('_', ' ')} ${calcYearInt + 1}`;
+      } else {
+        paymentLabel = `Rata Minimale Contributo ${actualFundId.replace('_', ' ')} ${year}`;
+      }
+    }
+  }
 
   // Helper: Draw a grid section header
   const drawSectionHeader = (title: string, subtitle?: string) => {
@@ -182,8 +266,11 @@ export function generateF24PDF(
 
   currentY += 32;
 
-  // SEZIONE ERARIO (Empty Mock for authenticity)
-  drawSectionHeader('SEZIONE ERARIO', 'IMPOSTE DIRETTE - IVA - RITENUTE - ECC.');
+  // Formatting values
+  const formattedAmount = amount.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // SEZIONE ERARIO
+  drawSectionHeader('SEZIONE ERARIO', `IMPOSTE DIRETTE - IVA - RITENUTE - ${sectionToFill === 'erario' ? paymentLabel.toUpperCase() : 'MOCK'}`);
   
   doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
   doc.rect(marginX, currentY, pageWidth - (2 * marginX), 18);
@@ -200,12 +287,22 @@ export function generateF24PDF(
   
   doc.line(marginX, currentY + 4.5, pageWidth - marginX, currentY + 4.5);
   
-  // Alternating mock grid lines
+  // Alternating grid lines
   doc.line(marginX, currentY + 11, pageWidth - marginX, currentY + 11);
   doc.line(marginX + 25, currentY, marginX + 25, currentY + 18);
   doc.line(marginX + 65, currentY, marginX + 65, currentY + 18);
   doc.line(marginX + 95, currentY, marginX + 95, currentY + 18);
   doc.line(marginX + 145, currentY, marginX + 145, currentY + 18);
+
+  if (sectionToFill === 'erario') {
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.text(taxCode, marginX + 12.5, currentY + 9.5, { align: 'center' });
+    doc.text(rateCode, marginX + 45, currentY + 9.5, { align: 'center' });
+    doc.text(paymentType === 'saldo' ? year : String(calcYearInt + 1), marginX + 80, currentY + 9.5, { align: 'center' });
+    doc.text(`€ ${formattedAmount}`, marginX + 140, currentY + 9.5, { align: 'right' });
+    doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 9.5, { align: 'right' });
+  }
 
   // Totale A & B
   doc.setFillColor(f24LightBlue[0], f24LightBlue[1], f24LightBlue[2]);
@@ -215,35 +312,14 @@ export function generateF24PDF(
   doc.setTextColor(textDark[0], textDark[1], textDark[2]);
   doc.text('TOTALE', marginX + 2, currentY + 15.5);
   doc.text('A', marginX + 91, currentY + 15.5);
-  doc.text('€ 0,00', marginX + 141, currentY + 15.5, { align: 'right' });
+  doc.text(sectionToFill === 'erario' ? `€ ${formattedAmount}` : '€ 0,00', marginX + 141, currentY + 15.5, { align: 'right' });
   doc.text('B', marginX + 147, currentY + 15.5);
   doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 15.5, { align: 'right' });
 
   currentY += 18;
 
-  // SEZIONE INPS - ACTIVE PORTION FOR GESTIONE SEPARATA
-  let paymentLabel = '';
-  let refPeriodStart = '';
-  let refPeriodEnd = '';
-  let inpsCodeTributo = 'P10'; // Professional GS rate code standard
-  
-  const calcYearInt = parseInt(year, 10);
-  
-  if (type === 'saldo') {
-    paymentLabel = `Saldo Gestione Separata INPS ${year}`;
-    refPeriodStart = `01/${year}`;
-    refPeriodEnd = `12/${year}`;
-  } else if (type === 'acconto1') {
-    paymentLabel = `I° Acconto Gestione Separata INPS ${calcYearInt + 1}`;
-    refPeriodStart = `01/${calcYearInt + 1}`;
-    refPeriodEnd = `12/${calcYearInt + 1}`;
-  } else {
-    paymentLabel = `II° Acconto Gestione Separata INPS ${calcYearInt + 1}`;
-    refPeriodStart = `01/${calcYearInt + 1}`;
-    refPeriodEnd = `12/${calcYearInt + 1}`;
-  }
-
-  drawSectionHeader('SEZIONE INPS', `CONTRIBUTI PREVIDENZIALI - ${paymentLabel.toUpperCase()}`);
+  // SEZIONE INPS
+  drawSectionHeader('SEZIONE INPS', `CONTRIBUTI PREVIDENZIALI - ${sectionToFill === 'inps' ? paymentLabel.toUpperCase() : 'MOCK'}`);
 
   doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
   doc.rect(marginX, currentY, pageWidth - (2 * marginX), 24);
@@ -270,22 +346,20 @@ export function generateF24PDF(
   doc.line(marginX + 120, currentY, marginX + 120, currentY + 24);
   doc.line(marginX + 155, currentY, marginX + 155, currentY + 24);
 
-  // Row 1 values
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+  if (sectionToFill === 'inps') {
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
 
-  // Codice sede - e.g. "8200" or empty. Let's make it look clean
-  doc.text('8200', marginX + 7.5, currentY + 9.5, { align: 'center' });
-  doc.text(inpsCodeTributo, marginX + 23.5, currentY + 9.5, { align: 'center' });
-  doc.text(fiscalCode, marginX + 56, currentY + 9.5, { align: 'center' });
-  doc.text(refPeriodStart, marginX + 90, currentY + 9.5, { align: 'center' });
-  doc.text(refPeriodEnd, marginX + 110, currentY + 9.5, { align: 'center' });
+    doc.text('8200', marginX + 7.5, currentY + 9.5, { align: 'center' });
+    doc.text(taxCode, marginX + 23.5, currentY + 9.5, { align: 'center' });
+    doc.text(fiscalCode, marginX + 56, currentY + 9.5, { align: 'center' });
+    doc.text(refPeriodStart || `01/${year}`, marginX + 90, currentY + 9.5, { align: 'center' });
+    doc.text(refPeriodEnd || `12/${year}`, marginX + 110, currentY + 9.5, { align: 'center' });
 
-  // Right aligned amount
-  const formattedAmount = amount.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  doc.text(`€ ${formattedAmount}`, marginX + 153, currentY + 9.5, { align: 'right' });
-  doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 9.5, { align: 'right' });
+    doc.text(`€ ${formattedAmount}`, marginX + 153, currentY + 9.5, { align: 'right' });
+    doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 9.5, { align: 'right' });
+  }
 
   // Grid second row line
   doc.line(marginX, currentY + 14, pageWidth - marginX, currentY + 14);
@@ -299,13 +373,13 @@ export function generateF24PDF(
   doc.setTextColor(textDark[0], textDark[1], textDark[2]);
   doc.text('TOTALE', marginX + 2, currentY + 20.5);
   doc.text('C', marginX + 116, currentY + 20.5);
-  doc.text(`€ ${formattedAmount}`, marginX + 153, currentY + 20.5, { align: 'right' });
+  doc.text(sectionToFill === 'inps' ? `€ ${formattedAmount}` : '€ 0,00', marginX + 153, currentY + 20.5, { align: 'right' });
   doc.text('D', marginX + 156, currentY + 20.5);
   doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 20.5, { align: 'right' });
 
   currentY += 24;
 
-  // SEZIONE REGIONI & ALTRI ENTI (Blank Grid lines to make it look highly recognizable)
+  // SEZIONE REGIONI
   drawSectionHeader('SEZIONE REGIONI', 'TRIBUTI REGIONALI ED ALTRE IMPOSTE');
   
   doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
@@ -338,6 +412,41 @@ export function generateF24PDF(
   doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 10.5, { align: 'right' });
 
   currentY += 12;
+
+  // SEZIONE ALTRI ENTI (Specific for independent professional funds)
+  drawSectionHeader('SEZIONE ALTRI ENTI PREVIDENZIALI ED ASSICURATIVI', sectionToFill === 'altre_casse' ? paymentLabel.toUpperCase() : 'MOCK');
+  doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+  doc.rect(marginX, currentY, pageWidth - (2 * marginX), 15);
+  
+  doc.line(marginX + 20, currentY, marginX + 20, currentY + 15);
+  doc.line(marginX + 45, currentY, marginX + 45, currentY + 15);
+  doc.line(marginX + 75, currentY, marginX + 75, currentY + 15);
+  doc.line(marginX + 115, currentY, marginX + 115, currentY + 15);
+  doc.line(marginX + 150, currentY, marginX + 150, currentY + 15);
+
+  if (sectionToFill === 'altre_casse') {
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text('EP', marginX + 10, currentY + 8, { align: 'center' }); // Ente Previdenziale
+    doc.text(taxCode, marginX + 32.5, currentY + 8, { align: 'center' });
+    doc.text(fiscalCode.substring(0, 8), marginX + 60, currentY + 8, { align: 'center' });
+    doc.text(year, marginX + 95, currentY + 8, { align: 'center' });
+    doc.text(`€ ${formattedAmount}`, marginX + 148, currentY + 8, { align: 'right' });
+    doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 8, { align: 'right' });
+  }
+
+  // Totale L & M
+  doc.line(marginX, currentY + 10, pageWidth - marginX, currentY + 10);
+  doc.setFillColor(f24LightBlue[0], f24LightBlue[1], f24LightBlue[2]);
+  doc.rect(marginX, currentY + 10, pageWidth - (2 * marginX), 5, 'F');
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.text('TOTALE I', marginX + 2, currentY + 13.5);
+  doc.text(sectionToFill === 'altre_casse' ? `€ ${formattedAmount}` : '€ 0,00', marginX + 145, currentY + 13.5, { align: 'right' });
+  doc.text('L', marginX + 148, currentY + 13.5);
+  doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 13.5, { align: 'right' });
+
+  currentY += 15;
 
   // SALDO FINALE SECTION
   doc.setDrawColor(f24Blue[0], f24Blue[1], f24Blue[2]);
@@ -385,9 +494,10 @@ export function generateF24PDF(
   doc.setTextColor(140, 140, 140);
   const now = new Date();
   doc.text(`* Documento generato dal calcolatore Fiscale in tempo reale il ${now.toLocaleString('it-IT')}. Modello conforme alle specifiche dell'Agenzia delle Entrate.`, marginX, currentY);
-  doc.text(`ID Transazione: F24-${profile.vatNumber}-${type.toUpperCase()}-${year}`, marginX, currentY + 2.5);
+  doc.text(`ID Transazione: F24-${profile.vatNumber || 'IVA'}-${category.toUpperCase()}-${paymentType.toUpperCase()}-${year}`, marginX, currentY + 2.5);
 
   // Save the F24 PDF
-  const filename = `F24_INPS_GestioneSeparata_${type.toUpperCase()}_${year}.pdf`;
+  const catShort = category === 'imposta' ? 'IMPOSTA' : 'CONTRIBUTI';
+  const filename = `F24_${catShort}_${paymentType.toUpperCase()}_${year}.pdf`;
   doc.save(filename);
 }
