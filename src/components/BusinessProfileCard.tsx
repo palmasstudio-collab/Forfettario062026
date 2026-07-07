@@ -6,7 +6,7 @@
 import React, { useState, useRef } from 'react';
 import { BusinessProfile, PensionFundType } from '../types';
 import { ATECO_CODES, PENSION_FUNDS, importAtecoRegistryFromPdf, findAtecoCode } from '../taxData';
-import { Building, Search, Info, HelpCircle, HardDriveDownload, Loader2, FolderPlus, Check, Save, RefreshCw } from 'lucide-react';
+import { Building, Search, Info, HelpCircle, HardDriveDownload, Loader2, FolderPlus, Check, Save, RefreshCw, ExternalLink } from 'lucide-react';
 import { safeAlert } from '../utils/safeWindow';
 
 interface BusinessProfileCardProps {
@@ -14,6 +14,7 @@ interface BusinessProfileCardProps {
   onChange: (profile: BusinessProfile) => void;
   isCreatingFolder?: boolean;
   driveFolderCreated?: boolean;
+  driveFolderUrl?: string;
   onCreateDriveFolder?: () => void;
   onRecreateDriveFolder?: () => void;
   isRecreatingFolder?: boolean;
@@ -26,6 +27,7 @@ export default function BusinessProfileCard({
   onChange,
   isCreatingFolder = false,
   driveFolderCreated = false,
+  driveFolderUrl,
   onCreateDriveFolder,
   onRecreateDriveFolder,
   isRecreatingFolder = false,
@@ -351,7 +353,21 @@ export default function BusinessProfileCard({
             {isCreatingFolder ? (
               <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
             ) : driveFolderCreated ? (
-              <Check className="w-5 h-5 text-emerald-600" />
+              <div className="flex flex-col items-center gap-1.5">
+                <Check className="w-5 h-5 text-emerald-600" />
+                {driveFolderUrl && (
+                  <a 
+                    href={driveFolderUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="mt-1 flex items-center gap-1 text-[10px] bg-emerald-600 text-white px-2 py-1 rounded hover:bg-emerald-700 transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ExternalLink className="w-2.5 h-2.5" />
+                    APRI
+                  </a>
+                )}
+              </div>
             ) : (
               <FolderPlus className="w-5 h-5 text-sky-600" />
             )}

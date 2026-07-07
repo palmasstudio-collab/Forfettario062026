@@ -431,22 +431,22 @@ export default function TaxSimulatorDashboard({
   };
 
   return (
-    <div className="flex flex-col gap-6 animate-fade-in" id="tax-simulator-dashboard">
+    <div className="flex flex-col gap-6 animate-fade-in text-theme-text" id="tax-simulator-dashboard">
       
       {/* Barra Azioni Principali: Esportazione PDF */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-theme-card rounded-3xl shadow-sm border border-theme-border p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700 hidden sm:block">
-            <FileText className="w-5 h-5 text-slate-600" />
+          <div className="p-2.5 bg-theme-bg rounded-xl text-theme-text hidden sm:block">
+            <FileText className="w-5 h-5 text-theme-text-muted" />
           </div>
           <div>
-            <h4 className="text-sm font-extrabold text-slate-800">Copia Esportabile del Fascicolo</h4>
-            <p className="text-[11px] text-slate-500">Scarica localmente l'intero bilancio fiscale simulato con il registro cronologico delle fatture.</p>
+            <h4 className="text-sm font-extrabold text-theme-text">Copia Esportabile del Fascicolo</h4>
+            <p className="text-[11px] text-theme-text-muted">Scarica localmente l'intero bilancio fiscale simulato con il registro cronologico delle fatture.</p>
           </div>
         </div>
         <button
           onClick={handleGeneratePDFClick}
-          className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm w-full sm:w-auto shrink-0"
+          className="bg-theme-accent hover:opacity-90 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm w-full sm:w-auto shrink-0"
           id="btn-export-pdf-main"
         >
           <Download className="w-4 h-4 text-emerald-400 stroke-[2.5]" />
@@ -460,39 +460,39 @@ export default function TaxSimulatorDashboard({
       <div className="lg:col-span-2 flex flex-col gap-6">
         
         {/* Card Input di Simulazione */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8">
+        <div className="bg-theme-card rounded-3xl shadow-sm border border-theme-border p-6 sm:p-8">
           <div className="flex items-center gap-3.5 mb-4">
             <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-600 animate-pulse">
               <Calculator className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-lg font-extrabold text-slate-900 tracking-tight">Parametri Avanzati di Calcolo</h3>
-              <p className="text-xs text-slate-500">Regola le deduzioni passive e lo scaglione temporale della tua attività</p>
+              <h3 className="text-lg font-extrabold text-theme-text tracking-tight">Parametri Avanzati di Calcolo</h3>
+              <p className="text-xs text-theme-text-muted">Regola le deduzioni passive e lo scaglione temporale della tua attività</p>
             </div>
           </div>
  
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
             {/* Contributi Previdenziali Versati nell'anno Corrente */}
             <div className="flex flex-col gap-1.5" id="prev-year-contributions-config">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
+              <label className="text-xs font-bold text-theme-text-muted uppercase tracking-wider flex items-center justify-between">
                 <span>Contributi Dedotti (Principio di Cassa)</span>
                 <span className="relative inline-block group">
-                  <HelpCircle className="w-3.5 h-3.5 text-slate-400 cursor-help" />
-                  <span className="pointer-events-none absolute bottom-full mb-1 right-1/2 -translate-x-1/2 w-56 bg-white text-slate-900 rounded-lg text-[10px] p-2 leading-relaxed opacity-0 group-hover:opacity-100 transition duration-150 z-20 shadow-xl border border-slate-200">
+                  <HelpCircle className="w-3.5 h-3.5 text-theme-text-muted cursor-help" />
+                  <span className="pointer-events-none absolute bottom-full mb-1 right-1/2 -translate-x-1/2 w-56 bg-theme-card text-theme-text rounded-lg text-[10px] p-2 leading-relaxed opacity-0 group-hover:opacity-100 transition duration-150 z-20 shadow-xl border border-theme-border">
                     Contributi previdenziali versati o addebitati tramite F24 nell'anno d'imposta selezionato. Vengono sottratti dal reddito imponibile lordo per calcolare la base imponibile netta.
                   </span>
                 </span>
               </label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 font-semibold text-xs">€</span>
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-theme-text-muted font-semibold text-xs">€</span>
                 <input
                   type="number"
                   min="0"
                   disabled={useAutomaticF24}
-                  className={`w-full pl-8 pr-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 text-sm font-semibold transition-all ${
+                  className={`w-full pl-8 pr-4 py-2.5 rounded-xl border border-theme-border focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 text-sm font-semibold transition-all ${
                     useAutomaticF24 
-                      ? 'bg-slate-50 text-emerald-600 border-slate-200 cursor-not-allowed font-extrabold' 
-                      : 'bg-white text-slate-800 border-slate-200'
+                      ? 'bg-theme-bg text-emerald-600 border-theme-border cursor-not-allowed font-extrabold' 
+                      : 'bg-theme-card text-theme-text border-theme-border'
                   }`}
                   value={prevYearContributions}
                   onChange={(e) => handleUpdateContributions(Math.max(0, parseFloat(e.target.value) || 0))}
@@ -546,21 +546,34 @@ export default function TaxSimulatorDashboard({
         </div>
  
         {/* Card Upload F24 e XML Fatture */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8">
+        <div className="bg-theme-card rounded-3xl shadow-sm border border-theme-border p-6 sm:p-8">
           <div className="flex items-center gap-3.5 mb-4">
             <div className="p-3 bg-sky-500/10 rounded-2xl text-sky-600">
               <Upload className="w-6 h-6" />
             </div>
-            <div>
-              <h3 className="text-lg font-extrabold text-slate-900 tracking-tight">Caricamento Dati Intelligente</h3>
-              <p className="text-xs text-slate-500">Carica o rimuovi i documenti e monitora il riepilogo in tempo reale</p>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-extrabold text-theme-text tracking-tight">Caricamento Dati Intelligente</h3>
+                {driveFolderUrl && (
+                  <a 
+                    href={driveFolderUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-theme-bg hover:bg-theme-border text-theme-text-muted hover:text-theme-text rounded-xl text-[10px] font-bold transition-all border border-theme-border"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    <span>Apri Cartella Drive</span>
+                  </a>
+                )}
+              </div>
+              <p className="text-xs text-theme-text-muted">Carica o rimuovi i documenti e monitora il riepilogo in tempo reale</p>
             </div>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
             {/* Colonna Sinistra: Carica XML & Elenco Fatture */}
             <div className="flex flex-col gap-4">
-              <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center relative hover:bg-slate-50 transition-colors min-h-[140px]">
+              <div className="border-2 border-dashed border-theme-border rounded-2xl p-6 flex flex-col items-center justify-center relative hover:bg-theme-bg transition-colors min-h-[140px]">
                 <input
                   ref={xmlInputRef}
                   type="file"
@@ -690,17 +703,17 @@ export default function TaxSimulatorDashboard({
                 ) : (
                   <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
                     {f24Entries.map((e) => (
-                      <div key={e.id} className="bg-white p-2.5 rounded-xl border border-slate-200/60 flex items-center justify-between text-xs hover:border-slate-300 transition-colors shadow-sm">
+                      <div key={e.id} className="bg-theme-card p-2.5 rounded-xl border border-theme-border flex items-center justify-between text-xs hover:border-theme-accent/50 transition-colors shadow-sm">
                         <div className="min-w-0 pr-2">
-                          <div className="font-bold text-slate-800">Tributo {e.taxCode}</div>
-                          <div className="text-[10px] text-slate-400 mt-0.5 font-mono flex items-center gap-1.5">
-                            <span className="font-bold uppercase tracking-wider text-[9px] px-1 py-0.2 bg-slate-100 text-slate-600 rounded">{e.source}</span>
+                          <div className="font-bold text-theme-text">Tributo {e.taxCode}</div>
+                          <div className="text-[10px] text-theme-text-muted mt-0.5 font-mono flex items-center gap-1.5">
+                            <span className="font-bold uppercase tracking-wider text-[9px] px-1 py-0.2 bg-theme-bg text-theme-text-muted rounded">{e.source}</span>
                             <span>·</span>
                             <span>{e.date}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="font-mono font-extrabold text-slate-900">€ {e.amount.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span className="font-mono font-extrabold text-theme-text">€ {e.amount.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           {onDeleteF24Entry && (
                             <button
                               type="button"
@@ -727,24 +740,24 @@ export default function TaxSimulatorDashboard({
                     <button
                       type="button"
                       onClick={() => setShowManualF24Form(true)}
-                      className="w-full py-2 text-[10px] font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 border border-dashed border-slate-300 hover:text-slate-800 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="w-full py-2 text-[10px] font-bold text-theme-text-muted bg-theme-bg hover:bg-theme-border border border-dashed border-theme-border hover:text-theme-text rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <span>+ Inserisci Contributo Manualmente</span>
                     </button>
                   ) : (
-                    <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-sm animate-in fade-in slide-in-from-top-2">
+                    <div className="bg-theme-card p-3 rounded-xl border border-theme-accent shadow-sm animate-in fade-in slide-in-from-top-2">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Nuovo Contributo</span>
-                        <button type="button" onClick={() => setShowManualF24Form(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer text-xs font-bold px-1 py-0.5 border rounded">
+                        <span className="text-[10px] font-bold text-theme-accent uppercase tracking-wider">Nuovo Contributo</span>
+                        <button type="button" onClick={() => setShowManualF24Form(false)} className="text-theme-text-muted hover:text-theme-text cursor-pointer text-xs font-bold px-1 py-0.5 border rounded">
                           X
                         </button>
                       </div>
                       <div className="grid grid-cols-2 gap-2 mb-2">
                         <div>
-                          <label className="text-[9px] font-bold text-slate-500 uppercase">Data Versamento</label>
+                          <label className="text-[9px] font-bold text-theme-text-muted uppercase">Data Versamento</label>
                           <input 
                             type="date" 
-                            className="w-full p-1.5 text-xs rounded bg-slate-50 border border-slate-200"
+                            className="w-full p-1.5 text-xs rounded bg-theme-bg border border-theme-border text-theme-text"
                             value={manualF24Data.date}
                             onChange={e => setManualF24Data({...manualF24Data, date: e.target.value})}
                           />

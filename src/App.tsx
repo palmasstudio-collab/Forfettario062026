@@ -9,6 +9,7 @@ import BusinessProfileCard from './components/BusinessProfileCard';
 import TaxSimulatorDashboard from './components/TaxSimulatorDashboard';
 import AccountingPositionModal from './components/AccountingPositionModal';
 import DeletePositionModal from './components/DeletePositionModal';
+import ThemeSelector, { ThemeType } from './components/ThemeSelector';
 import { createAccountingPositionFolder, uploadF24Pdf, deleteDriveFile, uploadFirebaseBackupToDrive, findOrCreateFolder, uploadInvoiceXml, listDriveFolders, listFilesInFolder, downloadFileContent, renameDriveFile, resolveYearFolderAndSubfolder, verifyAndRecreateFolderStructure } from './utils/googleDrive';
 import { parseInvoiceXml } from './utils/xmlInvoiceParser';
 import { extractF24DataFromPdf } from './utils/pdfF24Parser';
@@ -203,6 +204,21 @@ export default function App() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isCreatingDriveFolder, setIsCreatingDriveFolder] = useState(false);
   const [isRecreatingDriveFolder, setIsRecreatingDriveFolder] = useState(false);
+
+  // Aesthetic Themes
+  const [theme, setTheme] = useState<ThemeType>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('forfettario_theme_v1') as ThemeType) || 'vibrant';
+    }
+    return 'vibrant';
+  });
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('forfettario_theme_v1', theme);
+    }
+  }, [theme]);
 
   // Online/Offline detection states
   const [isOnline, setIsOnline] = useState<boolean>(() => typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -1443,7 +1459,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className="flex h-screen w-full bg-slate-50 font-sans overflow-hidden" id="app-container">
+      <div className="flex h-screen w-full bg-theme-bg text-theme-text font-main overflow-hidden transition-colors duration-300" id="app-container">
         
         {/* Mobile Sidebar Back-drop overlay */}
         {sidebarOpen && (
@@ -1509,11 +1525,23 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsDeleteModalOpen(true)}
-              className="p-2 bg-slate-850 hover:bg-rose-500/10 border border-slate-700 hover:border-rose-500/20 text-slate-400 hover:text-rose-400 rounded-xl transition-all cursor-pointer"
+              className="p-2 bg-slate-850 hover:bg-rose-500/10 border border-slate-700 hover:border-rose-500/20 text-slate-400 hover:text-rose-400 rounded-xl transition-all cursor-pointer shrink-0"
               title="Elimina posizione corrente"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
+
+            {activePosition?.driveFolderUrl && (
+              <a
+                href={activePosition.driveFolderUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 bg-slate-850 hover:bg-emerald-500/10 border border-slate-700 hover:border-emerald-500/20 text-slate-400 hover:text-emerald-400 rounded-xl transition-all cursor-pointer shrink-0 flex items-center justify-center"
+                title="Apri cartella Google Drive"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
           </div>
         </div>
 
@@ -1570,30 +1598,30 @@ export default function App() {
       </aside>
 
       {/* CORE WORKSPACE */}
-      <main className="flex-1 flex flex-col min-w-0" id="main-content-window">
+      <main className="flex-1 flex flex-col min-w-0 bg-theme-bg" id="main-content-window">
         
         {/* Top Professional Sleek Header */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 sm:px-8 shrink-0">
+        <header className="h-16 bg-theme-card border-b border-theme-border flex items-center justify-between px-6 sm:px-8 shrink-0">
           
           <div className="flex items-center gap-3">
             {/* Hamburger menu for small devices */}
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg md:hidden transition-colors"
+              className="p-1.5 text-theme-text-muted hover:bg-theme-bg rounded-lg md:hidden transition-colors"
               aria-label="Apri menu"
             >
               <Menu className="w-5.5 h-5.5" />
             </button>
             
             <div className="flex items-center gap-2 sm:gap-3">
-              <h2 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight">
+              <h2 className="text-sm sm:text-base font-extrabold text-theme-text tracking-tight">
                 Pannello di Controllo Fiscale
               </h2>
               <div className="relative inline-flex items-center" id="fiscal-year-selector">
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(e.target.value)}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold px-3 py-1 pr-8 rounded-full text-[11px] outline-none border-none cursor-pointer transition-all appearance-none"
+                  className="bg-theme-bg hover:bg-theme-border text-theme-text font-extrabold px-3 py-1 pr-8 rounded-full text-[11px] outline-none border-none cursor-pointer transition-all appearance-none"
                   style={{
                     backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23475569' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`,
                     backgroundPosition: 'right 0.5rem center',
@@ -1622,11 +1650,14 @@ export default function App() {
 
           <div className="flex items-center gap-3">
             
+            {/* Aesthetic Theme Selector */}
+            <ThemeSelector currentTheme={theme} onThemeChange={setTheme} />
+
             {/* Real Webhook trigger styled precisely as the theme */}
             <button
               onClick={handleTriggerBackupSync}
               disabled={syncStatus === 'syncing'}
-              className={`p-2 rounded-full text-slate-500 hover:bg-slate-50 border border-slate-200 hover:text-slate-800 transition-colors shrink-0 flex items-center justify-center relative group`}
+              className={`p-2 rounded-full text-theme-text-muted hover:bg-theme-bg border border-theme-border hover:text-theme-text transition-colors shrink-0 flex items-center justify-center relative group`}
               title="Backup asincrono Spreadsheet"
             >
               <RefreshCw className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin text-emerald-500' : ''}`} />
@@ -1765,6 +1796,7 @@ export default function App() {
                   onChange={setProfile}
                   isCreatingFolder={isCreatingDriveFolder}
                   driveFolderCreated={!!activePosition?.driveFolderId}
+                  driveFolderUrl={activePosition?.driveFolderUrl}
                   isUnselected={!isPositionSelected}
                   onCreateDriveFolder={async () => {
                     const token = googleAccessTokenState;

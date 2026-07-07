@@ -1,16 +1,99 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Space+Grotesk:wght@300..700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-serif: "Playfair Display", ui-serif, Georgia, serif;
+  --font-display: "Space Grotesk", sans-serif;
+
+  /* Theme-able colors mapping */
+  --color-theme-bg: var(--theme-bg);
+  --color-theme-card: var(--theme-card);
+  --color-theme-text: var(--theme-text);
+  --color-theme-text-muted: var(--theme-text-muted);
+  --color-theme-accent: var(--theme-accent);
+  --color-theme-border: var(--theme-border);
+}
+
+/* Theme Definitions */
+:root {
+  /* Default: Modern Vibrant / Standard */
+  --theme-bg: #fcfdfd;
+  --theme-card: #ffffff;
+  --theme-text: #0f172a;
+  --theme-text-muted: #64748b;
+  --theme-accent: #6366f1;
+  --theme-border: #e2e8f0;
+  --font-main: var(--font-sans);
+  --font-heading: var(--font-sans);
+}
+
+[data-theme='swiss'] {
+  --theme-bg: #ffffff;
+  --theme-card: #ffffff;
+  --theme-text: #000000;
+  --theme-text-muted: #666666;
+  --theme-accent: #000000;
+  --theme-border: #000000;
+  --font-main: var(--font-sans);
+  --font-heading: var(--font-sans);
+}
+
+[data-theme='cosmic'] {
+  --theme-bg: #0a0a0c;
+  --theme-card: #151518;
+  --theme-text: #f8fafc;
+  --theme-text-muted: #94a3b8;
+  --theme-accent: #a855f7;
+  --theme-border: #1e293b;
+  --font-main: var(--font-sans);
+  --font-heading: var(--font-display);
+}
+
+[data-theme='editorial'] {
+  --theme-bg: #fdfaf6;
+  --theme-card: #ffffff;
+  --theme-text: #1a1a1a;
+  --theme-text-muted: #71717a;
+  --theme-accent: #92400e;
+  --theme-border: #e7e5e4;
+  --font-main: var(--font-sans);
+  --font-heading: var(--font-serif);
+}
+
+[data-theme='retro'] {
+  --theme-bg: #0c0e0c;
+  --theme-card: #0c0e0c;
+  --theme-text: #00ff41;
+  --theme-text-muted: #008f11;
+  --theme-accent: #00ff41;
+  --theme-border: #00ff41;
+  --font-main: var(--font-mono);
+  --font-heading: var(--font-mono);
+}
+
+[data-theme='vibrant'] {
+  --theme-bg: #f8fafc;
+  --theme-card: #ffffff;
+  --theme-text: #0f172a;
+  --theme-text-muted: #64748b;
+  --theme-accent: #0ea5e9;
+  --theme-border: #e2e8f0;
+  --font-main: var(--font-sans);
+  --font-heading: var(--font-sans);
 }
 
 body {
-  font-family: var(--font-sans);
-  background-color: #fcfdfd;
-  color: #0f172a;
+  font-family: var(--font-main);
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
 }
 
 /* Custom micro animations */
