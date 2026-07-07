@@ -856,6 +856,7 @@ export default function TaxSimulatorDashboard({
         <F24PreviewCanvas
           profile={profile}
           selectedYear={selectedYear}
+          results={results}
           onAddF24Entries={onAddF24Entries}
           f24Files={f24Files}
         />
