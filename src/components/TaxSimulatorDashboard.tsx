@@ -32,6 +32,7 @@ import {
 import { generateTaxAndInvoicePDF } from '../utils/pdfGenerator';
 import { generateInvoicePDFDocument } from '../utils/pdfInvoiceBasic';
 import { generateF24PDF } from '../utils/f24PdfGenerator';
+import F24PreviewCanvas from './F24PreviewCanvas';
 
 export const getMissingInvoiceNumbers = (invoices: Invoice[], year: string): number[] => {
   const seqNos = invoices.map(inv => {
@@ -850,6 +851,14 @@ export default function TaxSimulatorDashboard({
             </div>
           </div>
         </div>
+
+        {/* Workspace Revisione Visiva Modello F24 */}
+        <F24PreviewCanvas
+          profile={profile}
+          selectedYear={selectedYear}
+          onAddF24Entries={onAddF24Entries}
+          f24Files={f24Files}
+        />
 
       </div>
  

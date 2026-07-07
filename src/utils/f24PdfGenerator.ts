@@ -10,7 +10,8 @@ export type F24Category = 'imposta' | 'contributi';
 export type F24PaymentType = 'saldo' | 'acconto1' | 'acconto2' | 'minimale';
 
 /**
- * Generates an authentic, printable Modello F24 PDF for Italian Taxes (Imposta Sostitutiva) and Pension Contributions
+ * Generates an extremely high-fidelity, authentic vector representation of the
+ * official Modello F24 (Agenzia delle Entrate) PDF, compiled with user details.
  */
 export function generateF24PDF(
   profile: BusinessProfile,
@@ -26,18 +27,19 @@ export function generateF24PDF(
     format: 'a4',
   });
 
-  const pageHeight = doc.internal.pageSize.height; // 297
-  const pageWidth = doc.internal.pageSize.width; // 210
-  const marginX = 10;
-  let currentY = 10;
+  const pageWidth = 210;
+  const marginX = 6;
+  const contentWidth = pageWidth - (2 * marginX); // 198mm
 
-  // Colors based on original F24 Form colors (Cyan/Blue headers and light grey grid lines)
-  const f24Blue = [0, 115, 170]; // Classic F24 cyan-blue header background
-  const f24LightBlue = [230, 242, 250]; // Light shading for alternating columns/totals
-  const textDark = [30, 41, 59]; // Text color (almost black)
-  const lineGray = [180, 180, 180]; // Grid lines
+  // Official F24 colors
+  const f24Teal = [0, 151, 178]; // Official turquoise/cyan header bars (#0097B2)
+  const f24LightTeal = [225, 244, 247]; // Soft teal shading for totals (#E1F4F7)
+  const lineGray = [160, 210, 220]; // Light teal-gray lines for grid
+  const borderTeal = [0, 151, 178];
+  const textDark = [40, 40, 40];
+  const textLight = [100, 100, 100];
 
-  // Label formatting helper
+  // Logic to calculate tax code and reference details
   const calcYearInt = parseInt(year, 10);
   let taxCode = '';
   let paymentLabel = '';
@@ -103,7 +105,6 @@ export function generateF24PDF(
         }
       }
     } else {
-      // Professional funds (Inarcassa, Cassa Forense, etc.)
       sectionToFill = 'altre_casse';
       taxCode = actualFundId.substring(0, 5).toUpperCase();
       if (paymentType === 'saldo') {
@@ -118,383 +119,800 @@ export function generateF24PDF(
     }
   }
 
-  // Helper: Draw a grid section header
-  const drawSectionHeader = (title: string, subtitle?: string) => {
-    doc.setFillColor(f24Blue[0], f24Blue[1], f24Blue[2]);
-    doc.rect(marginX, currentY, pageWidth - (2 * marginX), 6, 'F');
+  // Draw 1st Copy (Page 1)
+  drawF24Page(1, "1ª COPIA PER LA BANCA/POSTE/AGENTE DELLA RISCOSSIONE");
+
+  // Draw 2nd Copy (Page 2)
+  doc.addPage();
+  drawF24Page(2, "2ª COPIA PER LA BANCA/POSTE/AGENTE DELLA RISCOSSIONE");
+
+  // Draw 3rd Copy (Page 3)
+  doc.addPage();
+  drawF24Page(3, "COPIA PER IL SOGGETTO CHE EFFETTUA IL VERSAMENTO");
+
+  // Main function that draws a page of Modello F24
+  function drawF24Page(pageNum: number, copyLabel: string) {
+    let currentY = 5;
+
+    // --- PAGE HEADER BLOCK ---
+    // logo box or brand name
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.setLineWidth(0.3);
+
+    // Header Logo area
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    // Draw Logo text to resemble "Agenzia Entrate"
+    doc.text('genzia', marginX + 16, currentY + 7);
+    doc.text('ntrate', marginX + 16, currentY + 11);
+    
+    // Abstract logo shapes
+    doc.setFillColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.rect(marginX + 2, currentY + 2, 11, 10, 'F');
+    doc.setFillColor(255, 255, 255);
+    doc.circle(marginX + 7.5, currentY + 7, 3, 'F');
+    doc.setFillColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.circle(marginX + 7.5, currentY + 7, 1.5, 'F');
+
+    // Title Block
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text('MODELLO DI PAGAMENTO', marginX + 2, currentY + 18);
+    doc.text('UNIFICATO', marginX + 2, currentY + 22);
+
+    // Large € Watermark
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(36);
+    doc.setTextColor(225, 244, 247);
+    doc.text('€', pageWidth / 2, currentY + 15, { align: 'center' });
+
+    // Mod. F24 tag
+    doc.setFillColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.rect(pageWidth - marginX - 18, currentY, 18, 5, 'F');
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Mod. F24', pageWidth - marginX - 15, currentY + 3.8);
+
+    // Delegation Box on top right
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.setLineWidth(0.2);
+    doc.line(pageWidth - marginX - 75, currentY + 6, pageWidth - marginX, currentY + 6);
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(6);
+    doc.setTextColor(textLight[0], textLight[1], textLight[2]);
+    doc.text('DELEGA IRREVOCABILE A:', pageWidth - marginX - 74, currentY + 9);
+    doc.text('AGENZIA', pageWidth - marginX - 74, currentY + 14);
+    doc.text('PROV.', pageWidth - marginX - 14, currentY + 14);
+    doc.text('PER L\'ACCREDITO ALLA TESORERIA COMPETENTE', pageWidth - marginX - 74, currentY + 19);
+
+    // Draw lines inside delegation block
+    doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+    doc.line(pageWidth - marginX - 75, currentY + 10, pageWidth - marginX, currentY + 10);
+    doc.line(pageWidth - marginX - 75, currentY + 15, pageWidth - marginX, currentY + 15);
+    doc.rect(pageWidth - marginX - 75, currentY + 6, 75, 14.5);
+
+    currentY += 22;
+
+    // Helper: Draw turquoise header bar
+    const drawSectionHeader = (title: string, rightNote?: string) => {
+      doc.setFillColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+      doc.rect(marginX, currentY, contentWidth, 5, 'F');
+      
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text(title.toUpperCase(), marginX + 1.5, currentY + 3.6);
+
+      if (rightNote) {
+        doc.setFont('Helvetica', 'normal');
+        doc.setFontSize(5.5);
+        doc.text(rightNote, pageWidth - marginX - 1.5, currentY + 3.4, { align: 'right' });
+      }
+      currentY += 5;
+    };
+
+    // Helper: Draw typewriter Courier characters inside split boxes
+    const drawFormString = (text: string, count: number, x: number, y: number, charWidth: number = 3.6, boxHeight: number = 4) => {
+      doc.setFont('Courier', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(0, 0, 0);
+      const str = text.toUpperCase().padEnd(count, ' ');
+      for (let i = 0; i < count; i++) {
+        const char = str[i];
+        if (char && char !== ' ') {
+          doc.text(char, x + (i * charWidth) + (charWidth / 2), y + 3.1, { align: 'center' });
+        }
+      }
+    };
+
+    // Helper: Draw empty split boxes (individual letter slots)
+    const drawInputBoxes = (count: number, x: number, y: number, charWidth: number = 3.6, boxHeight: number = 4) => {
+      doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+      doc.setLineWidth(0.15);
+      for (let i = 0; i < count; i++) {
+        doc.rect(x + (i * charWidth), y, charWidth, boxHeight);
+      }
+    };
+
+    // Helper: Format euro amount into split digits for cents
+    const drawEuroAmountInForm = (val: number, x: number, y: number) => {
+      const parts = val.toFixed(2).split('.');
+      const integerPart = parseInt(parts[0], 10).toLocaleString('it-IT').replace(/\./g, '');
+      const decimalPart = parts[1];
+
+      doc.setFont('Courier', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(0, 0, 0);
+
+      // Decimals (cents) go into the final 2 boxes on the right
+      doc.text(decimalPart, x + 44.5, y + 3.2, { align: 'center' });
+
+      // Integer part goes left of the comma, right-aligned to the decimal separator
+      doc.text(integerPart, x + 34, y + 3.2, { align: 'right' });
+    };
+
+    // Helper: Draw F24 official currency lines (euro separator comma)
+    const drawEuroFieldDesign = (x: number, y: number) => {
+      doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+      doc.setLineWidth(0.15);
+      // Box for Euros (38mm)
+      doc.rect(x, y, 37, 4);
+      // Box for Cents (9mm)
+      doc.rect(x + 39, y, 8, 4);
+      // Draw comma
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+      doc.text(',', x + 37.4, y + 3.3);
+    };
+
+    // --- CONTRIBUENTE SECTION ---
+    drawSectionHeader('CONTRIBUENTE', 'barrare in caso di anno d\'imposta non coincidente con anno solare [ ]');
+
+    // CF Row
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.setLineWidth(0.25);
+    doc.rect(marginX, currentY, contentWidth, 23.5); // Outer frame for contribuente
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('CODICE FISCALE', marginX + 1.5, currentY + 3.2);
+
+    const fiscalCode = profile.fiscalCode || profile.vatNumber || '';
+    drawInputBoxes(16, marginX + 24, currentY + 0.8, 3.6, 4);
+    drawFormString(fiscalCode, 16, marginX + 24, currentY + 0.8, 3.6, 4);
+
+    // Separator line
+    doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+    doc.line(marginX, currentY + 5.2, pageWidth - marginX, currentY + 5.2);
+
+    // Name Row
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('DATI ANAGRAFICI', marginX + 1.5, currentY + 8.8);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(4.5);
+    doc.setTextColor(textLight[0], textLight[1], textLight[2]);
+    doc.text('cognome, denominazione o ragione sociale', marginX + 24, currentY + 7);
+    doc.text('nome', marginX + 115, currentY + 7);
+
+    // User values
+    doc.setFont('Courier', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(0, 0, 0);
+    
+    const nameParts = profile.fullName.split(' ');
+    const lastName = nameParts[0] || '';
+    const firstName = nameParts.slice(1).join(' ') || ' ';
+    doc.text(lastName.toUpperCase(), marginX + 24, currentY + 10.5);
+    doc.text(firstName.toUpperCase(), marginX + 115, currentY + 10.5);
+
+    // Birth details Row
+    doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+    doc.line(marginX, currentY + 11.5, pageWidth - marginX, currentY + 11.5);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(4.5);
+    doc.setTextColor(textLight[0], textLight[1], textLight[2]);
+    doc.text('data di nascita', marginX + 24, currentY + 13.5);
+    doc.text('giorno     mese       anno', marginX + 24, currentY + 15.2);
+    doc.text('sesso (M o F)', marginX + 62, currentY + 13.5);
+    doc.text('comune (o Stato estero) di nascita', marginX + 78, currentY + 13.5);
+    doc.text('prov.', marginX + 185, currentY + 13.5);
+
+    // Date boxes
+    drawInputBoxes(8, marginX + 24, currentY + 16, 3.2, 4);
+    drawFormString("01011985", 8, marginX + 24, currentY + 16, 3.2, 4);
+
+    // Sesso box
+    drawInputBoxes(1, marginX + 63, currentY + 16, 3.5, 4);
+    drawFormString("M", 1, marginX + 63, currentY + 16, 3.5, 4);
+
+    // Comune nascita
+    doc.setFont('Courier', 'bold');
+    doc.setFontSize(9.5);
+    doc.text('ROMA', marginX + 78, currentY + 19.2);
+    doc.text('RM', marginX + 185, currentY + 19.2);
+
+    // Domicilio fiscale Row
+    doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+    doc.line(marginX, currentY + 20.5, pageWidth - marginX, currentY + 20.5);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('DOMICILIO FISCALE', marginX + 1.5, currentY + 23.2);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(4.5);
+    doc.setTextColor(textLight[0], textLight[1], textLight[2]);
+    doc.text('comune', marginX + 24, currentY + 22);
+    doc.text('prov.', marginX + 115, currentY + 22);
+    doc.text('via e numero civico', marginX + 128, currentY + 22);
+
+    // User address values
+    doc.setFont('Courier', 'bold');
+    doc.setFontSize(9);
+    doc.text('ROMA', marginX + 24, currentY + 25.2);
+    doc.text('RM', marginX + 115, currentY + 25.2);
+    doc.text('VIA DEI CONDOTTI 10', marginX + 128, currentY + 25.2);
+
+    currentY += 26.5;
+
+    // --- COOBBLIGATO Row ---
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.rect(marginX, currentY, contentWidth, 5.2);
+    
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('CODICE FISCALE del coobbligato, erede,', marginX + 1, currentY + 2);
+    doc.text('genitore, tutore o curatore fallimentare', marginX + 1, currentY + 4);
+
+    drawInputBoxes(16, marginX + 45, currentY + 0.6, 3.4, 4);
+    
+    doc.text('codice identificativo', marginX + 148, currentY + 3.2);
+    drawInputBoxes(2, marginX + 178, currentY + 0.6, 4, 4);
+
+    currentY += 5.2;
+
+    // --- SEZIONE ERARIO ---
+    drawSectionHeader('SEZIONE ERARIO', 'IMPOSTE DIRETTE - IVA - RITENUTE ALLA FONTE - ALTRI TRIBUTI ED INTERESSI');
+
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.rect(marginX, currentY, contentWidth, 23.5); // Outer Section frame
+
+    // Grid Column Labels
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('codice tributo', marginX + 4, currentY + 2.8);
+    doc.text('rateazione/regione/\nprov./mese rif.', marginX + 26, currentY + 2.2);
+    doc.text('anno di\nriferimento', marginX + 54, currentY + 2.2);
+    doc.text('importi a debito versati', marginX + 102, currentY + 2.8);
+    doc.text('importi a credito compensati', marginX + 148, currentY + 2.8);
+
+    doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+    doc.line(marginX, currentY + 4.8, pageWidth - marginX, currentY + 4.8);
+
+    // Draw the Erario inputs grid lines
+    const erarioY = currentY + 4.8;
+    for (let r = 0; r < 4; r++) {
+      const rowY = erarioY + (r * 4.2);
+      if (r < 3) {
+        doc.line(marginX, rowY + 4.2, pageWidth - marginX, rowY + 4.2);
+      }
+      
+      // Vertical grid lines
+      doc.line(marginX + 23, rowY, marginX + 23, rowY + 4.2);
+      doc.line(marginX + 51, rowY, marginX + 51, rowY + 4.2);
+      doc.line(marginX + 74, rowY, marginX + 74, rowY + 4.2);
+      doc.line(marginX + 135, rowY, marginX + 135, rowY + 4.2);
+
+      // Input boxes on Erario columns
+      if (r < 3) {
+        drawInputBoxes(4, marginX + 3, rowY + 0.1, 4, 4);
+        drawInputBoxes(4, marginX + 28, rowY + 0.1, 4, 4);
+        drawInputBoxes(4, marginX + 54, rowY + 0.1, 4, 4);
+        drawEuroFieldDesign(marginX + 80, rowY + 0.1);
+        drawEuroFieldDesign(marginX + 140, rowY + 0.1);
+      }
+    }
+
+    // Insert active data for Erario
+    if (sectionToFill === 'erario') {
+      const activeRowY = erarioY;
+      drawFormString(taxCode, 4, marginX + 3, activeRowY + 0.1, 4, 4);
+      drawFormString(rateCode, 4, marginX + 28, activeRowY + 0.1, 4, 4);
+      drawFormString(paymentType === 'saldo' ? year : String(calcYearInt + 1), 4, marginX + 54, activeRowY + 0.1, 4, 4);
+      drawEuroAmountInForm(amount, marginX + 80, activeRowY + 0.1);
+    }
+
+    // Totals Block
+    const erarioTotalY = erarioY + 12.6;
+    doc.setFillColor(f24LightTeal[0], f24LightTeal[1], f24LightTeal[2]);
+    doc.rect(marginX + 0.1, erarioTotalY, contentWidth - 0.2, 5.9, 'F');
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.line(marginX, erarioTotalY, pageWidth - marginX, erarioTotalY);
+
+    // Vertical total divider
+    doc.line(marginX + 74, erarioTotalY, marginX + 74, erarioTotalY + 5.9);
+    doc.line(marginX + 135, erarioTotalY, marginX + 135, erarioTotalY + 5.9);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('TOTALE', marginX + 3, erarioTotalY + 4.2);
     
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(8.5);
-    doc.setTextColor(255, 255, 255);
-    doc.text(title.toUpperCase(), marginX + 2, currentY + 4.2);
+    doc.setTextColor(0, 0, 0);
+    doc.text('A', marginX + 70, erarioTotalY + 4.2);
+    doc.text('B', marginX + 131, erarioTotalY + 4.2);
 
-    if (subtitle) {
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(6.5);
-      doc.text(subtitle, pageWidth - marginX - 2, currentY + 4.2, { align: 'right' });
+    if (sectionToFill === 'erario') {
+      const parts = amount.toFixed(2).split('.');
+      doc.text(parseInt(parts[0], 10).toLocaleString('it-IT'), marginX + 114, erarioTotalY + 4.2, { align: 'right' });
+      doc.text(parts[1], marginX + 122, erarioTotalY + 4.2, { align: 'center' });
+    } else {
+      doc.text('0', marginX + 114, erarioTotalY + 4.2, { align: 'right' });
+      doc.text('00', marginX + 122, erarioTotalY + 4.2, { align: 'center' });
     }
-    currentY += 6;
-  };
+    
+    doc.text('0', marginX + 174, erarioTotalY + 4.2, { align: 'right' });
+    doc.text('00', marginX + 182, erarioTotalY + 4.2, { align: 'center' });
 
-  // Helper: Draw letter boxes for inputs (like Fiscal Code or VAT)
-  const drawCharBoxes = (text: string, count: number, x: number, y: number, boxWidth: number = 4.5, boxHeight: number = 5) => {
+    currentY += 23.5;
+
+    // --- SEZIONE INPS ---
+    drawSectionHeader('SEZIONE INPS');
+
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.rect(marginX, currentY, contentWidth, 23.5);
+
+    // Header column labels
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('codice\nsede', marginX + 2, currentY + 2.4);
+    doc.text('causale\ncontributo', marginX + 13, currentY + 2.4);
+    doc.text('matricola INPS/codice INPS/\nfiliale azienda', marginX + 35, currentY + 2.4);
+    doc.text('periodo di riferimento:\nda mm/aaaa      a mm/aaaa', marginX + 76, currentY + 2.4);
+    doc.text('importi a debito versati', marginX + 138, currentY + 3.2);
+    doc.text('importi a credito compensati', marginX + 168, currentY + 3.2);
+
     doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
-    doc.setLineWidth(0.2);
-    doc.setFont('Courier', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+    doc.line(marginX, currentY + 4.8, pageWidth - marginX, currentY + 4.8);
 
-    const formattedText = text.toUpperCase().padEnd(count, ' ');
+    const inpsY = currentY + 4.8;
+    for (let r = 0; r < 4; r++) {
+      const rowY = inpsY + (r * 4.2);
+      if (r < 3) {
+        doc.line(marginX, rowY + 4.2, pageWidth - marginX, rowY + 4.2);
+      }
+      
+      // Dividers
+      doc.line(marginX + 11, rowY, marginX + 11, rowY + 4.2);
+      doc.line(marginX + 25, rowY, marginX + 25, rowY + 4.2);
+      doc.line(marginX + 73, rowY, marginX + 73, rowY + 4.2);
+      doc.line(marginX + 125, rowY, marginX + 125, rowY + 4.2);
+      doc.line(marginX + 160, rowY, marginX + 160, rowY + 4.2);
 
-    for (let i = 0; i < count; i++) {
-      const boxX = x + (i * boxWidth);
-      doc.rect(boxX, y, boxWidth, boxHeight);
-      const char = formattedText[i];
-      if (char && char !== ' ') {
-        doc.text(char, boxX + (boxWidth / 2), y + 3.8, { align: 'center' });
+      if (r < 3) {
+        drawInputBoxes(4, marginX + 1, rowY + 0.1, 2.3, 4);
+        drawInputBoxes(4, marginX + 13, rowY + 0.1, 2.6, 4);
+        drawInputBoxes(13, marginX + 26, rowY + 0.1, 3.4, 4);
+        // Period boxes
+        drawInputBoxes(6, marginX + 74, rowY + 0.1, 3.6, 4);
+        drawInputBoxes(6, marginX + 100, rowY + 0.1, 3.6, 4);
+        drawEuroFieldDesign(marginX + 126, rowY + 0.1);
+        drawEuroFieldDesign(marginX + 161, rowY + 0.1);
       }
     }
-  };
 
-  // Page Header (Agenzia delle Entrate, Modello Unificato, Logo)
-  doc.setFillColor(250, 250, 250);
-  doc.rect(marginX, currentY, pageWidth - (2 * marginX), 18, 'F');
-  
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.setTextColor(100, 116, 139);
-  doc.text('AGENZIA DELLE ENTRATE', marginX + 2, currentY + 4);
+    // Insert active data for INPS
+    if (sectionToFill === 'inps') {
+      const activeRowY = inpsY;
+      drawFormString('8200', 4, marginX + 1, activeRowY + 0.1, 2.3, 4);
+      drawFormString(taxCode, 4, marginX + 13, activeRowY + 0.1, 2.6, 4);
+      drawFormString(fiscalCode, 13, marginX + 26, activeRowY + 0.1, 3.4, 4);
+      
+      const startClean = (refPeriodStart || `01/${year}`).replace('/', '');
+      const endClean = (refPeriodEnd || `12/${year}`).replace('/', '');
+      drawFormString(startClean, 6, marginX + 74, activeRowY + 0.1, 3.6, 4);
+      drawFormString(endClean, 6, marginX + 100, activeRowY + 0.1, 3.6, 4);
 
-  doc.setFontSize(14);
-  doc.setTextColor(f24Blue[0], f24Blue[1], f24Blue[2]);
-  doc.text('MODELLO DI PAGAMENTO', marginX + 2, currentY + 10);
-  doc.text('UNIFICATO', marginX + 2, currentY + 15);
+      drawEuroAmountInForm(amount, marginX + 126, activeRowY + 0.1);
+    }
 
-  // Large € Symbol watermark
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(28);
-  doc.setTextColor(f24Blue[0], f24Blue[1], f24Blue[2]);
-  doc.text('€', pageWidth / 2 - 10, currentY + 13, { align: 'center' });
+    // Totals Block
+    const inpsTotalY = inpsY + 12.6;
+    doc.setFillColor(f24LightTeal[0], f24LightTeal[1], f24LightTeal[2]);
+    doc.rect(marginX + 0.1, inpsTotalY, contentWidth - 0.2, 5.9, 'F');
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.line(marginX, inpsTotalY, pageWidth - marginX, inpsTotalY);
 
-  doc.setFont('Helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('DELEGA IRREVOCABILE A:', pageWidth - marginX - 60, currentY + 4);
-  
-  doc.setFont('Helvetica', 'bold');
-  doc.text('AG. POSTE / BANCA', pageWidth - marginX - 60, currentY + 9);
-  doc.text('Mod. F24', pageWidth - marginX - 2, currentY + 4, { align: 'right' });
+    doc.line(marginX + 125, inpsTotalY, marginX + 125, inpsTotalY + 5.9);
+    doc.line(marginX + 160, inpsTotalY, marginX + 160, inpsTotalY + 5.9);
 
-  // Draw thin border around delegation box
-  doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
-  doc.rect(pageWidth - marginX - 62, currentY + 1, 62, 11);
-
-  currentY += 18;
-
-  // CONTRIBUENTE SECTION
-  drawSectionHeader('CONTRIBUENTE', 'Barrare in caso di anno d\'imposta non coincidente con anno solare [ ]');
-
-  // Codice Fiscale
-  doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
-  doc.setLineWidth(0.2);
-  doc.rect(marginX, currentY, pageWidth - (2 * marginX), 32);
-
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('CODICE FISCALE', marginX + 2, currentY + 4.5);
-
-  const fiscalCode = profile.fiscalCode || profile.vatNumber || '';
-  drawCharBoxes(fiscalCode, 16, marginX + 32, currentY + 1.2, 4.5, 5);
-
-  // Dati Anagrafici
-  doc.line(marginX, currentY + 7, pageWidth - marginX, currentY + 7);
-  doc.text('DATI ANAGRAFICI', marginX + 2, currentY + 11.5);
-
-  doc.setFont('Helvetica', 'normal');
-  doc.setFontSize(6);
-  doc.setTextColor(120, 120, 120);
-  doc.text('cognome, denominazione o ragione sociale', marginX + 32, currentY + 10.5);
-  doc.text('nome', marginX + 110, currentY + 10.5);
-
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  
-  // Format Name / Surname
-  const nameParts = profile.fullName.split(' ');
-  const lastName = nameParts[0] || '';
-  const firstName = nameParts.slice(1).join(' ') || ' ';
-  doc.text(lastName.toUpperCase(), marginX + 32, currentY + 14.5);
-  doc.text(firstName.toUpperCase(), marginX + 110, currentY + 14.5);
-
-  // Birth Details
-  doc.line(marginX, currentY + 16, pageWidth - marginX, currentY + 16);
-  doc.setFont('Helvetica', 'normal');
-  doc.setFontSize(6);
-  doc.text('data di nascita (gg mm aaaa)', marginX + 2, currentY + 19);
-  doc.text('sesso (M o F)', marginX + 34, currentY + 19);
-  doc.text('comune (o Stato estero) di nascita', marginX + 50, currentY + 19);
-  doc.text('prov.', marginX + 145, currentY + 19);
-
-  // Draw birth data boxes
-  drawCharBoxes('01011985', 8, marginX + 2, currentY + 20, 3.2, 4.2);
-  drawCharBoxes('M', 1, marginX + 35, currentY + 20, 3.5, 4.2);
-  
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('ROMA', marginX + 50, currentY + 23.5);
-  doc.text('RM', marginX + 145, currentY + 23.5);
-
-  // Domicilio Fiscale
-  doc.line(marginX, currentY + 25, pageWidth - marginX, currentY + 25);
-  doc.setFont('Helvetica', 'normal');
-  doc.setFontSize(6);
-  doc.setTextColor(120, 120, 120);
-  doc.text('DOMICILIO FISCALE', marginX + 2, currentY + 29);
-  doc.text('comune', marginX + 32, currentY + 29);
-  doc.text('prov.', marginX + 95, currentY + 29);
-  doc.text('via e numero civico', marginX + 110, currentY + 29);
-
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('ROMA', marginX + 32, currentY + 31.5);
-  doc.text('RM', marginX + 95, currentY + 31.5);
-  doc.text('VIA DEI CONDOTTI 10', marginX + 110, currentY + 31.5);
-
-  currentY += 32;
-
-  // Formatting values
-  const formattedAmount = amount.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  // SEZIONE ERARIO
-  drawSectionHeader('SEZIONE ERARIO', `IMPOSTE DIRETTE - IVA - RITENUTE - ${sectionToFill === 'erario' ? paymentLabel.toUpperCase() : 'MOCK'}`);
-  
-  doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
-  doc.rect(marginX, currentY, pageWidth - (2 * marginX), 18);
-  
-  // Columns header
-  doc.setFont('Helvetica', 'normal');
-  doc.setFontSize(5);
-  doc.setTextColor(100, 100, 100);
-  doc.text('codice tributo', marginX + 5, currentY + 3.5);
-  doc.text('rateazione/regione/prov.', marginX + 35, currentY + 3.5);
-  doc.text('anno di rif.', marginX + 75, currentY + 3.5);
-  doc.text('importi a debito versati', marginX + 110, currentY + 3.5);
-  doc.text('importi a credito compensati', marginX + 155, currentY + 3.5);
-  
-  doc.line(marginX, currentY + 4.5, pageWidth - marginX, currentY + 4.5);
-  
-  // Alternating grid lines
-  doc.line(marginX, currentY + 11, pageWidth - marginX, currentY + 11);
-  doc.line(marginX + 25, currentY, marginX + 25, currentY + 18);
-  doc.line(marginX + 65, currentY, marginX + 65, currentY + 18);
-  doc.line(marginX + 95, currentY, marginX + 95, currentY + 18);
-  doc.line(marginX + 145, currentY, marginX + 145, currentY + 18);
-
-  if (sectionToFill === 'erario') {
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('TOTALE', marginX + 3, inpsTotalY + 4.2);
+    
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(8.5);
-    doc.text(taxCode, marginX + 12.5, currentY + 9.5, { align: 'center' });
-    doc.text(rateCode, marginX + 45, currentY + 9.5, { align: 'center' });
-    doc.text(paymentType === 'saldo' ? year : String(calcYearInt + 1), marginX + 80, currentY + 9.5, { align: 'center' });
-    doc.text(`€ ${formattedAmount}`, marginX + 140, currentY + 9.5, { align: 'right' });
-    doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 9.5, { align: 'right' });
-  }
+    doc.setTextColor(0, 0, 0);
+    doc.text('C', marginX + 120, inpsTotalY + 4.2);
+    doc.text('D', marginX + 155, inpsTotalY + 4.2);
 
-  // Totale A & B
-  doc.setFillColor(f24LightBlue[0], f24LightBlue[1], f24LightBlue[2]);
-  doc.rect(marginX, currentY + 11, pageWidth - (2 * marginX), 7, 'F');
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('TOTALE', marginX + 2, currentY + 15.5);
-  doc.text('A', marginX + 91, currentY + 15.5);
-  doc.text(sectionToFill === 'erario' ? `€ ${formattedAmount}` : '€ 0,00', marginX + 141, currentY + 15.5, { align: 'right' });
-  doc.text('B', marginX + 147, currentY + 15.5);
-  doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 15.5, { align: 'right' });
+    if (sectionToFill === 'inps') {
+      const parts = amount.toFixed(2).split('.');
+      doc.text(parseInt(parts[0], 10).toLocaleString('it-IT'), marginX + 153, inpsTotalY + 4.2, { align: 'right' });
+      doc.text(parts[1], marginX + 158, inpsTotalY + 4.2, { align: 'center' });
+    } else {
+      doc.text('0', marginX + 153, inpsTotalY + 4.2, { align: 'right' });
+      doc.text('00', marginX + 158, inpsTotalY + 4.2, { align: 'center' });
+    }
+    
+    doc.text('0', marginX + 188, inpsTotalY + 4.2, { align: 'right' });
+    doc.text('00', marginX + 193, inpsTotalY + 4.2, { align: 'center' });
 
-  currentY += 18;
+    currentY += 23.5;
 
-  // SEZIONE INPS
-  drawSectionHeader('SEZIONE INPS', `CONTRIBUTI PREVIDENZIALI - ${sectionToFill === 'inps' ? paymentLabel.toUpperCase() : 'MOCK'}`);
+    // --- SEZIONE REGIONI ---
+    drawSectionHeader('SEZIONE REGIONI');
 
-  doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
-  doc.rect(marginX, currentY, pageWidth - (2 * marginX), 24);
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.rect(marginX, currentY, contentWidth, 15);
 
-  // Headers
-  doc.setFont('Helvetica', 'normal');
-  doc.setFontSize(5);
-  doc.setTextColor(100, 100, 100);
-  doc.text('codice sede', marginX + 2, currentY + 3.5);
-  doc.text('causale cont.', marginX + 18, currentY + 3.5);
-  doc.text('matricola INPS/codice INPS', marginX + 35, currentY + 3.5);
-  doc.text('periodo da:', marginX + 82, currentY + 3.5);
-  doc.text('periodo a:', marginX + 102, currentY + 3.5);
-  doc.text('importi a debito versati', marginX + 125, currentY + 3.5);
-  doc.text('importi a credito compensati', marginX + 160, currentY + 3.5);
+    // Headers
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('codice\nregione', marginX + 1.5, currentY + 2.4);
+    doc.text('codice tributo', marginX + 14, currentY + 3);
+    doc.text('rateazione/\nmese rif.', marginX + 38, currentY + 2.4);
+    doc.text('anno di\nriferimento', marginX + 64, currentY + 2.4);
+    doc.text('importi a debito versati', marginX + 115, currentY + 3);
+    doc.text('importi a credito compensati', marginX + 158, currentY + 3);
 
-  doc.line(marginX, currentY + 4.5, pageWidth - marginX, currentY + 4.5);
+    doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+    doc.line(marginX, currentY + 4.8, pageWidth - marginX, currentY + 4.8);
 
-  // Grid vertical lines
-  doc.line(marginX + 15, currentY, marginX + 15, currentY + 24);
-  doc.line(marginX + 32, currentY, marginX + 32, currentY + 24);
-  doc.line(marginX + 80, currentY, marginX + 80, currentY + 24);
-  doc.line(marginX + 100, currentY, marginX + 100, currentY + 24);
-  doc.line(marginX + 120, currentY, marginX + 120, currentY + 24);
-  doc.line(marginX + 155, currentY, marginX + 155, currentY + 24);
+    const regioniY = currentY + 4.8;
+    for (let r = 0; r < 2; r++) {
+      const rowY = regioniY + (r * 4.2);
+      if (r < 1) {
+        doc.line(marginX, rowY + 4.2, pageWidth - marginX, rowY + 4.2);
+      }
+      doc.line(marginX + 11, rowY, marginX + 11, rowY + 4.2);
+      doc.line(marginX + 35, rowY, marginX + 35, rowY + 4.2);
+      doc.line(marginX + 61, rowY, marginX + 61, rowY + 4.2);
+      doc.line(marginX + 90, rowY, marginX + 90, rowY + 4.2);
+      doc.line(marginX + 145, rowY, marginX + 145, rowY + 4.2);
 
-  if (sectionToFill === 'inps') {
+      if (r < 1) {
+        drawInputBoxes(2, marginX + 2, rowY + 0.1, 4.2, 4);
+        drawInputBoxes(4, marginX + 14, rowY + 0.1, 4.2, 4);
+        drawInputBoxes(4, marginX + 38, rowY + 0.1, 4.2, 4);
+        drawInputBoxes(4, marginX + 64, rowY + 0.1, 4.2, 4);
+        drawEuroFieldDesign(marginX + 94, rowY + 0.1);
+        drawEuroFieldDesign(marginX + 148, rowY + 0.1);
+      }
+    }
+
+    // Totals regioni
+    const regioniTotalY = regioniY + 4.2;
+    doc.setFillColor(f24LightTeal[0], f24LightTeal[1], f24LightTeal[2]);
+    doc.rect(marginX + 0.1, regioniTotalY, contentWidth - 0.2, 5.9, 'F');
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.line(marginX, regioniTotalY, pageWidth - marginX, regioniTotalY);
+
+    doc.line(marginX + 90, regioniTotalY, marginX + 90, regioniTotalY + 5.9);
+    doc.line(marginX + 145, regioniTotalY, marginX + 145, regioniTotalY + 5.9);
+
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-
-    doc.text('8200', marginX + 7.5, currentY + 9.5, { align: 'center' });
-    doc.text(taxCode, marginX + 23.5, currentY + 9.5, { align: 'center' });
-    doc.text(fiscalCode, marginX + 56, currentY + 9.5, { align: 'center' });
-    doc.text(refPeriodStart || `01/${year}`, marginX + 90, currentY + 9.5, { align: 'center' });
-    doc.text(refPeriodEnd || `12/${year}`, marginX + 110, currentY + 9.5, { align: 'center' });
-
-    doc.text(`€ ${formattedAmount}`, marginX + 153, currentY + 9.5, { align: 'right' });
-    doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 9.5, { align: 'right' });
-  }
-
-  // Grid second row line
-  doc.line(marginX, currentY + 14, pageWidth - marginX, currentY + 14);
-
-  // Totale C & D
-  doc.setFillColor(f24LightBlue[0], f24LightBlue[1], f24LightBlue[2]);
-  doc.rect(marginX, currentY + 14, pageWidth - (2 * marginX), 10, 'F');
-  
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('TOTALE', marginX + 2, currentY + 20.5);
-  doc.text('C', marginX + 116, currentY + 20.5);
-  doc.text(sectionToFill === 'inps' ? `€ ${formattedAmount}` : '€ 0,00', marginX + 153, currentY + 20.5, { align: 'right' });
-  doc.text('D', marginX + 156, currentY + 20.5);
-  doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 20.5, { align: 'right' });
-
-  currentY += 24;
-
-  // SEZIONE REGIONI
-  drawSectionHeader('SEZIONE REGIONI', 'TRIBUTI REGIONALI ED ALTRE IMPOSTE');
-  
-  doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
-  doc.rect(marginX, currentY, pageWidth - (2 * marginX), 12);
-  doc.line(marginX, currentY + 6, pageWidth - marginX, currentY + 6);
-  doc.setFillColor(f24LightBlue[0], f24LightBlue[1], f24LightBlue[2]);
-  doc.rect(marginX, currentY + 6, pageWidth - (2 * marginX), 6, 'F');
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.text('TOTALE E', marginX + 2, currentY + 10.5);
-  doc.text('€ 0,00', marginX + 145, currentY + 10.5, { align: 'right' });
-  doc.text('F', marginX + 150, currentY + 10.5);
-  doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 10.5, { align: 'right' });
-
-  currentY += 12;
-
-  // SEZIONE IMU E ALTRI TRIBUTI LOCALI
-  drawSectionHeader('SEZIONE IMU E ALTRI TRIBUTI LOCALI', 'IMPOSTA COMUNALE - TARI - ECC.');
-  
-  doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
-  doc.rect(marginX, currentY, pageWidth - (2 * marginX), 12);
-  doc.line(marginX, currentY + 6, pageWidth - marginX, currentY + 6);
-  doc.setFillColor(f24LightBlue[0], f24LightBlue[1], f24LightBlue[2]);
-  doc.rect(marginX, currentY + 6, pageWidth - (2 * marginX), 6, 'F');
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.text('TOTALE G', marginX + 2, currentY + 10.5);
-  doc.text('€ 0,00', marginX + 145, currentY + 10.5, { align: 'right' });
-  doc.text('H', marginX + 150, currentY + 10.5);
-  doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 10.5, { align: 'right' });
-
-  currentY += 12;
-
-  // SEZIONE ALTRI ENTI (Specific for independent professional funds)
-  drawSectionHeader('SEZIONE ALTRI ENTI PREVIDENZIALI ED ASSICURATIVI', sectionToFill === 'altre_casse' ? paymentLabel.toUpperCase() : 'MOCK');
-  doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
-  doc.rect(marginX, currentY, pageWidth - (2 * marginX), 15);
-  
-  doc.line(marginX + 20, currentY, marginX + 20, currentY + 15);
-  doc.line(marginX + 45, currentY, marginX + 45, currentY + 15);
-  doc.line(marginX + 75, currentY, marginX + 75, currentY + 15);
-  doc.line(marginX + 115, currentY, marginX + 115, currentY + 15);
-  doc.line(marginX + 150, currentY, marginX + 150, currentY + 15);
-
-  if (sectionToFill === 'altre_casse') {
+    doc.setFontSize(7);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('TOTALE', marginX + 3, regioniTotalY + 4.2);
+    
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.text('EP', marginX + 10, currentY + 8, { align: 'center' }); // Ente Previdenziale
-    doc.text(taxCode, marginX + 32.5, currentY + 8, { align: 'center' });
-    doc.text(fiscalCode.substring(0, 8), marginX + 60, currentY + 8, { align: 'center' });
-    doc.text(year, marginX + 95, currentY + 8, { align: 'center' });
-    doc.text(`€ ${formattedAmount}`, marginX + 148, currentY + 8, { align: 'right' });
-    doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 8, { align: 'right' });
+    doc.setFontSize(8.5);
+    doc.setTextColor(0, 0, 0);
+    doc.text('E', marginX + 85, regioniTotalY + 4.2);
+    doc.text('F', marginX + 140, regioniTotalY + 4.2);
+
+    doc.text('0', marginX + 128, regioniTotalY + 4.2, { align: 'right' });
+    doc.text('00', marginX + 134, regioniTotalY + 4.2, { align: 'center' });
+    doc.text('0', marginX + 178, regioniTotalY + 4.2, { align: 'right' });
+    doc.text('00', marginX + 184, regioniTotalY + 4.2, { align: 'center' });
+
+    currentY += 15;
+
+    // --- SEZIONE IMU E ALTRI TRIBUTI LOCALI ---
+    drawSectionHeader('SEZIONE IMU E ALTRI TRIBUTI LOCALI');
+
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.rect(marginX, currentY, contentWidth, 15);
+
+    // Headers
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(4.5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('codice ente/\ncodice comune', marginX + 1, currentY + 2.2);
+    doc.text('Ravv.', marginX + 14, currentY + 3);
+    doc.text('Immob.\nvariati', marginX + 20, currentY + 2.2);
+    doc.text('Acc.', marginX + 27, currentY + 3);
+    doc.text('Saldo', marginX + 32, currentY + 3);
+    doc.text('numero\nimmobili', marginX + 39, currentY + 2.2);
+    doc.text('codice tributo', marginX + 51, currentY + 3);
+    doc.text('rateazione/\nmese rif.', marginX + 70, currentY + 2.2);
+    doc.text('anno di\nriferimento', marginX + 91, currentY + 2.2);
+    doc.text('importi a debito versati', marginX + 125, currentY + 3);
+    doc.text('importi a credito compensati', marginX + 162, currentY + 3);
+
+    doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+    doc.line(marginX, currentY + 4.8, pageWidth - marginX, currentY + 4.8);
+
+    const imuY = currentY + 4.8;
+    for (let r = 0; r < 2; r++) {
+      const rowY = imuY + (r * 4.2);
+      if (r < 1) {
+        doc.line(marginX, rowY + 4.2, pageWidth - marginX, rowY + 4.2);
+      }
+      doc.line(marginX + 13, rowY, marginX + 13, rowY + 4.2);
+      doc.line(marginX + 19, rowY, marginX + 19, rowY + 4.2);
+      doc.line(marginX + 26, rowY, marginX + 26, rowY + 4.2);
+      doc.line(marginX + 31, rowY, marginX + 31, rowY + 4.2);
+      doc.line(marginX + 37, rowY, marginX + 37, rowY + 4.2);
+      doc.line(marginX + 49, rowY, marginX + 49, rowY + 4.2);
+      doc.line(marginX + 68, rowY, marginX + 68, rowY + 4.2);
+      doc.line(marginX + 87, rowY, marginX + 87, rowY + 4.2);
+      doc.line(marginX + 115, rowY, marginX + 115, rowY + 4.2);
+      doc.line(marginX + 155, rowY, marginX + 155, rowY + 4.2);
+
+      if (r < 1) {
+        drawInputBoxes(4, marginX + 1, rowY + 0.1, 2.8, 4);
+        drawInputBoxes(3, marginX + 39, rowY + 0.1, 3.1, 4);
+        drawInputBoxes(4, marginX + 50, rowY + 0.1, 4.2, 4);
+        drawInputBoxes(4, marginX + 69, rowY + 0.1, 4.2, 4);
+        drawInputBoxes(4, marginX + 88, rowY + 0.1, 4.2, 4);
+        drawEuroFieldDesign(marginX + 116, rowY + 0.1);
+        drawEuroFieldDesign(marginX + 156, rowY + 0.1);
+      }
+    }
+
+    // Totals imu
+    const imuTotalY = imuY + 4.2;
+    doc.setFillColor(f24LightTeal[0], f24LightTeal[1], f24LightTeal[2]);
+    doc.rect(marginX + 0.1, imuTotalY, contentWidth - 0.2, 5.9, 'F');
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.line(marginX, imuTotalY, pageWidth - marginX, imuTotalY);
+
+    doc.line(marginX + 115, imuTotalY, marginX + 115, imuTotalY + 5.9);
+    doc.line(marginX + 155, imuTotalY, marginX + 155, imuTotalY + 5.9);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('TOTALE', marginX + 3, imuTotalY + 4.2);
+    
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(0, 0, 0);
+    doc.text('G', marginX + 110, imuTotalY + 4.2);
+    doc.text('H', marginX + 150, imuTotalY + 4.2);
+
+    doc.text('0', marginX + 148, imuTotalY + 4.2, { align: 'right' });
+    doc.text('00', marginX + 153, imuTotalY + 4.2, { align: 'center' });
+    doc.text('0', marginX + 188, imuTotalY + 4.2, { align: 'right' });
+    doc.text('00', marginX + 193, imuTotalY + 4.2, { align: 'center' });
+
+    currentY += 15;
+
+    // --- SEZIONE ALTRI ENTI PREVIDENZIALI ---
+    drawSectionHeader('SEZIONE ALTRI ENTI PREVIDENZIALI E ASSICURATIVI');
+
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.rect(marginX, currentY, contentWidth, 23.5);
+
+    // Headers
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(4.5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('INAIL', marginX + 1.5, currentY + 2.5);
+    doc.text('codice sede', marginX + 16, currentY + 2.5);
+    doc.text('codice ditta', marginX + 35, currentY + 2.5);
+    doc.text('c.c.', marginX + 66, currentY + 2.5);
+    doc.text('numero di riferimento', marginX + 78, currentY + 2.5);
+    doc.text('causale', marginX + 111, currentY + 2.5);
+    doc.text('importi a debito versati', marginX + 128, currentY + 2.5);
+    doc.text('importi a credito compensati', marginX + 165, currentY + 2.5);
+
+    doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+    doc.line(marginX, currentY + 3.8, pageWidth - marginX, currentY + 3.8);
+
+    const inailY = currentY + 3.8;
+    // INAIL Row
+    doc.line(marginX + 14, inailY, marginX + 14, inailY + 4);
+    doc.line(marginX + 32, inailY, marginX + 32, inailY + 4);
+    doc.line(marginX + 64, inailY, marginX + 64, inailY + 4);
+    doc.line(marginX + 75, inailY, marginX + 75, inailY + 4);
+    doc.line(marginX + 109, inailY, marginX + 109, inailY + 4);
+    doc.line(marginX + 122, inailY, marginX + 122, inailY + 4);
+    doc.line(marginX + 158, inailY, marginX + 158, inailY + 4);
+
+    drawInputBoxes(5, marginX + 15, inailY + 0.1, 3.2, 3.8);
+    drawInputBoxes(8, marginX + 33, inailY + 0.1, 3.2, 3.8);
+    drawInputBoxes(1, marginX + 68, inailY + 0.1, 3.5, 3.8);
+    drawInputBoxes(10, marginX + 76, inailY + 0.1, 3.1, 3.8);
+    drawEuroFieldDesign(marginX + 123, inailY + 0.1);
+    drawEuroFieldDesign(marginX + 159, inailY + 0.1);
+
+    // Separator line under INAIL
+    doc.line(marginX, inailY + 3.8, pageWidth - marginX, inailY + 3.8);
+
+    // Other funds row
+    const otherFundsHeaderY = inailY + 3.8;
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(4.2);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('codice ente', marginX + 1.5, otherFundsHeaderY + 2.2);
+    doc.text('codice sede', marginX + 16, otherFundsHeaderY + 2.2);
+    doc.text('causale cont.', marginX + 34, otherFundsHeaderY + 2.2);
+    doc.text('codice posizione', marginX + 51, otherFundsHeaderY + 2.2);
+    doc.text('periodo di riferimento:\nda mm/aaaa      a mm/aaaa', marginX + 83, otherFundsHeaderY + 2.2);
+    doc.text('importi a debito versati', marginX + 130, otherFundsHeaderY + 2.2);
+    doc.text('importi a credito compensati', marginX + 165, otherFundsHeaderY + 2.2);
+
+    doc.line(marginX, otherFundsHeaderY + 3, pageWidth - marginX, otherFundsHeaderY + 3);
+
+    // Row for independent funds (Casse)
+    const otherY = otherFundsHeaderY + 3;
+    doc.line(marginX + 14, otherY, marginX + 14, otherY + 4);
+    doc.line(marginX + 32, otherY, marginX + 32, otherY + 4);
+    doc.line(marginX + 48, otherY, marginX + 48, otherY + 4);
+    doc.line(marginX + 80, otherY, marginX + 80, otherY + 4);
+    doc.line(marginX + 122, otherY, marginX + 122, otherY + 4);
+    doc.line(marginX + 158, otherY, marginX + 158, otherY + 4);
+
+    drawInputBoxes(4, marginX + 1, otherY + 0.1, 3, 3.8);
+    drawInputBoxes(5, marginX + 15, otherY + 0.1, 3.2, 3.8);
+    drawInputBoxes(4, marginX + 33, otherY + 0.1, 3.2, 3.8);
+    drawInputBoxes(8, marginX + 49, otherY + 0.1, 3.5, 3.8);
+    // Period boxes
+    drawInputBoxes(6, marginX + 81, otherY + 0.1, 3.1, 3.8);
+    drawInputBoxes(6, marginX + 102, otherY + 0.1, 3.1, 3.8);
+
+    drawEuroFieldDesign(marginX + 123, otherY + 0.1);
+    drawEuroFieldDesign(marginX + 159, otherY + 0.1);
+
+    if (sectionToFill === 'altre_casse') {
+      drawFormString('EP', 4, marginX + 1, otherY + 0.1, 3, 3.8);
+      drawFormString(taxCode, 4, marginX + 33, otherY + 0.1, 3.2, 3.8);
+      drawFormString(fiscalCode.substring(0, 8), 8, marginX + 49, otherY + 0.1, 3.5, 3.8);
+      
+      drawFormString(`01${year}`, 6, marginX + 81, otherY + 0.1, 3.1, 3.8);
+      drawFormString(`12${year}`, 6, marginX + 102, otherY + 0.1, 3.1, 3.8);
+
+      drawEuroAmountInForm(amount, marginX + 123, otherY + 0.1);
+    }
+
+    // Totals cassa
+    const otherTotalY = otherY + 4.1;
+    doc.setFillColor(f24LightTeal[0], f24LightTeal[1], f24LightTeal[2]);
+    doc.rect(marginX + 0.1, otherTotalY, contentWidth - 0.2, 5.9, 'F');
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.line(marginX, otherTotalY, pageWidth - marginX, otherTotalY);
+
+    doc.line(marginX + 122, otherTotalY, marginX + 122, otherTotalY + 5.9);
+    doc.line(marginX + 158, otherTotalY, marginX + 158, otherTotalY + 5.9);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('TOTALE', marginX + 3, otherTotalY + 4.2);
+    
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(0, 0, 0);
+    doc.text('I', marginX + 118, otherTotalY + 4.2);
+    doc.text('L', marginX + 154, otherTotalY + 4.2);
+
+    if (sectionToFill === 'altre_casse') {
+      const parts = amount.toFixed(2).split('.');
+      doc.text(parseInt(parts[0], 10).toLocaleString('it-IT'), marginX + 150, otherTotalY + 4.2, { align: 'right' });
+      doc.text(parts[1], marginX + 155, otherTotalY + 4.2, { align: 'center' });
+    } else {
+      doc.text('0', marginX + 150, otherTotalY + 4.2, { align: 'right' });
+      doc.text('00', marginX + 155, otherTotalY + 4.2, { align: 'center' });
+    }
+    
+    doc.text('0', marginX + 186, otherTotalY + 4.2, { align: 'right' });
+    doc.text('00', marginX + 191, otherTotalY + 4.2, { align: 'center' });
+
+    currentY += 23.5;
+
+    // --- Bottom Signature and Final Balance Box ---
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.setLineWidth(0.35);
+    // Saldo finale border
+    doc.rect(marginX, currentY + 1.2, contentWidth, 12.5);
+    doc.setFillColor(f24LightTeal[0], f24LightTeal[1], f24LightTeal[2]);
+    doc.rect(marginX + 0.1, currentY + 1.3, contentWidth - 0.2, 4.2, 'F');
+
+    doc.setFont('Helvetica', 'black');
+    doc.setFontSize(7.5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('SALDO FINALE', marginX + 3, currentY + 4.3);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text('EURO +', marginX + 4, currentY + 10.5);
+
+    // Print final balance
+    const parts = amount.toFixed(2).split('.');
+    doc.setFont('Courier', 'bold');
+    doc.setFontSize(14);
+    doc.text(parseInt(parts[0], 10).toLocaleString('it-IT') + ',' + parts[1], pageWidth - marginX - 4, currentY + 11, { align: 'right' });
+
+    currentY += 13.7;
+
+    // Signature Area
+    doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+    doc.setLineWidth(0.2);
+    doc.rect(marginX, currentY + 1, contentWidth, 11);
+    doc.line(marginX + 95, currentY + 1, marginX + 95, currentY + 12);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('FIRMA', marginX + 2, currentY + 3.2);
+    
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(4.5);
+    doc.text('AUTORIZZO ADDEBITO SU CONTO CORRENTE IBAN (firma)', marginX + 22, currentY + 3.2);
+
+    // Signature label or simulation
+    doc.setFont('Courier', 'italic');
+    doc.setFontSize(8.5);
+    doc.setTextColor(0, 0, 0);
+    doc.text(profile.fullName.toUpperCase(), marginX + 34, currentY + 8.5);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('ESTREMI DEL VERSAMENTO (da compilare a cura di banca/poste/agente della riscossione)', marginX + 97, currentY + 3.2);
+    
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(4);
+    doc.setTextColor(textLight[0], textLight[1], textLight[2]);
+    doc.text('DATA      giorno    mese       anno', marginX + 97, currentY + 6.2);
+    doc.text('CODICE BANCA/POSTE/AGENTE DELLA RISCOSSIONE', marginX + 144, currentY + 6.2);
+
+    currentY += 12;
+
+    // Copy metadata line
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(0, 0, 0);
+    doc.text(copyLabel, marginX, currentY + 4);
+
+    // Page indicator
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(5);
+    doc.setTextColor(textLight[0], textLight[1], textLight[2]);
+    doc.text(`Modello conforme Agenzia delle Entrate - Generato il ${new Date().toLocaleDateString('it-IT')} - Pagina ${pageNum} di 3`, pageWidth - marginX, currentY + 4, { align: 'right' });
   }
-
-  // Totale L & M
-  doc.line(marginX, currentY + 10, pageWidth - marginX, currentY + 10);
-  doc.setFillColor(f24LightBlue[0], f24LightBlue[1], f24LightBlue[2]);
-  doc.rect(marginX, currentY + 10, pageWidth - (2 * marginX), 5, 'F');
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.text('TOTALE I', marginX + 2, currentY + 13.5);
-  doc.text(sectionToFill === 'altre_casse' ? `€ ${formattedAmount}` : '€ 0,00', marginX + 145, currentY + 13.5, { align: 'right' });
-  doc.text('L', marginX + 148, currentY + 13.5);
-  doc.text('€ 0,00', pageWidth - marginX - 2, currentY + 13.5, { align: 'right' });
-
-  currentY += 15;
-
-  // SALDO FINALE SECTION
-  doc.setDrawColor(f24Blue[0], f24Blue[1], f24Blue[2]);
-  doc.setLineWidth(0.4);
-  doc.rect(marginX, currentY + 2, pageWidth - (2 * marginX), 16);
-  
-  doc.setFillColor(f24LightBlue[0], f24LightBlue[1], f24LightBlue[2]);
-  doc.rect(marginX, currentY + 2, pageWidth - (2 * marginX), 6, 'F');
-  
-  doc.setFont('Helvetica', 'black');
-  doc.setFontSize(8.5);
-  doc.setTextColor(f24Blue[0], f24Blue[1], f24Blue[2]);
-  doc.text('SALDO FINALE (DEBITO - CREDITO)', marginX + 3, currentY + 6.2);
-
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('EURO +', marginX + 15, currentY + 13.5);
-  
-  doc.setFont('Courier', 'bold');
-  doc.setFontSize(14);
-  doc.text(formattedAmount, pageWidth - marginX - 5, currentY + 13.5, { align: 'right' });
-
-  // Signature Block
-  doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
-  doc.setLineWidth(0.2);
-  doc.line(marginX + 95, currentY + 18, marginX + 95, currentY + 34);
-  doc.rect(marginX, currentY + 18, pageWidth - (2 * marginX), 16);
-  
-  doc.setFont('Helvetica', 'normal');
-  doc.setFontSize(6);
-  doc.setTextColor(100, 100, 100);
-  doc.text('FIRMA DELL\'INTERESSATO', marginX + 3, currentY + 21);
-  doc.text('ESTREMI DEL VERSAMENTO (Banca/Posta)', marginX + 98, currentY + 21);
-
-  doc.setFont('Helvetica', 'italic');
-  doc.setFontSize(7.5);
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text(profile.fullName.toUpperCase(), marginX + 15, currentY + 28);
-
-  // Authenticity footer with QR Code placeholder or serial numbers
-  currentY += 36;
-  doc.setFont('Helvetica', 'normal');
-  doc.setFontSize(5);
-  doc.setTextColor(140, 140, 140);
-  const now = new Date();
-  doc.text(`* Documento generato dal calcolatore Fiscale in tempo reale il ${now.toLocaleString('it-IT')}. Modello conforme alle specifiche dell'Agenzia delle Entrate.`, marginX, currentY);
-  doc.text(`ID Transazione: F24-${profile.vatNumber || 'IVA'}-${category.toUpperCase()}-${paymentType.toUpperCase()}-${year}`, marginX, currentY + 2.5);
 
   // Save the F24 PDF
   const catShort = category === 'imposta' ? 'IMPOSTA' : 'CONTRIBUTI';
