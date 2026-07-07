@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { generateTaxAndInvoicePDF } from '../utils/pdfGenerator';
 import { generateInvoicePDFDocument } from '../utils/pdfInvoiceBasic';
+import { generateF24PDF } from '../utils/f24PdfGenerator';
 
 export const getMissingInvoiceNumbers = (invoices: Invoice[], year: string): number[] => {
   const seqNos = invoices.map(inv => {
@@ -1031,19 +1032,61 @@ export default function TaxSimulatorDashboard({
                     </div>
                     <div className="flex justify-between py-1 items-center">
                       <span className="text-[10px] text-slate-500 font-bold">Contributo Dovuto (col. 5)</span>
-                      <span className="font-bold text-blue-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.inpsGestioneSeparataDue?.toFixed(2)}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-blue-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.inpsGestioneSeparataDue?.toFixed(2)}</span>
+                        {results.inpsGestioneSeparataDue && results.inpsGestioneSeparataDue > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataDue || 0, 'saldo', selectedYear)}
+                            className="p-1 px-1.5 text-[9px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 border border-blue-200 rounded transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                            title="Scarica F24 Saldo"
+                          >
+                            <FileText className="w-3 h-3 text-blue-500" />
+                            <span>F24 Saldo</span>
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                     <div className="p-2 bg-theme-bg/80 rounded-xl space-y-1.5 border border-theme-border/40 mt-1">
                       <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Pianificazione F24 Anno Successivo</div>
-                      <div className="flex justify-between text-[10px] text-slate-600 font-medium">
+                      
+                      <div className="flex justify-between items-center text-[10px] text-slate-600 font-medium py-0.5">
                         <span>1° Acconto 40% (Giugno)</span>
-                        <span className="font-mono font-bold text-slate-700">€ {results.inpsGestioneSeparataAcconto1?.toFixed(2)}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-slate-700">€ {results.inpsGestioneSeparataAcconto1?.toFixed(2)}</span>
+                          {results.inpsGestioneSeparataAcconto1 && results.inpsGestioneSeparataAcconto1 > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto1 || 0, 'acconto1', selectedYear)}
+                              className="p-1 px-1.5 text-[8px] font-bold bg-slate-100/80 hover:bg-slate-200/80 text-slate-700 hover:text-slate-800 border border-slate-300/40 rounded transition-colors cursor-pointer flex items-center gap-0.5 shrink-0"
+                              title="Scarica F24 I° Acconto"
+                            >
+                              <FileText className="w-2.5 h-2.5 text-slate-500" />
+                              <span>F24 Acc. I</span>
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
-                      <div className="flex justify-between text-[10px] text-slate-600 font-medium">
+
+                      <div className="flex justify-between items-center text-[10px] text-slate-600 font-medium py-0.5">
                         <span>2° Acconto 40% (Novembre)</span>
-                        <span className="font-mono font-bold text-slate-700">€ {results.inpsGestioneSeparataAcconto2?.toFixed(2)}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-slate-700">€ {results.inpsGestioneSeparataAcconto2?.toFixed(2)}</span>
+                          {results.inpsGestioneSeparataAcconto2 && results.inpsGestioneSeparataAcconto2 > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto2 || 0, 'acconto2', selectedYear)}
+                              className="p-1 px-1.5 text-[8px] font-bold bg-slate-100/80 hover:bg-slate-200/80 text-slate-700 hover:text-slate-800 border border-slate-300/40 rounded transition-colors cursor-pointer flex items-center gap-0.5 shrink-0"
+                              title="Scarica F24 II° Acconto"
+                            >
+                              <FileText className="w-2.5 h-2.5 text-slate-500" />
+                              <span>F24 Acc. II</span>
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
-                      <div className="flex justify-between text-[10px] text-slate-600 font-medium border-t border-theme-border/20 pt-1">
+
+                      <div className="flex justify-between text-[10px] text-slate-600 font-medium border-t border-theme-border/20 pt-1.5">
                         <span>Totale Acconti (80%)</span>
                         <span className="font-mono font-bold text-slate-700">€ {results.inpsGestioneSeparataAccontiTotale?.toFixed(2)}</span>
                       </div>
