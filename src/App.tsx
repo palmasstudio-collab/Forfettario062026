@@ -345,9 +345,10 @@ export default function App() {
       return;
     }
     
-    addSyncLog(`📁 Creazione cartella Google Drive per "${activePosition.name}" in corso...`);
+    const posStartYear = activePosition.profile?.startYear || '2025';
+    addSyncLog(`📁 Creazione cartelle Google Drive per "${activePosition.name}" (dall'anno ${posStartYear} al ${new Date().getFullYear()}) in corso...`);
     try {
-      const folder = await createAccountingPositionFolder(token, activePosition.name, activePosition.profile.fullName, undefined, selectedYear);
+      const folder = await createAccountingPositionFolder(token, activePosition.name, activePosition.profile.fullName, undefined, selectedYear, posStartYear);
       
       // Update local and firestore positions state
       setPositions((prev) =>
@@ -424,6 +425,7 @@ export default function App() {
     }
     
     const uploadYear = year || selectedYear;
+    const posStartYear = activePosition.profile?.startYear || '2025';
     addSyncLog(`🔍 Verifica preventiva obbligatoria dell'esistenza delle cartelle di archiviazione per "${activePosition.profile.fullName || 'Cliente'}"...`);
 
     try {
@@ -433,7 +435,9 @@ export default function App() {
         activePosition.name,
         activePosition.profile.fullName,
         activePosition.driveFolderId,
-        uploadYear
+        uploadYear,
+        undefined,
+        posStartYear
       );
 
       // Save healed structure in the state
@@ -468,6 +472,7 @@ export default function App() {
     if (data.action === (window as any).google.picker.Action.PICKED) {
       const folder = data.docs[0];
       const selectedParentDriveId = folder.id;
+      const posStartYear = activePosition.profile?.startYear || '2025';
       
       setIsCreatingDriveFolder(true);
       try {
@@ -476,7 +481,8 @@ export default function App() {
           activePosition.name, 
           activePosition.profile.fullName, 
           selectedParentDriveId, 
-          selectedYear
+          selectedYear,
+          posStartYear
         );
         
         setPositions(prev => prev.map(p => 
@@ -513,9 +519,11 @@ export default function App() {
       return;
     }
 
+    const posStartYear = activePosition.profile?.startYear || '2025';
+
     setIsRecreatingDriveFolder(true);
-    addSyncLog(`🛠️ Avvio della procedura di ripristino di emergenza per "${activePosition.profile.fullName || 'Cliente'}"...`);
-    addSyncLog(`🔍 Verifica preventiva dell'esistenza delle cartelle su Google Drive per l'anno ${selectedYear}...`);
+    addSyncLog(`🛠️ Avvio della procedura di rigenerazione cartelle per "${activePosition.profile.fullName || 'Cliente'}"...`);
+    addSyncLog(`🔍 Generazione/Verifica cartelle su Google Drive dall'anno ${posStartYear} all'anno in corso (${new Date().getFullYear()})...`);
 
     try {
       const healedFolder = await verifyAndRecreateFolderStructure(
@@ -523,7 +531,9 @@ export default function App() {
         activePosition.name,
         activePosition.profile.fullName,
         activePosition.driveFolderId,
-        selectedYear
+        selectedYear,
+        undefined,
+        posStartYear
       );
 
       // Aggiorna lo stato locale
@@ -617,6 +627,7 @@ export default function App() {
     }
 
     const uploadYear = year || selectedYear;
+    const posStartYear = activePosition.profile?.startYear || '2025';
     addSyncLog(`🔍 Verifica preventiva obbligatoria dell'esistenza delle cartelle di archiviazione per "${activePosition.profile.fullName || 'Cliente'}"...`);
 
     try {
@@ -626,7 +637,9 @@ export default function App() {
         activePosition.name,
         activePosition.profile.fullName,
         activePosition.driveFolderId,
-        uploadYear
+        uploadYear,
+        undefined,
+        posStartYear
       );
 
       // Save healed structure in the state
@@ -688,6 +701,7 @@ export default function App() {
     }
 
     const uploadYear = year || selectedYear;
+    const posStartYear = activePosition.profile?.startYear || '2025';
     addSyncLog(`🔍 [Massivo] Verifica preventiva obbligatoria delle cartelle per "${activePosition.profile.fullName || 'Cliente'}"...`);
 
     try {
@@ -697,7 +711,9 @@ export default function App() {
         activePosition.name,
         activePosition.profile.fullName,
         activePosition.driveFolderId,
-        uploadYear
+        uploadYear,
+        undefined,
+        posStartYear
       );
 
       addSyncLog(`✅ Struttura cartelle verificata per caricamento massivo.`);

@@ -280,7 +280,8 @@ export async function createAccountingPositionFolder(
   positionName: string,
   clientFullName: string,
   customParentId: string | undefined,
-  year: string
+  year: string,
+  startYear?: string
 ): Promise<CreatedFolderResult> {
   try {
     // If we detect a mock token, bypass real API call to avoid 401/403
@@ -297,13 +298,31 @@ export async function createAccountingPositionFolder(
     const finalFolderTitle = `Forfettario ${cleanedFullName || positionName.trim() || 'Senza Nome'}`;
     const childFolder = await findOrCreateFolder(accessToken, finalFolderTitle, parent);
 
-    // Create the Year subfolder inside the main folder
-    const yearFolder = await findOrCreateFolder(accessToken, `Anno ${year}`, childFolder.id);
+    const currentYearNum = new Date().getFullYear();
+    const startYearNum = Math.min(
+      parseInt(startYear || year || '2025', 10) || 2025,
+      currentYearNum
+    );
+    const endYearNum = Math.max(currentYearNum, parseInt(year || '2026', 10) || currentYearNum);
 
-    // Create the 3 specific subfolders inside the Year subfolder
-    const fattureFolder = await findOrCreateFolder(accessToken, 'Fatture Emesse', yearFolder.id);
-    const f24Folder = await findOrCreateFolder(accessToken, 'F24', yearFolder.id);
-    const fileGenericiFolder = await findOrCreateFolder(accessToken, 'File Generici', yearFolder.id);
+    let selectedYearFattureId = '';
+    let selectedYearF24Id = '';
+    let selectedYearFileGenericiId = '';
+
+    // Create subfolders for ALL years from startYear up to currentYear (e.g. 2025 -> 2026)
+    for (let y = startYearNum; y <= endYearNum; y++) {
+      const yearFolder = await findOrCreateFolder(accessToken, `Anno ${y}`, childFolder.id);
+
+      const fattureFolder = await findOrCreateFolder(accessToken, 'Fatture Emesse', yearFolder.id);
+      const f24Folder = await findOrCreateFolder(accessToken, 'F24', yearFolder.id);
+      const fileGenericiFolder = await findOrCreateFolder(accessToken, 'File Generici', yearFolder.id);
+
+      if (String(y) === year || y === endYearNum || !selectedYearFattureId) {
+        selectedYearFattureId = fattureFolder.id;
+        selectedYearF24Id = f24Folder.id;
+        selectedYearFileGenericiId = fileGenericiFolder.id;
+      }
+    }
 
     // Create shortcut in the specified central shared Google Drive folder (1ogkOOPaH3EwYUV-DO-GHgZ0HswocM7E8)
     try {
@@ -315,9 +334,9 @@ export async function createAccountingPositionFolder(
     return {
       id: childFolder.id,
       url: childFolder.webViewLink || `https://drive.google.com/drive/folders/${childFolder.id}`,
-      fattureEmesseFolderId: fattureFolder.id,
-      f24FolderId: f24Folder.id,
-      fileGenericiFolderId: fileGenericiFolder.id
+      fattureEmesseFolderId: selectedYearFattureId,
+      f24FolderId: selectedYearF24Id,
+      fileGenericiFolderId: selectedYearFileGenericiId
     };
   } catch (err) {
     console.warn("Using smart sandbox simulation fallback for Google Drive folder creation:", err);
@@ -669,7 +688,8 @@ export async function verifyAndRecreateFolderStructure(
   clientFullName: string,
   currentDriveFolderId: string | undefined,
   year: string,
-  customParentId?: string
+  customParentId?: string,
+  startYear?: string
 ): Promise<CreatedFolderResult> {
   try {
     if (accessToken.includes('mock-')) {
@@ -733,20 +753,38 @@ export async function verifyAndRecreateFolderStructure(
       mainFolderId = mainFolder.id;
     }
 
-    // 2. Find or create the Year subfolder inside the main folder
-    const yearFolder = await findOrCreateFolder(accessToken, `Anno ${year}`, mainFolderId);
+    const currentYearNum = new Date().getFullYear();
+    const startYearNum = Math.min(
+      parseInt(startYear || year || '2025', 10) || 2025,
+      currentYearNum
+    );
+    const endYearNum = Math.max(currentYearNum, parseInt(year || '2026', 10) || currentYearNum);
 
-    // 3. Find or create the 3 specific subfolders inside the Year subfolder
-    const fattureFolder = await findOrCreateFolder(accessToken, 'Fatture Emesse', yearFolder.id);
-    const f24Folder = await findOrCreateFolder(accessToken, 'F24', yearFolder.id);
-    const fileGenericiFolder = await findOrCreateFolder(accessToken, 'File Generici', yearFolder.id);
+    let selectedYearFattureId = '';
+    let selectedYearF24Id = '';
+    let selectedYearFileGenericiId = '';
+
+    // Create subfolders for ALL years from startYear up to currentYear (e.g. 2025 -> 2026)
+    for (let y = startYearNum; y <= endYearNum; y++) {
+      const yearFolder = await findOrCreateFolder(accessToken, `Anno ${y}`, mainFolderId);
+
+      const fattureFolder = await findOrCreateFolder(accessToken, 'Fatture Emesse', yearFolder.id);
+      const f24Folder = await findOrCreateFolder(accessToken, 'F24', yearFolder.id);
+      const fileGenericiFolder = await findOrCreateFolder(accessToken, 'File Generici', yearFolder.id);
+
+      if (String(y) === year || y === endYearNum || !selectedYearFattureId) {
+        selectedYearFattureId = fattureFolder.id;
+        selectedYearF24Id = f24Folder.id;
+        selectedYearFileGenericiId = fileGenericiFolder.id;
+      }
+    }
 
     return {
       id: mainFolderId,
       url: mainFolder.webViewLink || `https://drive.google.com/drive/folders/${mainFolderId}`,
-      fattureEmesseFolderId: fattureFolder.id,
-      f24FolderId: f24Folder.id,
-      fileGenericiFolderId: fileGenericiFolder.id
+      fattureEmesseFolderId: selectedYearFattureId,
+      f24FolderId: selectedYearF24Id,
+      fileGenericiFolderId: selectedYearFileGenericiId
     };
   } catch (err) {
     console.warn("Using smart sandbox simulation fallback for Google Drive folder healing:", err);

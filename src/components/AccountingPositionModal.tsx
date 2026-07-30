@@ -35,7 +35,7 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
   const [pensionFund, setPensionFund] = useState<PensionFundType>('INPS_GESTIONE_SEPARATA');
   const [isStartup, setIsStartup] = useState(true);
   const [inpsReduction35, setInpsReduction35] = useState(true);
-  const [startYear, setStartYear] = useState('2026');
+  const [startYear, setStartYear] = useState('2025');
   const [vatOpeningDate, setVatOpeningDate] = useState('');
 
   // Search local state for ATECO dropdown inside modal
@@ -76,7 +76,7 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
       setPensionFund('INPS_GESTIONE_SEPARATA');
       setIsStartup(true);
       setInpsReduction35(true);
-      setStartYear('2026');
+      setStartYear('2025');
       setVatOpeningDate('');
       setSearchTerm('');
       setShowAtecoDropdown(false);
@@ -173,7 +173,7 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
     try {
       // Access token matching connected account simulation if missing, as required
       const token = accessToken || 'mock-access-token-palmasstudio';
-      const folderResult = await createAccountingPositionFolder(token, name.trim(), fullName.trim(), parentFolderId.trim(), startYear);
+      const folderResult = await createAccountingPositionFolder(token, name.trim(), fullName.trim(), parentFolderId.trim(), startYear, startYear);
       setCreatedFolderId(folderResult.id);
       setCreatedFolderUrl(folderResult.url);
       setCreatedFattureEmesseFolderId(folderResult.fattureEmesseFolderId);
@@ -302,6 +302,22 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
                   value={vatOpeningDate}
                   onChange={(e) => setVatOpeningDate(e.target.value)}
                 />
+              </div>
+
+              {/* Anno di Inizio Contabilità */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Anno di Inizio (Fatture dal...)</label>
+                <select
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 text-sm font-medium transition-all text-slate-800 bg-white"
+                  value={startYear}
+                  onChange={(e) => setStartYear(e.target.value)}
+                >
+                  {[2020, 2021, 2022, 2023, 2024, 2025, 2026].map((y) => (
+                    <option key={y} value={y.toString()}>
+                      Anno {y} (genera dal {y} al {new Date().getFullYear()})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Codice ATECO Primario */}

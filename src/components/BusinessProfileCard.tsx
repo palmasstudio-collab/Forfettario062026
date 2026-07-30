@@ -192,6 +192,23 @@ export default function BusinessProfileCard({
           />
         </div>
 
+        {/* Anno di Inizio Contabilità */}
+        <div className="flex flex-col gap-1.5 font-sans">
+          <label className="text-xs font-bold text-slate-705 uppercase tracking-wider">Anno di Inizio Contabilità</label>
+          <select
+            disabled={isUnselected}
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 text-sm font-medium transition-all bg-white disabled:bg-slate-50 disabled:text-slate-400"
+            value={profile.startYear || '2025'}
+            onChange={(e) => handleUpdateField('startYear', e.target.value)}
+          >
+            {[2020, 2021, 2022, 2023, 2024, 2025, 2026].map((y) => (
+              <option key={y} value={y.toString()}>
+                {y} (Genera cartelle dal {y} al {new Date().getFullYear()})
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Codice ATECO Search & Autocomplete */}
         <div className="flex flex-col gap-1.5 md:col-span-2 relative">
           <label className="text-xs font-bold text-slate-705 uppercase tracking-wider flex items-center justify-between">
