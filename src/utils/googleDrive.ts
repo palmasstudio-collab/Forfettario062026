@@ -682,18 +682,47 @@ export async function verifyAndRecreateFolderStructure(
     const finalFolderTitle = `Forfettario ${cleanedFullName || positionName.trim() || 'Senza Nome'}`;
 
     let mainFolderId = currentDriveFolderId;
-    let isMainFolderValid = false;
+    let mainFolder: { id: string; webViewLink?: string; name?: string } | null = null;
 
-    // 1. Verify if the main folder exists
+    // 1. Verify if the main folder exists on Drive and relocate it to the new parent if needed
     if (mainFolderId) {
-      isMainFolderValid = await checkFileExists(accessToken, mainFolderId);
+      try {
+        const checkRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${mainFolderId}?fields=id,name,trashed,parents,webViewLink`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (checkRes.ok) {
+          const fileData = await checkRes.json();
+          if (!fileData.trashed) {
+            mainFolder = fileData;
+            // Check if it's already under the target parent folder
+            const currentParents: string[] = fileData.parents || [];
+            if (!currentParents.includes(parent)) {
+              // Move the existing folder into the new target destination folder
+              const removeParentsStr = currentParents.join(',');
+              const moveUrl = `https://www.googleapis.com/drive/v3/files/${mainFolderId}?addParents=${parent}${removeParentsStr ? `&removeParents=${removeParentsStr}` : ''}&fields=id,name,parents,webViewLink`;
+              const moveRes = await fetch(moveUrl, {
+                method: 'PATCH',
+                headers: { Authorization: `Bearer ${accessToken}` }
+              });
+              if (moveRes.ok) {
+                const movedData = await moveRes.json();
+                mainFolder = movedData;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Could not verify or relocate existing folder:", err);
+      }
     }
 
-    let mainFolder;
-    if (!isMainFolderValid) {
-      // Recreate the main folder
-      mainFolder = await findOrCreateFolder(accessToken, finalFolderTitle, parent);
-      mainFolderId = mainFolder.id;
+    if (!mainFolder) {
+      // Create or find the main folder directly under the target parent folder
+      const foundOrCreated = await findOrCreateFolder(accessToken, finalFolderTitle, parent);
+      mainFolderId = foundOrCreated.id;
+      mainFolder = foundOrCreated;
+      
       // Create shortcut in central shared Google Drive folder
       try {
         await createDriveShortcut(accessToken, finalFolderTitle, mainFolderId);
@@ -701,7 +730,7 @@ export async function verifyAndRecreateFolderStructure(
         console.warn("Could not create Drive shortcut in central shared folder:", shortcutErr);
       }
     } else {
-      mainFolder = { id: mainFolderId, webViewLink: `https://drive.google.com/drive/folders/${mainFolderId}` };
+      mainFolderId = mainFolder.id;
     }
 
     // 2. Find or create the Year subfolder inside the main folder
@@ -713,7 +742,7 @@ export async function verifyAndRecreateFolderStructure(
     const fileGenericiFolder = await findOrCreateFolder(accessToken, 'File Generici', yearFolder.id);
 
     return {
-      id: mainFolderId!,
+      id: mainFolderId,
       url: mainFolder.webViewLink || `https://drive.google.com/drive/folders/${mainFolderId}`,
       fattureEmesseFolderId: fattureFolder.id,
       f24FolderId: f24Folder.id,
