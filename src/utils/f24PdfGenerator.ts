@@ -48,6 +48,14 @@ export function generateF24PDF(
   let refPeriodEnd = '';
   let rateCode = '0101';
 
+  // Calculate standard F24 payment deadline (Scadenza)
+  let dueDate = `30/06/${calcYearInt + 1}`;
+  if (paymentType === 'acconto2') {
+    dueDate = `30/11/${calcYearInt + 1}`;
+  } else if (paymentType === 'minimale') {
+    dueDate = `Scadenze: 16/05, 20/08, 16/11, 16/02`;
+  }
+
   if (category === 'imposta') {
     sectionToFill = 'erario';
     if (paymentType === 'saldo') {
@@ -176,6 +184,26 @@ export function generateF24PDF(
     doc.setFontSize(7.5);
     doc.setTextColor(255, 255, 255);
     doc.text('Mod. F24', pageWidth - marginX - 15, currentY + 3.8);
+
+    // SCADENZA stamp/badge in the middle of the header
+    const isMinimale = paymentType === 'minimale';
+    const boxWidth = isMinimale ? 78 : 55;
+    const boxX = isMinimale ? 58 : 70;
+    
+    doc.setFillColor(254, 242, 242); // soft red background
+    doc.setDrawColor(239, 68, 68); // bright red border
+    doc.setLineWidth(0.3);
+    doc.roundedRect(boxX, currentY, boxWidth, 5, 0.5, 0.5, 'FD');
+    
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(5);
+    doc.setTextColor(239, 68, 68);
+    doc.text('SCADENZA:', boxX + 2, currentY + 3.6);
+    
+    doc.setFont('Courier', 'bold');
+    doc.setFontSize(isMinimale ? 5.5 : 6.5);
+    doc.setTextColor(153, 27, 27); // dark crimson red
+    doc.text(dueDate, boxX + 16, currentY + 3.7);
 
     // Delegation Box on top right
     doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
@@ -907,6 +935,12 @@ export function generateF24PDF(
     doc.setTextColor(0, 0, 0);
     doc.text(copyLabel, marginX, currentY + 4);
 
+    // Render Scadenza under the copy label for extra safety
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(153, 27, 27);
+    doc.text(`DA VERSARE ENTRO IL / SCADENZA: ${dueDate}`, marginX, currentY + 8);
+
     // Page indicator
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(5);
@@ -914,8 +948,9 @@ export function generateF24PDF(
     doc.text(`Modello conforme Agenzia delle Entrate - Generato il ${new Date().toLocaleDateString('it-IT')} - Pagina ${pageNum} di 3`, pageWidth - marginX, currentY + 4, { align: 'right' });
   }
 
-  // Save the F24 PDF
+  // Save the F24 PDF with scadenza in the filename
   const catShort = category === 'imposta' ? 'IMPOSTA' : 'CONTRIBUTI';
-  const filename = `F24_${catShort}_${paymentType.toUpperCase()}_${year}.pdf`;
+  const fileDueDate = dueDate.replace(/\//g, '-').replace(/:/g, '').replace(/,/g, '_').replace(/ /g, '');
+  const filename = `F24_${catShort}_${paymentType.toUpperCase()}_${year}_SCADENZA_${fileDueDate}.pdf`;
   doc.save(filename);
 }

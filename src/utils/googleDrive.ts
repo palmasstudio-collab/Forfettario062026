@@ -16,7 +16,7 @@ interface DriveFile {
 }
 
 // ID Fisso richiesto per la root cartella "forfettari"
-const FORFETTARI_ROOT_FOLDER_ID = '1Kf0fCj15LLv3lYd8XKuqVQgPWLRtRs2Y';
+const FORFETTARI_ROOT_FOLDER_ID = '1ogkOOPaH3EwYUV-DO-GHgZ0HswocM7E8';
 // ID Fisso richiesto per la cartella di backup in JSON "cartella backup Firebase"
 const FIREBASE_BACKUP_FOLDER_ID = '13X4iMZ9Z1rF4s-vVz4GVs3MZaPhTegMv';
 
@@ -273,7 +273,7 @@ export interface CreatedFolderResult {
 
 /**
  * Creates a dedicated subfolder nested under the specified parent folder on Google Drive.
- * Uses the reference parent folder ID: 1aY3zA-D3_tAhEFLmasuTCz3JURKeviKP
+ * Uses the reference parent folder ID: 1ogkOOPaH3EwYUV-DO-GHgZ0HswocM7E8
  */
 export async function createAccountingPositionFolder(
   accessToken: string,
@@ -289,7 +289,7 @@ export async function createAccountingPositionFolder(
     }
     
     // User's specific target parent folder
-    const defaultParentFolderId = '1aY3zA-D3_tAhEFLmasuTCz3JURKeviKP';
+    const defaultParentFolderId = '1ogkOOPaH3EwYUV-DO-GHgZ0HswocM7E8';
     const parent = customParentId && customParentId.trim() !== '' ? customParentId : defaultParentFolderId;
 
     // Use formatting: "Forfettario Nome Cognome"
@@ -305,7 +305,7 @@ export async function createAccountingPositionFolder(
     const f24Folder = await findOrCreateFolder(accessToken, 'F24', yearFolder.id);
     const fileGenericiFolder = await findOrCreateFolder(accessToken, 'File Generici', yearFolder.id);
 
-    // Create shortcut in the specified central shared Google Drive folder (1Kf0fCj15LLv3lYd8XKuqVQgPWLRtRs2Y)
+    // Create shortcut in the specified central shared Google Drive folder (1ogkOOPaH3EwYUV-DO-GHgZ0HswocM7E8)
     try {
       await createDriveShortcut(accessToken, finalFolderTitle, childFolder.id);
     } catch (shortcutErr) {
@@ -604,7 +604,7 @@ export async function createDriveShortcut(
   accessToken: string,
   shortcutName: string,
   targetId: string,
-  parentFolderId: string = '1Kf0fCj15LLv3lYd8XKuqVQgPWLRtRs2Y'
+  parentFolderId: string = '1ogkOOPaH3EwYUV-DO-GHgZ0HswocM7E8'
 ): Promise<any> {
   const url = 'https://www.googleapis.com/drive/v3/files?fields=id,name,webViewLink';
   const body = {
@@ -676,7 +676,7 @@ export async function verifyAndRecreateFolderStructure(
       throw new Error("Simulated auth token bypass");
     }
 
-    const defaultParentFolderId = '1aY3zA-D3_tAhEFLmasuTCz3JURKeviKP';
+    const defaultParentFolderId = '1ogkOOPaH3EwYUV-DO-GHgZ0HswocM7E8';
     const parent = customParentId && customParentId.trim() !== '' ? customParentId : defaultParentFolderId;
     const cleanedFullName = clientFullName.trim();
     const finalFolderTitle = `Forfettario ${cleanedFullName || positionName.trim() || 'Senza Nome'}`;

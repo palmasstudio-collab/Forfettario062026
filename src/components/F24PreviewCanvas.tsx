@@ -17,7 +17,8 @@ import {
   Eye, 
   Sparkles, 
   Download, 
-  HelpCircle 
+  HelpCircle,
+  Calendar
 } from 'lucide-react';
 import { BusinessProfile, TaxReturnCalculation } from '../types';
 import { extractF24DataFromPdf } from '../utils/pdfF24Parser';
@@ -324,6 +325,32 @@ export default function F24PreviewCanvas({
   // External compiler official URL
   const externalF24Url = "https://www.amministrazionicomunali.it/modello_f24/modello_f24_online.php";
 
+  // Dynamic Scadenza computation for UI
+  const getUiDueDate = () => {
+    const isGestioneSeparata = profile.pensionFund === 'INPS_GESTIONE_SEPARATA';
+    const isArtigianiCommercianti = profile.pensionFund === 'INPS_ARTIGIANI' || profile.pensionFund === 'INPS_COMMERCIANTI';
+    
+    // Default substitute tax due dates
+    let taxDueDate = `30/06/${parseInt(selectedYear, 10) + 1}`;
+    let inpsDueDate = `30/06/${parseInt(selectedYear, 10) + 1}`;
+    
+    if (formState.erarioCodice === '1792') { // Secondo acconto
+      taxDueDate = `30/11/${parseInt(selectedYear, 10) + 1}`;
+    }
+    
+    if (isArtigianiCommercianti) {
+      // Minimale has 4 standard rates
+      inpsDueDate = `16/05/${selectedYear}, 20/08/${selectedYear}, 16/11/${selectedYear}, 16/02/${parseInt(selectedYear, 10) + 1}`;
+    } else if (isGestioneSeparata) {
+      // Same as substitute tax
+      inpsDueDate = `30/06/${parseInt(selectedYear, 10) + 1}`;
+    }
+    
+    return { taxDueDate, inpsDueDate };
+  };
+  
+  const { taxDueDate, inpsDueDate } = getUiDueDate();
+
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-7 flex flex-col gap-6" id="f24-preview-canvas-overlay">
       
@@ -395,6 +422,35 @@ export default function F24PreviewCanvas({
               <span>Apri F24 Online</span>
               <ExternalLink className="w-4 h-4" />
             </a>
+          </div>
+
+          {/* Scadenze Fiscali Badge Bar */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-rose-50/50 border border-rose-200/40 rounded-2xl p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-rose-500/10 text-rose-700 rounded-xl border border-rose-200/30">
+                <Calendar className="w-4 h-4 text-rose-600" />
+              </div>
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-black text-rose-600 uppercase tracking-wider block">Scadenza Imposta Sostitutiva ({formState.erarioCodice})</span>
+                <span className="text-sm font-black text-rose-950 font-mono">{taxDueDate}</span>
+                <span className="text-[10px] text-rose-700/80 block">Versamento saldo o primo acconto dell'imposta sostitutiva per il regime forfettario.</span>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3 border-t md:border-t-0 md:border-l border-rose-200/40 pt-3 md:pt-0 md:pl-4">
+              <div className="p-2 bg-rose-500/10 text-rose-700 rounded-xl border border-rose-200/30">
+                <Calendar className="w-4 h-4 text-rose-600" />
+              </div>
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-black text-rose-600 uppercase tracking-wider block">Scadenza Contributi INPS / Cassa ({formState.inpsCausale})</span>
+                <span className="text-sm font-black text-rose-950 font-mono">{inpsDueDate}</span>
+                <span className="text-[10px] text-rose-700/80 block">
+                  {profile.pensionFund === 'INPS_ARTIGIANI' || profile.pensionFund === 'INPS_COMMERCIANTI' 
+                    ? 'Scadenze delle 4 rate trimestrali fisse sul minimale contributivo.'
+                    : 'Versamento contributi a saldo o in acconto per la Gestione Separata.'}
+                </span>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
