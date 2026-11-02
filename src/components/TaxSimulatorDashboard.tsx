@@ -388,6 +388,33 @@ export default function TaxSimulatorDashboard({
   const totalIssuedInvoicesAmount = invoices.reduce((sum, inv) => sum + inv.amount, 0);
   const activeRevenue = revenueMode === 'issued' ? totalIssuedInvoicesAmount : revenue;
 
+  // Calcolo automatico degli Acconti versati nell'anno precedente tramite F24 per l'anno in corso
+  const previousYearNum = parseInt(selectedYear, 10) - 1;
+  const previousYearStr = String(previousYearNum);
+
+  // 1. Acconti Imposta Sostitutiva versati l'anno precedente per l'anno corrente (Cod. 1790 + 1791)
+  const previousYearErarioAccontiEntries = allF24Entries.filter(e => {
+    const isTarget = e.targetYear === selectedYear;
+    const isPaidPrevYear = e.date && e.date.startsWith(previousYearStr);
+    const isErarioAccontoCode = e.taxCode === '1790' || e.taxCode === '1791' || (e.isAcconto && ['1790', '1791'].includes(e.taxCode));
+    return isTarget || (isPaidPrevYear && isErarioAccontoCode);
+  });
+  const substituteTaxAdvancesFromF24 = previousYearErarioAccontiEntries.reduce((sum, e) => sum + e.amount, 0);
+
+  // 2. Acconti INPS Gestione Separata versati l'anno precedente per l'anno corrente (Causale PXX / P10 es. 46 € a giugno e 68 € a novembre)
+  const previousYearInpsAccontiEntries = allF24Entries.filter(e => {
+    const isTarget = e.targetYear === selectedYear;
+    const isPaidPrevYear = e.date && e.date.startsWith(previousYearStr);
+    const isPxxCode = e.taxCode === 'PXX' || e.taxCode === 'P10';
+    const isAccontoMarker = e.isAcconto || 
+      e.description?.toLowerCase().includes('acconto') || 
+      e.accontoType === '1_acconto' || 
+      e.accontoType === '2_acconto' ||
+      (isPaidPrevYear && isPxxCode && e.amount <= 150); // Esempio acconti 46 € e 68 €
+    return (isTarget && isPxxCode) || (isPaidPrevYear && isPxxCode && isAccontoMarker);
+  });
+  const inpsAdvancesFromF24 = previousYearInpsAccontiEntries.reduce((sum, e) => sum + e.amount, 0);
+
   const taxInput: TaxInput = {
     revenue: activeRevenue,
     atecoCode: profile.atecoCode,
@@ -397,7 +424,9 @@ export default function TaxSimulatorDashboard({
     yearOfActivity,
     vatOpeningDate: profile.vatOpeningDate,
     calculationYear: parseInt(selectedYear, 10),
-    inpsReduction35: profile.inpsReduction35 !== false
+    inpsReduction35: profile.inpsReduction35 !== false,
+    substituteTaxAdvancesPaidForCurrentYear: substituteTaxAdvancesFromF24,
+    inpsAdvancesPaidForCurrentYear: inpsAdvancesFromF24
   };
 
   const results: TaxReturnCalculation = calculateTaxReturn(taxInput);
@@ -982,11 +1011,28 @@ export default function TaxSimulatorDashboard({
                   <span className="text-[10px] text-slate-500 font-bold">LM36 (Reddito Netto)</span>
                   <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.netTaxableIncome.toFixed(0)}</span>
                 </div>
+                
+                {/* Riconoscimento Acconti da F24 anno precedente in LM */}
+                {results.substituteTaxAdvancesDeducted !== undefined && results.substituteTaxAdvancesDeducted > 0 && (
+                  <div className="flex justify-between py-1 items-center bg-emerald-50/70 px-2 rounded-lg border border-emerald-200/60 my-1">
+                    <span className="text-[10px] text-emerald-800 font-bold flex items-center gap-1">
+                      <span>LM42 (Acconti già versati F24 {previousYearStr})</span>
+                    </span>
+                    <span className="font-bold text-emerald-700 font-mono">- € {results.substituteTaxAdvancesDeducted.toFixed(2)}</span>
+                  </div>
+                )}
+
                 <div className="py-2 border-t border-slate-100">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-[10px] text-slate-500 font-bold">LM39 col. 1 (Imposta Sostitutiva)</span>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[10px] text-slate-500 font-bold">LM39 col. 1 (Imposta Lorda)</span>
                     <span className="font-bold text-rose-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.substituteTax.toFixed(2)}</span>
                   </div>
+                  {results.substituteTaxAdvancesDeducted !== undefined && results.substituteTaxAdvancesDeducted > 0 && (
+                    <div className="flex justify-between items-center mb-1.5 bg-rose-50/60 px-2 py-1 rounded-lg border border-rose-200/50">
+                      <span className="text-[10px] text-rose-900 font-extrabold">LM43 (Imposta Netta Residua a Debito)</span>
+                      <span className="font-extrabold text-rose-700 font-mono">€ {results.substituteTaxNetDue?.toFixed(2)}</span>
+                    </div>
+                  )}
                   {results.substituteTax > 0 ? (
                     <div className="bg-rose-50/40 p-2 rounded-xl border border-rose-200/40 space-y-1.5 mt-1">
                       <div className="text-[8px] font-black text-rose-600 uppercase tracking-wider flex items-center gap-1">
@@ -996,12 +1042,12 @@ export default function TaxSimulatorDashboard({
                       <div className="grid grid-cols-3 gap-1">
                         <button
                           type="button"
-                          onClick={() => generateF24PDF(profile, results.substituteTax, 'imposta', 'saldo', selectedYear)}
+                          onClick={() => generateF24PDF(profile, results.substituteTaxNetDue ?? results.substituteTax, 'imposta', 'saldo', selectedYear)}
                           className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-rose-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
                           title="Genera F24 Saldo (Cod. 1792 - 30 Giugno)"
                         >
                           <span className="text-[7px] text-slate-500 uppercase font-bold">Saldo (1792)</span>
-                          <span className="font-mono text-[9px]">€ {results.substituteTax.toFixed(0)}</span>
+                          <span className="font-mono text-[9px]">€ {(results.substituteTaxNetDue ?? results.substituteTax).toFixed(0)}</span>
                         </button>
                         <button
                           type="button"
@@ -1137,42 +1183,59 @@ export default function TaxSimulatorDashboard({
                       <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 font-mono">{(results.inpsGestioneSeparataRate ? results.inpsGestioneSeparataRate * 100 : 26.07).toFixed(2)}%</span>
                     </div>
                     <div className="py-2 border-t border-slate-50">
-                      <div className="flex justify-between items-center mb-1.5">
+                      <div className="flex justify-between items-center mb-1">
                         <span className="text-[10px] text-slate-500 font-bold">Contributo Dovuto (col. 5)</span>
                         <span className="font-bold text-blue-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 font-mono">€ {results.inpsGestioneSeparataDue?.toFixed(2)}</span>
                       </div>
+
+                      {/* Riconoscimento Acconti INPS PXX anno precedente */}
+                      {results.inpsAdvancesDeducted !== undefined && results.inpsAdvancesDeducted > 0 && (
+                        <>
+                          <div className="flex justify-between py-1 items-center bg-emerald-50/70 px-2 rounded-lg border border-emerald-200/60 my-1">
+                            <span className="text-[10px] text-emerald-800 font-bold">Acconti già versati F24 {previousYearStr} (PXX)</span>
+                            <span className="font-bold text-emerald-700 font-mono">- € {results.inpsAdvancesDeducted.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between items-center mb-1.5 bg-blue-50/60 px-2 py-1 rounded-lg border border-blue-200/50">
+                            <span className="text-[10px] text-blue-900 font-extrabold">Saldo Netto INPS Residuo a Debito</span>
+                            <span className="font-extrabold text-blue-700 font-mono">€ {results.inpsNetDue?.toFixed(2)}</span>
+                          </div>
+                        </>
+                      )}
+
                       {results.inpsGestioneSeparataDue && results.inpsGestioneSeparataDue > 0 ? (
                         <div className="bg-blue-50/40 p-2 rounded-xl border border-blue-200/40 space-y-1.5 mt-1">
-                          <div className="text-[8px] font-black text-blue-600 uppercase tracking-wider flex items-center gap-1">
-                            <FileText className="w-2.5 h-2.5 text-blue-500" />
-                            <span>Genera Modelli F24 Gestione Separata</span>
+                          <div className="text-[8px] font-black text-blue-600 uppercase tracking-wider flex items-center justify-between">
+                            <span className="flex items-center gap-1">
+                              <FileText className="w-2.5 h-2.5 text-blue-500" />
+                              <span>F24 Gestione Separata (Ripartizione 40% / 60%)</span>
+                            </span>
                           </div>
                           <div className="grid grid-cols-3 gap-1">
                             <button
                               type="button"
-                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataDue || 0, 'contributi', 'saldo', selectedYear, 'PXX')}
+                              onClick={() => generateF24PDF(profile, results.inpsNetDue ?? results.inpsGestioneSeparataDue ?? 0, 'contributi', 'saldo', selectedYear, 'PXX')}
                               className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
                               title="Genera F24 Saldo Gestione Separata (Causale PXX - 30 Giugno)"
                             >
                               <span className="text-[7px] text-slate-500 uppercase font-bold">Saldo (PXX)</span>
-                              <span className="font-mono text-[9px]">€ {results.inpsGestioneSeparataDue.toFixed(0)}</span>
+                              <span className="font-mono text-[9px]">€ {(results.inpsNetDue ?? results.inpsGestioneSeparataDue ?? 0).toFixed(0)}</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto1 || 0, 'contributi', 'acconto1', selectedYear, 'PXX')}
                               className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
-                              title="Genera F24 I° Acconto (Causale PXX - 30 Giugno)"
+                              title="Genera F24 1° Acconto 40% (Causale PXX - 30 Giugno)"
                             >
-                              <span className="text-[7px] text-slate-500 uppercase font-bold">I° Acc (PXX)</span>
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">I° Acc 40% (PXX)</span>
                               <span className="font-mono text-[9px]">€ {(results.inpsGestioneSeparataAcconto1 || 0).toFixed(0)}</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto2 || 0, 'contributi', 'acconto2', selectedYear, 'PXX')}
                               className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
-                              title="Genera F24 2° Acconto (Causale PXX - 30 Novembre in unica soluzione)"
+                              title="Genera F24 2° Acconto 60% (Causale PXX - 30 Novembre in unica soluzione)"
                             >
-                              <span className="text-[7px] text-slate-500 uppercase font-bold">II° Acc (PXX)</span>
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">II° Acc 60% (PXX)</span>
                               <span className="font-mono text-[9px]">€ {(results.inpsGestioneSeparataAcconto2 || 0).toFixed(0)}</span>
                             </button>
                           </div>

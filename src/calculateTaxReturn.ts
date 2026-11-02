@@ -155,10 +155,11 @@ export function calculateTaxReturn(input: TaxInput): TaxReturnCalculation {
     inpsGestioneSeparataDue = inpsGestioneSeparataBase * inpsGestioneSeparataRate;
     currentYearContributions = inpsGestioneSeparataDue;
 
-    // Acconti per l'anno successivo (80% del dovuto, suddivisi in 1° acconto 40% e 2° acconto 40%)
+    // Acconti INPS Gestione Separata (Causale PXX / P10):
+    // Ripartizione ordinaria acconti: 1° acconto 40% a Giugno (es. 46 €) e 2° acconto 60% a Novembre (es. 68 €)
     inpsGestioneSeparataAcconto1 = inpsGestioneSeparataDue * 0.40;
-    inpsGestioneSeparataAcconto2 = inpsGestioneSeparataDue * 0.40;
-    inpsGestioneSeparataAccontiTotale = inpsGestioneSeparataDue * 0.80;
+    inpsGestioneSeparataAcconto2 = inpsGestioneSeparataDue * 0.60;
+    inpsGestioneSeparataAccontiTotale = inpsGestioneSeparataDue;
   } else if (fund.hasMinimum && fund.minimumContribution !== undefined && fund.minimumThreshold !== undefined) {
     // Casse con minimale fisso (Artigiani/Commercianti fallback, if not INPS Art/Com)
     let threshold = fund.minimumThreshold;
@@ -207,9 +208,16 @@ export function calculateTaxReturn(input: TaxInput): TaxReturnCalculation {
     }
   }
 
-  // 7. Reddito Netto Rimasto in Tasca al Professionista
-  // Calcolato sul fatturato lordo sottraendo l'imposta sostitutiva e i contributi calcolati per l'anno in corso
-  const netIncome = Math.max(0, revenue - substituteTax - currentYearContributions);
+  // 7. Scomputo degli Acconti già versati nell'anno precedente per l'anno in corso (Quadro LM rigo Acconti e Quadro RR)
+  const substituteTaxAdvancesDeducted = Math.max(0, input.substituteTaxAdvancesPaidForCurrentYear || 0);
+  const inpsAdvancesDeducted = Math.max(0, input.inpsAdvancesPaidForCurrentYear || 0);
+
+  const substituteTaxNetDue = Math.max(0, substituteTaxSaldo - substituteTaxAdvancesDeducted);
+  const inpsNetDue = Math.max(0, currentYearContributions - inpsAdvancesDeducted);
+
+  // 8. Reddito Netto Rimasto in Tasca al Professionista
+  // Calcolato sul fatturato lordo sottraendo l'imposta sostitutiva effettivamente versata e i contributi
+  const netIncome = Math.max(0, revenue - (substituteTaxNetDue > 0 ? substituteTaxNetDue : substituteTax) - currentYearContributions);
 
   return {
     grossRevenue: revenue,
@@ -237,6 +245,10 @@ export function calculateTaxReturn(input: TaxInput): TaxReturnCalculation {
     substituteTaxSaldo,
     substituteTaxAcconto1,
     substituteTaxAcconto2,
-    substituteTaxAccontiTotale
+    substituteTaxAccontiTotale,
+    substituteTaxAdvancesDeducted,
+    inpsAdvancesDeducted,
+    substituteTaxNetDue,
+    inpsNetDue
   };
 }

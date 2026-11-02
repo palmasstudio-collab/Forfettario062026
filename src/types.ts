@@ -39,6 +39,8 @@ export interface TaxInput {
   vatOpeningDate?: string;
   calculationYear?: number;
   inpsReduction35?: boolean;
+  substituteTaxAdvancesPaidForCurrentYear?: number; // Acconti imposta sostitutiva (1790, 1791) già pagati l'anno precedente per quest'anno
+  inpsAdvancesPaidForCurrentYear?: number; // Acconti INPS (PXX) già pagati l'anno precedente per quest'anno
 }
 
 export interface TaxReturnCalculation {
@@ -68,6 +70,11 @@ export interface TaxReturnCalculation {
   substituteTaxAcconto1?: number; // 1° Acconto 50% entro 30 Giugno (Cod. 1790)
   substituteTaxAcconto2?: number; // 2° Acconto 50% entro 30 Novembre (Cod. 1791)
   substituteTaxAccontiTotale?: number; // Totale acconti dovuti
+  // Dettagli acconti già versati rinvenuti da F24 anno precedente:
+  substituteTaxAdvancesDeducted?: number; // Somma di 1790 + 1791 già versati per l'anno corrente
+  inpsAdvancesDeducted?: number; // Somma di acconti PXX già versati per l'anno corrente
+  substituteTaxNetDue?: number; // Saldo netto imposta sostitutiva a debito dopo scomputo acconti
+  inpsNetDue?: number; // Saldo netto INPS a debito dopo scomputo acconti
 }
 
 export interface Invoice {
@@ -100,11 +107,15 @@ export interface BusinessProfile {
 
 export interface F24Entry {
   id: string;
-  date: string; // The date of payment or entry
-  taxCode: string; // Codice Tributo e.g., 4001, 1792, AP, CP ecc.
+  date: string; // The date of payment or entry (YYYY-MM-DD)
+  taxCode: string; // Codice Tributo e.g., 4001, 1792, 1790, 1791, PXX, P10, AP, CP ecc.
   amount: number; // Importo versato
   description?: string;
   source: string; // "Manuale" o "PDF"
+  driveFileId?: string;
+  isAcconto?: boolean; // Se è un acconto (1790, 1791, PXX acconto)
+  targetYear?: string; // Anno di competenza a cui si riferisce l'acconto (es. versato nel 2025 per il 2026)
+  accontoType?: '1_acconto' | '2_acconto' | 'saldo' | 'altro';
 }
 
 export interface AccountingPosition {

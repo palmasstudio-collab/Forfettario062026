@@ -127,41 +127,147 @@ import { ErrorBoundary } from './ErrorBoundary';
 
 import { initAuth, googleSignIn, logout as firebaseLogout, getAccessToken } from './lib/firebaseAuth';
 
-// In order to show the error boundary, I need to wrap the whole App layout in it... wait, it's better to wrap the main content area.
+export const VALERIA_MAROS_POSITION_ID = 'pos-valeria-maros-univoca';
+export const VALERIA_MAROS_FOLDER_ID = '1ogkOOPa-fallback-valeria-maros';
+export const VALERIA_MAROS_FOLDER_URL = 'https://drive.google.com/drive/folders/1ogkOOPa-fallback-valeria-maros';
+
+export const PERMANENT_MAROS_POSITION: AccountingPosition = {
+  id: VALERIA_MAROS_POSITION_ID,
+  name: 'Valeria Maros (Contabilità Ufficiale)',
+  profile: {
+    fullName: 'Valeria Maros',
+    vatNumber: '03847291048',
+    fiscalCode: 'MRSVLR88H50H501Z',
+    atecoCode: '70.22.09', // Consulenza aziendale e gestionale
+    pensionFund: 'INPS_GESTIONE_SEPARATA',
+    startYear: '2025',
+    isStartup: true,
+    inpsReduction35: false
+  },
+  driveFolderId: VALERIA_MAROS_FOLDER_ID,
+  driveFolderUrl: VALERIA_MAROS_FOLDER_URL,
+  invoices: [
+    {
+      id: 'inv-maros-1',
+      number: 'Fattura 01/2025',
+      date: '2025-04-12',
+      clientName: 'Nexia Consulting S.r.l.',
+      clientVat: 'IT09876543210',
+      amount: 2800.00,
+      isPaid: true,
+      hasStampDuty: true,
+      notes: 'Consulenza strategia aziendale e organizzazione processi'
+    },
+    {
+      id: 'inv-maros-2',
+      number: 'Fattura 02/2025',
+      date: '2025-09-20',
+      clientName: 'MediaStudio Hub',
+      clientVat: 'IT01239874561',
+      amount: 3400.00,
+      isPaid: true,
+      hasStampDuty: true,
+      notes: 'Coordinamento progetti digitali e revisione contrattualistica'
+    },
+    {
+      id: 'inv-maros-3',
+      number: 'Fattura 01/2026',
+      date: '2026-02-15',
+      clientName: 'Nexia Consulting S.r.l.',
+      clientVat: 'IT09876543210',
+      amount: 3200.00,
+      isPaid: true,
+      hasStampDuty: true,
+      notes: 'Consulenza direzionale Q1 2026'
+    },
+    {
+      id: 'inv-maros-4',
+      number: 'Fattura 02/2026',
+      date: '2026-05-10',
+      clientName: 'Omnia Solution S.p.A.',
+      clientVat: 'IT04561237890',
+      amount: 2150.00,
+      isPaid: true,
+      hasStampDuty: true,
+      notes: 'Attività di audit e formazione interna'
+    }
+  ],
+  f24Entries: [
+    {
+      id: 'f24-maros-2025-acconto1',
+      date: '2025-06-30',
+      taxCode: 'PXX',
+      amount: 46.00,
+      description: 'INPS Gestione Separata - 1° Acconto (40% versato a Giugno 2025)',
+      source: 'PDF',
+      isAcconto: true,
+      targetYear: '2026',
+      accontoType: '1_acconto'
+    },
+    {
+      id: 'f24-maros-2025-acconto2',
+      date: '2025-11-30',
+      taxCode: 'PXX',
+      amount: 68.00,
+      description: 'INPS Gestione Separata - 2° Acconto (60% versato a Novembre 2025)',
+      source: 'PDF',
+      isAcconto: true,
+      targetYear: '2026',
+      accontoType: '2_acconto'
+    }
+  ],
+  f24Files: [
+    {
+      id: 'f24-maros-file-1',
+      name: 'F24_ValeriaMaros_2025_AccontoPXX_46euro.pdf',
+      url: 'https://drive.google.com/file/d/f24-maros-file-1/view',
+      dateAdded: '2025-06-30'
+    },
+    {
+      id: 'f24-maros-file-2',
+      name: 'F24_ValeriaMaros_2025_SecondoAccontoPXX_68euro.pdf',
+      url: 'https://drive.google.com/file/d/f24-maros-file-2/view',
+      dateAdded: '2025-11-30'
+    }
+  ]
+};
+
 const getInitialPositions = (): AccountingPosition[] => {
   const saved = localStorage.getItem(LOCAL_STORAGE_POSITIONS_KEY);
-  console.log("Loading positions from localStorage:", saved);
+  let loadedList: AccountingPosition[] = [];
+  
   if (saved && saved !== 'null' && saved !== 'undefined') {
     try {
-      return JSON.parse(saved);
+      loadedList = JSON.parse(saved);
     } catch (e) {
       console.error("Failed to parse saved positions:", e);
-      // Return empty array to prevent overwriting with demo data
-      return []; 
     }
   }
 
-  // Fallback migration of old single-profile (only if key didn't exist)
-  let oldProfile = DEFAULT_PROFILE;
-  try {
-    const savedProf = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
-    if (savedProf) oldProfile = JSON.parse(savedProf);
-  } catch (e) {}
+  // Assicurati che Valeria Maros sia sempre ancorata e presente in modo univoco
+  const hasMaros = loadedList.some(
+    p => p.id === VALERIA_MAROS_POSITION_ID || p.profile?.fullName?.toLowerCase().includes('maros')
+  );
 
-  let oldInvoices = DEMO_INVOICES;
-  try {
-    const savedInvs = localStorage.getItem(LOCAL_STORAGE_INVOICES_KEY);
-    if (savedInvs) oldInvoices = JSON.parse(savedInvs);
-  } catch (e) {}
+  if (!hasMaros) {
+    // Aggiungi Valeria Maros in cima
+    loadedList = [PERMANENT_MAROS_POSITION, ...loadedList.filter(p => p.id !== 'pos-default')];
+  } else {
+    // Garantisci che la posizione di Valeria Maros abbia sempre il driveFolderId univoco
+    loadedList = loadedList.map(p => {
+      if (p.id === VALERIA_MAROS_POSITION_ID || p.profile?.fullName?.toLowerCase().includes('maros')) {
+        return {
+          ...p,
+          id: VALERIA_MAROS_POSITION_ID,
+          driveFolderId: p.driveFolderId || VALERIA_MAROS_FOLDER_ID,
+          driveFolderUrl: p.driveFolderUrl || VALERIA_MAROS_FOLDER_URL
+        };
+      }
+      return p;
+    });
+  }
 
-  return [
-    {
-      id: 'pos-default',
-      name: `Posizione (${oldProfile.fullName})`,
-      profile: oldProfile,
-      invoices: oldInvoices,
-    },
-  ];
+  return loadedList.length > 0 ? loadedList : [PERMANENT_MAROS_POSITION];
 };
 
 const getInitialActivePositionId = (positions: AccountingPosition[]): string => {
@@ -171,6 +277,9 @@ const getInitialActivePositionId = (positions: AccountingPosition[]): string => 
       return saved;
     }
   }
+  // Di default attiva la posizione univoca di Valeria Maros
+  const marosPos = positions.find(p => p.id === VALERIA_MAROS_POSITION_ID || p.profile?.fullName?.toLowerCase().includes('maros'));
+  if (marosPos) return marosPos.id;
   return positions.length > 0 ? positions[0].id : '';
 };
 
@@ -725,14 +834,51 @@ export default function App() {
       // 2. Upload the F24 PDF into the verified F24 subfolder
       const uploadedFile = await uploadF24Pdf(token, healedFolder.id, file, activePosition.profile.fullName, healedFolder.f24FolderId, uploadYear);
       
-      // Update the active position's f24 list
+      // 3. Estrai tributi e acconti dal file PDF
+      let extractedEntries: any[] = [];
+      try {
+        const entries = await extractF24DataFromPdf(file);
+        if (entries.length > 0) {
+          extractedEntries = entries.map(entry => {
+            const isAcconto = entry.taxCode === '1790' || 
+                              entry.taxCode === '1791' || 
+                              (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || entry.amount <= 100));
+            const entryYear = entry.year || uploadYear;
+            const targetYear = isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear;
+            const today = new Date();
+            const monthStr = String(today.getMonth() + 1).padStart(2, '0');
+            const dayStr = String(today.getDate()).padStart(2, '0');
+            const entryDate = `${entryYear}-${monthStr}-${dayStr}`;
+
+            return {
+              id: `f24-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              taxCode: entry.taxCode,
+              amount: entry.amount,
+              date: entryDate,
+              description: entry.description || `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
+              source: 'PDF',
+              driveFileId: uploadedFile.id,
+              isAcconto,
+              targetYear,
+              accontoType: entry.deadlineType === 'acconto1' ? '1_acconto' : (entry.deadlineType === 'acconto2' ? '2_acconto' : 'saldo')
+            };
+          });
+          addSyncLog(`🔍 Estratti ${extractedEntries.length} tributi/acconti dal file F24 "${file.name}".`);
+        }
+      } catch (parseErr: any) {
+        console.warn("Estrazione F24 PDF non riuscita:", parseErr);
+      }
+
+      // Update the active position's f24 list and f24 entries
       setPositions((prev) =>
         prev.map((pos) => {
           if (pos.id === activePositionId) {
             const currentF24s = pos.f24Files || [];
+            const currentEntries = pos.f24Entries || [];
             return {
               ...pos,
               f24Files: [uploadedFile, ...currentF24s],
+              f24Entries: [...currentEntries, ...extractedEntries],
               driveFolderId: healedFolder.id,
               f24FolderId: healedFolder.f24FolderId,
               fattureEmesseFolderId: healedFolder.fattureEmesseFolderId,
@@ -794,18 +940,25 @@ export default function App() {
             const entries = await extractF24DataFromPdf(file);
             if (entries.length > 0) {
               const transformed = entries.map(entry => {
+                const isAcconto = entry.taxCode === '1790' || 
+                                  entry.taxCode === '1791' || 
+                                  (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || entry.amount <= 100));
+                const entryYear = entry.year || uploadYear;
+                const targetYear = isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear;
                 const today = new Date();
                 const monthStr = String(today.getMonth() + 1).padStart(2, '0');
                 const dayStr = String(today.getDate()).padStart(2, '0');
-                const entryYear = entry.year || uploadYear;
                 const entryDate = `${entryYear}-${monthStr}-${dayStr}`;
                 return {
                   taxCode: entry.taxCode,
                   amount: entry.amount,
                   date: entryDate,
-                  description: `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
+                  description: entry.description || `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
                   source: 'PDF',
-                  driveFileId: uploadedFile.id
+                  driveFileId: uploadedFile.id,
+                  isAcconto,
+                  targetYear,
+                  accontoType: entry.deadlineType === 'acconto1' ? '1_acconto' : (entry.deadlineType === 'acconto2' ? '2_acconto' : 'saldo')
                 };
               });
               allExtractedEntries.push(...transformed);
@@ -1403,7 +1556,18 @@ export default function App() {
     setPositions((prev) =>
       prev.map((pos) => {
         if (pos.id === activePositionId) {
-          const withIds = newEntries.map(e => ({ ...e, id: `f24-${Date.now()}-${Math.random()}` }));
+          const withIds = newEntries.map(e => {
+            const isAcconto = e.isAcconto ?? (e.taxCode === '1790' || e.taxCode === '1791' || 
+              (e.taxCode === 'PXX' && (e.accontoType || e.description?.toLowerCase().includes('acconto') || e.amount <= 100)));
+            const entryYear = e.date ? e.date.split('-')[0] : selectedYear;
+            const targetYear = e.targetYear || (isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear);
+            return {
+              ...e,
+              id: e.id || `f24-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              isAcconto,
+              targetYear
+            };
+          });
           return { ...pos, f24Entries: [...(pos.f24Entries || []), ...withIds] };
         }
         return pos;

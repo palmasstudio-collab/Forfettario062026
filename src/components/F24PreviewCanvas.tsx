@@ -76,6 +76,7 @@ export default function F24PreviewCanvas({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string>('');
+  const [extractedF24Entries, setExtractedF24Entries] = useState<any[]>([]);
   
   // Field copy states
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -122,7 +123,7 @@ export default function F24PreviewCanvas({
   
   const inpsDue = results?.inpsGestioneSeparataDue ?? results?.currentYearContributions ?? 0;
   const inpsAcconto1 = results?.inpsGestioneSeparataAcconto1 ?? (inpsDue * 0.40);
-  const inpsAcconto2 = results?.inpsGestioneSeparataAcconto2 ?? (inpsDue * 0.40);
+  const inpsAcconto2 = results?.inpsGestioneSeparataAcconto2 ?? (inpsDue * 0.60);
 
   // Compute active amounts according to selected schedule preset
   const scheduleCalculations = useMemo(() => {
@@ -349,20 +350,24 @@ export default function F24PreviewCanvas({
     try {
       if (isPdf) {
         const parsedEntries = await extractF24DataFromPdf(selectedFile);
+        setExtractedF24Entries(parsedEntries);
         if (parsedEntries.length > 0) {
-          const entry = parsedEntries[0];
-          const isErario = ['1790', '1791', '1792', '4001', '4002'].includes(entry.taxCode);
-          
+          const erarioEntry = parsedEntries.find(e => ['1790', '1791', '1792', '4001', '4002'].includes(e.taxCode));
+          const inpsEntry = parsedEntries.find(e => ['PXX', 'P10', 'AF', 'CF', 'AP', 'CP'].includes(e.taxCode));
+          const totalAmount = parsedEntries.reduce((sum, e) => sum + e.amount, 0);
+
           setFormState(prev => ({
             ...prev,
-            erarioCodice: isErario ? entry.taxCode : prev.erarioCodice,
-            erarioImporto: isErario ? entry.amount.toFixed(2) : prev.erarioImporto,
-            erarioAnno: entry.year || prev.erarioAnno,
-            inpsCausale: !isErario ? entry.taxCode : prev.inpsCausale,
-            inpsImporto: !isErario ? entry.amount.toFixed(2) : prev.inpsImporto,
-            saldoFinale: entry.amount.toFixed(2)
+            erarioCodice: erarioEntry ? erarioEntry.taxCode : prev.erarioCodice,
+            erarioImporto: erarioEntry ? erarioEntry.amount.toFixed(2) : prev.erarioImporto,
+            erarioAnno: erarioEntry?.year || prev.erarioAnno,
+            inpsCausale: inpsEntry ? inpsEntry.taxCode : prev.inpsCausale,
+            inpsImporto: inpsEntry ? inpsEntry.amount.toFixed(2) : prev.inpsImporto,
+            saldoFinale: totalAmount.toFixed(2)
           }));
-          setStatusMessage(`F24 analizzato correttamente. Rilevato tributo ${entry.taxCode} per € ${entry.amount.toFixed(2)}.`);
+          
+          const detailsList = parsedEntries.map(e => `${e.taxCode}: € ${e.amount.toFixed(2)}`).join(', ');
+          setStatusMessage(`✅ Modello F24 analizzato: rilevate ${parsedEntries.length} righe (${detailsList}). Gli acconti verranno applicati al report dell'anno successivo.`);
         } else {
           setStatusMessage('File caricato. Nessun tributo estratto in automatico: puoi compilarlo manualmente.');
         }
@@ -535,27 +540,55 @@ export default function F24PreviewCanvas({
         });
       }
     } else {
-      const erarioAmount = parseFloat(formState.erarioImporto);
-      const inpsAmount = parseFloat(formState.inpsImporto);
-
-      if (!isNaN(erarioAmount) && erarioAmount > 0) {
-        entriesToSave.push({
-          taxCode: formState.erarioCodice,
-          amount: erarioAmount,
-          date: `${selectedYear}-06-30`,
-          description: `Quietanza F24 Erario (Codice Tributo ${formState.erarioCodice})`,
-          source: 'PRE_COMPILATO'
+      if (extractedF24Entries.length > 0) {
+        extractedF24Entries.forEach(entry => {
+          const isAcconto = entry.taxCode === '1790' || 
+                            entry.taxCode === '1791' || 
+                            (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || entry.amount <= 100));
+          const entryYear = entry.year || selectedYear;
+          const targetYear = isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear;
+          entriesToSave.push({
+            taxCode: entry.taxCode,
+            amount: entry.amount,
+            date: `${entryYear}-06-30`,
+            description: entry.description || `Quietanza PDF (Codice ${entry.taxCode})`,
+            source: 'PDF',
+            isAcconto,
+            targetYear,
+            accontoType: entry.deadlineType === 'acconto1' ? '1_acconto' : (entry.deadlineType === 'acconto2' ? '2_acconto' : 'saldo')
+          });
         });
-      }
+      } else {
+        const erarioAmount = parseFloat(formState.erarioImporto);
+        const inpsAmount = parseFloat(formState.inpsImporto);
 
-      if (!isNaN(inpsAmount) && inpsAmount > 0) {
-        entriesToSave.push({
-          taxCode: formState.inpsCausale,
-          amount: inpsAmount,
-          date: `${selectedYear}-06-30`,
-          description: `Quietanza F24 INPS (Causale ${formState.inpsCausale})`,
-          source: 'PRE_COMPILATO'
-        });
+        if (!isNaN(erarioAmount) && erarioAmount > 0) {
+          const isAcconto = formState.erarioCodice === '1790' || formState.erarioCodice === '1791';
+          const targetYear = isAcconto ? String(parseInt(selectedYear, 10) + 1) : selectedYear;
+          entriesToSave.push({
+            taxCode: formState.erarioCodice,
+            amount: erarioAmount,
+            date: `${selectedYear}-06-30`,
+            description: `Quietanza F24 Erario (Codice Tributo ${formState.erarioCodice})`,
+            source: 'PRE_COMPILATO',
+            isAcconto,
+            targetYear
+          });
+        }
+
+        if (!isNaN(inpsAmount) && inpsAmount > 0) {
+          const isAcconto = selectedSchedule === 'june_acconto1' || selectedSchedule === 'nov_acconto2';
+          const targetYear = isAcconto ? String(parseInt(selectedYear, 10) + 1) : selectedYear;
+          entriesToSave.push({
+            taxCode: formState.inpsCausale,
+            amount: inpsAmount,
+            date: `${selectedYear}-06-30`,
+            description: `Quietanza F24 INPS (Causale ${formState.inpsCausale})`,
+            source: 'PRE_COMPILATO',
+            isAcconto,
+            targetYear
+          });
+        }
       }
     }
 
@@ -758,8 +791,8 @@ export default function F24PreviewCanvas({
                 }`}
               >
                 <div className="text-[10px] font-black uppercase opacity-80">30 Giugno</div>
-                <div className="text-xs font-bold mt-1">Solo 1° Acconto 50%</div>
-                <div className="text-[10px] opacity-80 mt-1 font-mono">Cod. 1790 ({currentYearNum + 1})</div>
+                <div className="text-xs font-bold mt-1">1° Acconto (40% PXX - 50% Erario)</div>
+                <div className="text-[10px] opacity-80 mt-1 font-mono">Cod. 1790 / PXX ({currentYearNum + 1})</div>
               </button>
 
               <button
@@ -786,8 +819,8 @@ export default function F24PreviewCanvas({
                 }`}
               >
                 <div className="text-[10px] font-black uppercase opacity-80">30 Novembre</div>
-                <div className="text-xs font-bold mt-1">2° Acconto 50%</div>
-                <div className="text-[10px] opacity-80 mt-1 font-mono">Cod. 1791 (Unica Soluz.)</div>
+                <div className="text-xs font-bold mt-1">2° Acconto (60% PXX - 50% Erario)</div>
+                <div className="text-[10px] opacity-80 mt-1 font-mono">Cod. 1791 / PXX (Unica Soluz.)</div>
               </button>
             </div>
 
@@ -1766,6 +1799,43 @@ export default function F24PreviewCanvas({
                     <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-xs flex gap-2">
                       <AlertCircle className="w-4 h-4 shrink-0 text-blue-500" />
                       <span>{statusMessage}</span>
+                    </div>
+                  )}
+
+                  {extractedF24Entries.length > 0 && (
+                    <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 space-y-2">
+                      <div className="text-[10px] font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Righe Estratte &amp; Destinazione Acconti ({extractedF24Entries.length})</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {extractedF24Entries.map((e, idx) => {
+                          const isAcconto = e.taxCode === '1790' || e.taxCode === '1791' || 
+                            (e.taxCode === 'PXX' && (e.deadlineType === 'acconto1' || e.deadlineType === 'acconto2' || e.description?.toLowerCase().includes('acconto') || e.amount <= 100));
+                          const entryYear = e.year || selectedYear;
+                          const targetYear = isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear;
+                          return (
+                            <div key={idx} className="p-2 bg-white rounded-lg border border-emerald-100 flex items-center justify-between text-xs">
+                              <div>
+                                <div className="font-bold text-slate-800 font-mono flex items-center gap-1.5">
+                                  <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[9px] text-slate-700">{e.taxCode}</span>
+                                  <span>€ {e.amount.toFixed(2)}</span>
+                                </div>
+                                <div className="text-[10px] text-slate-500 mt-0.5">
+                                  {isAcconto ? (
+                                    <span className="text-emerald-700 font-semibold">
+                                      ✨ Acconto: confluirà nel report del {targetYear}
+                                    </span>
+                                  ) : (
+                                    <span>Saldo competenza {entryYear}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-mono text-slate-400">{entryYear}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
