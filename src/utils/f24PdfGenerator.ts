@@ -59,21 +59,21 @@ export function generateF24PDF(
   if (category === 'imposta') {
     sectionToFill = 'erario';
     if (paymentType === 'saldo') {
-      taxCode = '1790';
+      taxCode = '1792';
       paymentLabel = `Saldo Imposta Sostitutiva ${year}`;
     } else if (paymentType === 'acconto1') {
-      taxCode = '1791';
+      taxCode = '1790';
       paymentLabel = `I° Acconto Imposta Sostitutiva ${calcYearInt + 1}`;
     } else {
-      taxCode = '1792';
-      paymentLabel = `II° Acconto Imposta Sostitutiva ${calcYearInt + 1}`;
+      taxCode = '1791';
+      paymentLabel = `II° Acconto / Unica Soluzione Imposta Sostitutiva ${calcYearInt + 1}`;
     }
   } else {
     // Pension Contributions
     const actualFundId = fundId || profile.pensionFund;
     if (actualFundId === 'INPS_GESTIONE_SEPARATA') {
       sectionToFill = 'inps';
-      taxCode = 'P10';
+      taxCode = (fundId && (fundId === 'P10' || fundId === 'PXX')) ? fundId : 'PXX';
       if (paymentType === 'saldo') {
         paymentLabel = `Saldo Gestione Separata INPS ${year}`;
         refPeriodStart = `01/${year}`;
@@ -954,3 +954,439 @@ export function generateF24PDF(
   const filename = `F24_${catShort}_${paymentType.toUpperCase()}_${year}_SCADENZA_${fileDueDate}.pdf`;
   doc.save(filename);
 }
+
+export interface RavvedimentoPdfParams {
+  profile: BusinessProfile;
+  year: string;
+  taxCode: string; // '1792' | '1790' | '1791'
+  impostaAmount: number;
+  sanzioneAmount: number;
+  interessiAmount: number;
+  isTardivaDichiarazione?: boolean;
+  tardivaAmount?: number; // 25
+  inpsCausale?: string; // 'PXX' | 'P10'
+  inpsTotalAmount?: number; // Contributo + sanzioni civili + interessi
+  inpsSede?: string;
+  dataRavvedimento?: string;
+}
+
+/**
+ * Genera il Modello F24 conforme per il Ravvedimento Operoso (art. 13 D.Lgs. 472/97):
+ * - Imposta Sostitutiva omessa (1790, 1791, 1792)
+ * - Sanzione ridotta con codice tributo 8911
+ * - Interessi legali con codice tributo 1989
+ * - Eventuale sanzione fissa per dichiarazione tardiva mod. REDDITI PF (25 € codice 8911)
+ * - Sezione INPS: contributi + sanzioni e interessi unificati in un unico rigo (causale PXX o P10)
+ */
+export function generateRavvedimentoF24PDF(params: RavvedimentoPdfParams) {
+  const {
+    profile,
+    year,
+    taxCode,
+    impostaAmount,
+    sanzioneAmount,
+    interessiAmount,
+    isTardivaDichiarazione = false,
+    tardivaAmount = 25,
+    inpsCausale = 'PXX',
+    inpsTotalAmount = 0,
+    inpsSede = '8200',
+    dataRavvedimento = new Date().toLocaleDateString('it-IT')
+  } = params;
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = 210;
+  const marginX = 6;
+  const contentWidth = pageWidth - (2 * marginX);
+
+  const f24Teal = [0, 151, 178];
+  const f24LightTeal = [225, 244, 247];
+  const lineGray = [160, 210, 220];
+  const borderTeal = [0, 151, 178];
+  const textDark = [40, 40, 40];
+  const textLight = [100, 100, 100];
+
+  const fiscalCode = (profile.fiscalCode || profile.vatNumber || '').toUpperCase().padEnd(16, ' ').substring(0, 16);
+  const fullName = (profile.fullName || '').toUpperCase();
+
+  // Calcola i totali
+  const sanzioneTotale = sanzioneAmount + (isTardivaDichiarazione ? tardivaAmount : 0);
+  const erarioTotale = impostaAmount + sanzioneTotale + interessiAmount;
+  const inpsTotale = inpsTotalAmount || 0;
+  const saldoFinale = erarioTotale + inpsTotale;
+
+  // Draw 3 standard copies
+  drawRavvedimentoPage(1, "1ª COPIA PER LA BANCA/POSTE/AGENTE DELLA RISCOSSIONE");
+  doc.addPage();
+  drawRavvedimentoPage(2, "2ª COPIA PER LA BANCA/POSTE/AGENTE DELLA RISCOSSIONE");
+  doc.addPage();
+  drawRavvedimentoPage(3, "COPIA PER IL SOGGETTO CHE EFFETTUA IL VERSAMENTO");
+
+  function drawRavvedimentoPage(pageNum: number, copyLabel: string) {
+    let currentY = 5;
+
+    // Header Logo area
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.setLineWidth(0.3);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.text('genzia', marginX + 16, currentY + 7);
+    doc.text('ntrate', marginX + 16, currentY + 11);
+    
+    doc.setFillColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.rect(marginX + 2, currentY + 2, 11, 10, 'F');
+    doc.setFillColor(255, 255, 255);
+    doc.circle(marginX + 7.5, currentY + 7, 3, 'F');
+    doc.setFillColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.circle(marginX + 7.5, currentY + 7, 1.5, 'F');
+
+    // Title Block
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text('MODELLO DI PAGAMENTO', marginX + 2, currentY + 18);
+    doc.text('UNIFICATO', marginX + 2, currentY + 22);
+
+    // Large € Watermark
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(36);
+    doc.setTextColor(225, 244, 247);
+    doc.text('€', pageWidth / 2, currentY + 15, { align: 'center' });
+
+    // Mod. F24 tag
+    doc.setFillColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.rect(pageWidth - marginX - 18, currentY, 18, 5, 'F');
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Mod. F24', pageWidth - marginX - 15, currentY + 3.8);
+
+    // RAVVEDIMENTO stamp badge
+    const boxWidth = 92;
+    const boxX = 52;
+    doc.setFillColor(254, 242, 242);
+    doc.setDrawColor(220, 38, 38);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(boxX, currentY, boxWidth, 5, 0.5, 0.5, 'FD');
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(5);
+    doc.setTextColor(220, 38, 38);
+    doc.text('SANATORIA:', boxX + 2, currentY + 3.6);
+    doc.setFont('Courier', 'bold');
+    doc.setFontSize(5.5);
+    doc.setTextColor(153, 27, 27);
+    doc.text(`RAVVEDIMENTO OPEROSO - ${dataRavvedimento}`, boxX + 17, currentY + 3.6);
+
+    // Delegation Box on top right
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.setLineWidth(0.2);
+    doc.line(pageWidth - marginX - 60, currentY + 6, pageWidth - marginX, currentY + 6);
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(5.5);
+    doc.setTextColor(textLight[0], textLight[1], textLight[2]);
+    doc.text('DELEGA IRREVOCABILE A: TELEMATICO / INTERMEDIARIO', pageWidth - marginX - 59, currentY + 10);
+    doc.text('PAGAMENTO ESCLUSIVAMENTE TELEMATICO', pageWidth - marginX - 59, currentY + 15);
+
+    currentY += 24;
+
+    const drawSectionHeader = (title: string, rightNote?: string) => {
+      doc.setFillColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+      doc.rect(marginX, currentY, contentWidth, 5, 'F');
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(255, 255, 255);
+      doc.text(title, marginX + 2, currentY + 3.5);
+      if (rightNote) {
+        doc.setFont('Helvetica', 'normal');
+        doc.setFontSize(5.5);
+        doc.text(rightNote, pageWidth - marginX - 1.5, currentY + 3.4, { align: 'right' });
+      }
+      currentY += 5;
+    };
+
+    const drawFormString = (text: string, count: number, x: number, y: number, charWidth: number = 3.6, boxHeight: number = 4) => {
+      doc.setFont('Courier', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(0, 0, 0);
+      const str = text.toUpperCase().padEnd(count, ' ');
+      for (let i = 0; i < count; i++) {
+        const char = str[i];
+        if (char && char !== ' ') {
+          doc.text(char, x + (i * charWidth) + (charWidth / 2), y + 3.1, { align: 'center' });
+        }
+      }
+    };
+
+    const drawInputBoxes = (count: number, x: number, y: number, charWidth: number = 3.6, boxHeight: number = 4) => {
+      doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+      doc.setLineWidth(0.15);
+      for (let i = 0; i < count; i++) {
+        doc.rect(x + (i * charWidth), y, charWidth, boxHeight);
+      }
+    };
+
+    const drawEuroAmountInForm = (val: number, x: number, y: number) => {
+      const parts = val.toFixed(2).split('.');
+      const integerPart = parseInt(parts[0], 10).toLocaleString('it-IT').replace(/\./g, '');
+      const decimalPart = parts[1];
+
+      doc.setFont('Courier', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(0, 0, 0);
+      doc.text(decimalPart, x + 44.5, y + 3.2, { align: 'center' });
+      doc.text(integerPart, x + 34, y + 3.2, { align: 'right' });
+    };
+
+    const drawEuroFieldDesign = (x: number, y: number) => {
+      doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+      doc.setLineWidth(0.15);
+      doc.rect(x, y, 37, 4);
+      doc.rect(x + 39, y, 8, 4);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+      doc.text(',', x + 37.4, y + 3.3);
+    };
+
+    // --- CONTRIBUENTE ---
+    drawSectionHeader('CONTRIBUENTE');
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.setLineWidth(0.2);
+    doc.rect(marginX, currentY, contentWidth, 24);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(5.5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('CODICE FISCALE', marginX + 2, currentY + 3.2);
+    drawInputBoxes(16, marginX + 25, currentY + 0.6, 4.2, 4);
+    drawFormString(fiscalCode, 16, marginX + 25, currentY + 0.6, 4.2, 4);
+
+    doc.text('DATI ANAGRAFICI', marginX + 2, currentY + 7.5);
+    doc.text('cognome, denominazione o ragione sociale', marginX + 25, currentY + 7.5);
+    doc.text('nome', marginX + 115, currentY + 7.5);
+    drawInputBoxes(22, marginX + 25, currentY + 9, 3.8, 4);
+    drawFormString(fullName.substring(0, 22), 22, marginX + 25, currentY + 9, 3.8, 4);
+
+    currentY += 24;
+
+    // --- SEZIONE ERARIO (TRIBUTO OMESSO + SANZIONE 8911 + INTERESSI 1989) ---
+    drawSectionHeader('SEZIONE ERARIO', 'RAVVEDIMENTO OPEROSO - IMPOSTA SOSTITUTIVA, SANZIONI (8911) ED INTERESSI (1989)');
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.rect(marginX, currentY, contentWidth, 23.5);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('codice tributo', marginX + 4, currentY + 2.8);
+    doc.text('rateazione/mese rif.', marginX + 26, currentY + 2.2);
+    doc.text('anno di\nriferimento', marginX + 54, currentY + 2.2);
+    doc.text('importi a debito versati', marginX + 102, currentY + 2.8);
+    doc.text('importi a credito compensati', marginX + 148, currentY + 2.8);
+
+    doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+    doc.line(marginX, currentY + 4.8, pageWidth - marginX, currentY + 4.8);
+
+    const erarioY = currentY + 4.8;
+    for (let r = 0; r < 4; r++) {
+      const rowY = erarioY + (r * 4.2);
+      if (r < 3) {
+        doc.line(marginX, rowY + 4.2, pageWidth - marginX, rowY + 4.2);
+      }
+      doc.line(marginX + 23, rowY, marginX + 23, rowY + 4.2);
+      doc.line(marginX + 51, rowY, marginX + 51, rowY + 4.2);
+      doc.line(marginX + 74, rowY, marginX + 74, rowY + 4.2);
+      doc.line(marginX + 135, rowY, marginX + 135, rowY + 4.2);
+
+      if (r < 3) {
+        drawInputBoxes(4, marginX + 3, rowY + 0.1, 4, 4);
+        drawInputBoxes(4, marginX + 28, rowY + 0.1, 4, 4);
+        drawInputBoxes(4, marginX + 54, rowY + 0.1, 4, 4);
+        drawEuroFieldDesign(marginX + 80, rowY + 0.1);
+        drawEuroFieldDesign(marginX + 140, rowY + 0.1);
+      }
+    }
+
+    // Row 0: Tributo Principale Omesso (1790 / 1791 / 1792)
+    if (impostaAmount > 0) {
+      drawFormString(taxCode, 4, marginX + 3, erarioY + 0.1, 4, 4);
+      drawFormString('0101', 4, marginX + 28, erarioY + 0.1, 4, 4);
+      drawFormString(year, 4, marginX + 54, erarioY + 0.1, 4, 4);
+      drawEuroAmountInForm(impostaAmount, marginX + 80, erarioY + 0.1);
+    }
+
+    // Row 1: Sanzione Ravvedimento (8911)
+    if (sanzioneTotale > 0) {
+      const row1Y = erarioY + 4.2;
+      drawFormString('8911', 4, marginX + 3, row1Y + 0.1, 4, 4);
+      drawFormString('0101', 4, marginX + 28, row1Y + 0.1, 4, 4);
+      drawFormString(year, 4, marginX + 54, row1Y + 0.1, 4, 4);
+      drawEuroAmountInForm(sanzioneTotale, marginX + 80, row1Y + 0.1);
+    }
+
+    // Row 2: Interessi Ravvedimento (1989)
+    if (interessiAmount > 0) {
+      const row2Y = erarioY + 8.4;
+      drawFormString('1989', 4, marginX + 3, row2Y + 0.1, 4, 4);
+      drawFormString('0101', 4, marginX + 28, row2Y + 0.1, 4, 4);
+      drawFormString(year, 4, marginX + 54, row2Y + 0.1, 4, 4);
+      drawEuroAmountInForm(interessiAmount, marginX + 80, row2Y + 0.1);
+    }
+
+    // Erario Totals
+    const erarioTotalY = erarioY + 12.6;
+    doc.setFillColor(f24LightTeal[0], f24LightTeal[1], f24LightTeal[2]);
+    doc.rect(marginX + 0.1, erarioTotalY, contentWidth - 0.2, 5.9, 'F');
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.line(marginX, erarioTotalY, pageWidth - marginX, erarioTotalY);
+    doc.line(marginX + 74, erarioTotalY, marginX + 74, erarioTotalY + 5.9);
+    doc.line(marginX + 135, erarioTotalY, marginX + 135, erarioTotalY + 5.9);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('TOTALE', marginX + 3, erarioTotalY + 4.2);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(0, 0, 0);
+    doc.text('A', marginX + 70, erarioTotalY + 4.2);
+    doc.text('B', marginX + 131, erarioTotalY + 4.2);
+
+    const partsErario = erarioTotale.toFixed(2).split('.');
+    doc.text(parseInt(partsErario[0], 10).toLocaleString('it-IT'), marginX + 114, erarioTotalY + 4.2, { align: 'right' });
+    doc.text(partsErario[1], marginX + 122, erarioTotalY + 4.2, { align: 'center' });
+    doc.text('0', marginX + 174, erarioTotalY + 4.2, { align: 'right' });
+    doc.text('00', marginX + 182, erarioTotalY + 4.2, { align: 'center' });
+
+    currentY += 23.5;
+
+    // --- SEZIONE INPS ---
+    drawSectionHeader('SEZIONE INPS', 'CONTRIBUTI + SANZIONI CIVILI E INTERESSI UNIFICATI (NESSUN RIGO SEPARATO PER SANZIONI/INTERESSI)');
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.rect(marginX, currentY, contentWidth, 23.5);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('codice\nsede', marginX + 2, currentY + 2.4);
+    doc.text('causale\ncontributo', marginX + 13, currentY + 2.4);
+    doc.text('matricola INPS/codice INPS', marginX + 35, currentY + 2.4);
+    doc.text('periodo di riferimento:\nda mm/aaaa      a mm/aaaa', marginX + 76, currentY + 2.4);
+    doc.text('importi a debito versati', marginX + 138, currentY + 3.2);
+    doc.text('importi a credito compensati', marginX + 168, currentY + 3.2);
+
+    doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+    doc.line(marginX, currentY + 4.8, pageWidth - marginX, currentY + 4.8);
+
+    const inpsY = currentY + 4.8;
+    for (let r = 0; r < 4; r++) {
+      const rowY = inpsY + (r * 4.2);
+      if (r < 3) {
+        doc.line(marginX, rowY + 4.2, pageWidth - marginX, rowY + 4.2);
+      }
+      doc.line(marginX + 11, rowY, marginX + 11, rowY + 4.2);
+      doc.line(marginX + 25, rowY, marginX + 25, rowY + 4.2);
+      doc.line(marginX + 73, rowY, marginX + 73, rowY + 4.2);
+      doc.line(marginX + 125, rowY, marginX + 125, rowY + 4.2);
+      doc.line(marginX + 160, rowY, marginX + 160, rowY + 4.2);
+
+      if (r < 3) {
+        drawInputBoxes(4, marginX + 1, rowY + 0.1, 2.3, 4);
+        drawInputBoxes(4, marginX + 13, rowY + 0.1, 2.6, 4);
+        drawInputBoxes(13, marginX + 26, rowY + 0.1, 3.4, 4);
+        drawInputBoxes(6, marginX + 74, rowY + 0.1, 3.6, 4);
+        drawInputBoxes(6, marginX + 100, rowY + 0.1, 3.6, 4);
+        drawEuroFieldDesign(marginX + 126, rowY + 0.1);
+        drawEuroFieldDesign(marginX + 161, rowY + 0.1);
+      }
+    }
+
+    if (inpsTotale > 0) {
+      drawFormString(inpsSede, 4, marginX + 1, inpsY + 0.1, 2.3, 4);
+      drawFormString(inpsCausale, 4, marginX + 13, inpsY + 0.1, 2.6, 4);
+      drawFormString(fiscalCode, 13, marginX + 26, inpsY + 0.1, 3.4, 4);
+      drawFormString(`01${year}`, 6, marginX + 74, inpsY + 0.1, 3.6, 4);
+      drawFormString(`12${year}`, 6, marginX + 100, inpsY + 0.1, 3.6, 4);
+      drawEuroAmountInForm(inpsTotale, marginX + 126, inpsY + 0.1);
+    }
+
+    const inpsTotalY = inpsY + 12.6;
+    doc.setFillColor(f24LightTeal[0], f24LightTeal[1], f24LightTeal[2]);
+    doc.rect(marginX + 0.1, inpsTotalY, contentWidth - 0.2, 5.9, 'F');
+    doc.setDrawColor(borderTeal[0], borderTeal[1], borderTeal[2]);
+    doc.line(marginX, inpsTotalY, pageWidth - marginX, inpsTotalY);
+    doc.line(marginX + 125, inpsTotalY, marginX + 125, inpsTotalY + 5.9);
+    doc.line(marginX + 160, inpsTotalY, marginX + 160, inpsTotalY + 5.9);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('TOTALE', marginX + 3, inpsTotalY + 4.2);
+    doc.setFontSize(8.5);
+    doc.setTextColor(0, 0, 0);
+    doc.text('C', marginX + 120, inpsTotalY + 4.2);
+    doc.text('D', marginX + 155, inpsTotalY + 4.2);
+
+    const partsInps = inpsTotale.toFixed(2).split('.');
+    doc.text(parseInt(partsInps[0], 10).toLocaleString('it-IT'), marginX + 153, inpsTotalY + 4.2, { align: 'right' });
+    doc.text(partsInps[1], marginX + 158, inpsTotalY + 4.2, { align: 'center' });
+    doc.text('0', marginX + 188, inpsTotalY + 4.2, { align: 'right' });
+    doc.text('00', marginX + 193, inpsTotalY + 4.2, { align: 'center' });
+
+    currentY += 23.5;
+
+    // --- SALDO FINALE ---
+    const saldoY = currentY + 15;
+    doc.setFillColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.rect(marginX, saldoY, contentWidth, 7, 'F');
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(255, 255, 255);
+    doc.text('SALDO FINALE (A + C)', marginX + 3, saldoY + 4.8);
+
+    doc.setFont('Courier', 'bold');
+    doc.setFontSize(10.5);
+    doc.text(`EURO  ${saldoFinale.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - marginX - 4, saldoY + 5, { align: 'right' });
+
+    currentY = saldoY + 10;
+
+    // Firma e note
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(5);
+    doc.setTextColor(f24Teal[0], f24Teal[1], f24Teal[2]);
+    doc.text('FIRMA / ADDEBITO IBAN TELEMATICO', marginX + 2, currentY + 3.2);
+    doc.setFont('Courier', 'italic');
+    doc.setFontSize(8.5);
+    doc.setTextColor(0, 0, 0);
+    doc.text(fullName, marginX + 34, currentY + 8.5);
+
+    currentY += 14;
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(0, 0, 0);
+    doc.text(copyLabel, marginX, currentY + 4);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(153, 27, 27);
+    doc.text(`RAVVEDIMENTO OPEROSO EX ART. 13 D.LGS. 472/97 - DATA: ${dataRavvedimento}`, marginX, currentY + 8);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(5);
+    doc.setTextColor(textLight[0], textLight[1], textLight[2]);
+    doc.text(`Modello conforme Agenzia delle Entrate - Generato il ${new Date().toLocaleDateString('it-IT')} - Pagina ${pageNum} di 3`, pageWidth - marginX, currentY + 4, { align: 'right' });
+  }
+
+  const filename = `F24_RAVVEDIMENTO_OPEROSO_${year}_${taxCode}.pdf`;
+  doc.save(filename);
+}
+

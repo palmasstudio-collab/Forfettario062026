@@ -64,6 +64,10 @@ export interface TaxReturnCalculation {
   inpsGestioneSeparataAcconto1?: number;
   inpsGestioneSeparataAcconto2?: number;
   inpsGestioneSeparataAccontiTotale?: number;
+  substituteTaxSaldo?: number; // Saldo imposta sostitutiva anno precedente (Cod. 1792)
+  substituteTaxAcconto1?: number; // 1° Acconto 50% entro 30 Giugno (Cod. 1790)
+  substituteTaxAcconto2?: number; // 2° Acconto 50% entro 30 Novembre (Cod. 1791)
+  substituteTaxAccontiTotale?: number; // Totale acconti dovuti
 }
 
 export interface Invoice {

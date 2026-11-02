@@ -998,28 +998,28 @@ export default function TaxSimulatorDashboard({
                           type="button"
                           onClick={() => generateF24PDF(profile, results.substituteTax, 'imposta', 'saldo', selectedYear)}
                           className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-rose-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
-                          title="Genera F24 Saldo"
+                          title="Genera F24 Saldo (Cod. 1792 - 30 Giugno)"
                         >
-                          <span className="text-[7px] text-slate-500 uppercase font-bold">Saldo</span>
+                          <span className="text-[7px] text-slate-500 uppercase font-bold">Saldo (1792)</span>
                           <span className="font-mono text-[9px]">€ {results.substituteTax.toFixed(0)}</span>
                         </button>
                         <button
                           type="button"
-                          onClick={() => generateF24PDF(profile, results.substituteTax * 0.4, 'imposta', 'acconto1', selectedYear)}
+                          onClick={() => generateF24PDF(profile, results.substituteTaxAcconto1 ?? (results.substituteTax * 0.5), 'imposta', 'acconto1', selectedYear)}
                           className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-rose-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
-                          title="Genera F24 1° Acconto (40%)"
+                          title="Genera F24 1° Acconto 50% (Cod. 1790 - 30 Giugno)"
                         >
-                          <span className="text-[7px] text-slate-500 uppercase font-bold">I° Acc (40%)</span>
-                          <span className="font-mono text-[9px]">€ {(results.substituteTax * 0.4).toFixed(0)}</span>
+                          <span className="text-[7px] text-slate-500 uppercase font-bold">I° Acc 50% (1790)</span>
+                          <span className="font-mono text-[9px]">€ {(results.substituteTaxAcconto1 ?? (results.substituteTax * 0.5)).toFixed(0)}</span>
                         </button>
                         <button
                           type="button"
-                          onClick={() => generateF24PDF(profile, results.substituteTax * 0.6, 'imposta', 'acconto2', selectedYear)}
+                          onClick={() => generateF24PDF(profile, results.substituteTaxAcconto2 ?? (results.substituteTax * 0.5), 'imposta', 'acconto2', selectedYear)}
                           className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-rose-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
-                          title="Genera F24 2° Acconto (60%)"
+                          title="Genera F24 2° Acconto 50% (Cod. 1791 - 30 Novembre in unica soluzione)"
                         >
-                          <span className="text-[7px] text-slate-500 uppercase font-bold">II° Acc (60%)</span>
-                          <span className="font-mono text-[9px]">€ {(results.substituteTax * 0.6).toFixed(0)}</span>
+                          <span className="text-[7px] text-slate-500 uppercase font-bold">II° Acc 50% (1791)</span>
+                          <span className="font-mono text-[9px]">€ {(results.substituteTaxAcconto2 ?? (results.substituteTax * 0.5)).toFixed(0)}</span>
                         </button>
                       </div>
                     </div>
@@ -1150,29 +1150,29 @@ export default function TaxSimulatorDashboard({
                           <div className="grid grid-cols-3 gap-1">
                             <button
                               type="button"
-                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataDue || 0, 'contributi', 'saldo', selectedYear, 'INPS_GESTIONE_SEPARATA')}
+                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataDue || 0, 'contributi', 'saldo', selectedYear, 'PXX')}
                               className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
-                              title="Genera F24 Saldo"
+                              title="Genera F24 Saldo Gestione Separata (Causale PXX - 30 Giugno)"
                             >
-                              <span className="text-[7px] text-slate-500 uppercase font-bold">Saldo</span>
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">Saldo (PXX)</span>
                               <span className="font-mono text-[9px]">€ {results.inpsGestioneSeparataDue.toFixed(0)}</span>
                             </button>
                             <button
                               type="button"
-                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto1 || 0, 'contributi', 'acconto1', selectedYear, 'INPS_GESTIONE_SEPARATA')}
+                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto1 || 0, 'contributi', 'acconto1', selectedYear, 'PXX')}
                               className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
-                              title="Genera F24 I° Acconto (40%)"
+                              title="Genera F24 I° Acconto (Causale PXX - 30 Giugno)"
                             >
-                              <span className="text-[7px] text-slate-500 uppercase font-bold">I° Acc (40%)</span>
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">I° Acc (PXX)</span>
                               <span className="font-mono text-[9px]">€ {(results.inpsGestioneSeparataAcconto1 || 0).toFixed(0)}</span>
                             </button>
                             <button
                               type="button"
-                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto2 || 0, 'contributi', 'acconto2', selectedYear, 'INPS_GESTIONE_SEPARATA')}
+                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto2 || 0, 'contributi', 'acconto2', selectedYear, 'PXX')}
                               className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
-                              title="Genera F24 2° Acconto (40%)"
+                              title="Genera F24 2° Acconto (Causale PXX - 30 Novembre in unica soluzione)"
                             >
-                              <span className="text-[7px] text-slate-500 uppercase font-bold">II° Acc (40%)</span>
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">II° Acc (PXX)</span>
                               <span className="font-mono text-[9px]">€ {(results.inpsGestioneSeparataAcconto2 || 0).toFixed(0)}</span>
                             </button>
                           </div>
