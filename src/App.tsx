@@ -9,8 +9,24 @@ import BusinessProfileCard from './components/BusinessProfileCard';
 import TaxSimulatorDashboard from './components/TaxSimulatorDashboard';
 import AccountingPositionModal from './components/AccountingPositionModal';
 import DeletePositionModal from './components/DeletePositionModal';
+import DriveSearchModal from './components/DriveSearchModal';
 import ThemeSelector, { ThemeType } from './components/ThemeSelector';
-import { createAccountingPositionFolder, uploadF24Pdf, deleteDriveFile, uploadFirebaseBackupToDrive, findOrCreateFolder, uploadInvoiceXml, listDriveFolders, listFilesInFolder, downloadFileContent, renameDriveFile, resolveYearFolderAndSubfolder, verifyAndRecreateFolderStructure } from './utils/googleDrive';
+import { 
+  createAccountingPositionFolder, 
+  uploadF24Pdf, 
+  deleteDriveFile, 
+  uploadFirebaseBackupToDrive, 
+  findOrCreateFolder, 
+  uploadInvoiceXml, 
+  listDriveFolders, 
+  listFilesInFolder, 
+  downloadFileContent, 
+  renameDriveFile, 
+  resolveYearFolderAndSubfolder, 
+  verifyAndRecreateFolderStructure,
+  searchDriveForAccountingPositions,
+  importAccountingPositionFromDrive
+} from './utils/googleDrive';
 import { parseInvoiceXml } from './utils/xmlInvoiceParser';
 import { extractF24DataFromPdf } from './utils/pdfF24Parser';
 import { calculateTaxReturn } from './calculateTaxReturn';
@@ -21,27 +37,29 @@ import {
   FileText, 
   Database, 
   RefreshCw, 
-  Menu,
-  X,
-  TrendingUp,
-  CircleCheck,
-  Lock,
-  User,
-  ExternalLink,
-  PlusCircle,
-  Trash2,
-  Cloud,
-  CloudOff,
-  Folder,
-  Share2,
-  WifiOff,
-  AlertTriangle,
-  Sparkles,
-  Calendar,
-  FileCode,
-  ChevronDown,
-  ChevronUp,
-  FolderPlus
+  Menu, 
+  X, 
+  TrendingUp, 
+  CircleCheck, 
+  Lock, 
+  User, 
+  ExternalLink, 
+  PlusCircle, 
+  Trash2, 
+  Cloud, 
+  CloudOff, 
+  Folder, 
+  Share2, 
+  WifiOff, 
+  AlertTriangle, 
+  Sparkles, 
+  Calendar, 
+  FileCode, 
+  ChevronDown, 
+  ChevronUp, 
+  FolderPlus,
+  Search,
+  FolderSearch
 } from 'lucide-react';
 
 const LOCAL_STORAGE_PROFILE_KEY = 'forfettario_profile_v1';
@@ -202,8 +220,28 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isPositionModalOpen, setIsPositionModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDriveSearchModalOpen, setIsDriveSearchModalOpen] = useState(false);
+  const [driveSearchInitialQuery, setDriveSearchInitialQuery] = useState('Valeria Maros');
   const [isCreatingDriveFolder, setIsCreatingDriveFolder] = useState(false);
   const [isRecreatingDriveFolder, setIsRecreatingDriveFolder] = useState(false);
+
+  const handlePositionImported = (newPos: AccountingPosition) => {
+    setPositions((prev) => {
+      const existingIdx = prev.findIndex(
+        (p) => p.id === newPos.id || (p.driveFolderId && p.driveFolderId === newPos.driveFolderId)
+      );
+      let updated: AccountingPosition[];
+      if (existingIdx >= 0) {
+        updated = [...prev];
+        updated[existingIdx] = newPos;
+      } else {
+        updated = [...prev, newPos];
+      }
+      return updated.filter((p) => !(p.id === 'pos-default' && p.invoices.length === 0));
+    });
+    setActivePositionId(newPos.id);
+    addSyncLog(`✅ Contabilità di "${newPos.profile.fullName}" importata con successo da Google Drive!`);
+  };
 
   // Aesthetic Themes
   const [theme, setTheme] = useState<ThemeType>(() => {
@@ -311,6 +349,28 @@ export default function App() {
     );
     return () => unsubscribe();
   }, []);
+
+  // Automatic Drive check for Valeria Maros if Drive is connected and not already in positions
+  useEffect(() => {
+    if (googleAccessTokenState) {
+      const hasMaros = positions.some(
+        (p) => p.profile?.fullName?.toLowerCase().includes('maros') || p.name.toLowerCase().includes('maros')
+      );
+      if (!hasMaros) {
+        searchDriveForAccountingPositions(googleAccessTokenState, 'Valeria Maros')
+          .then(async (found) => {
+            if (found && found.length > 0) {
+              addSyncLog(`🔍 Trovata cartella su Google Drive per "${found[0].cleanedName}". Importazione automatica...`);
+              const imported = await importAccountingPositionFromDrive(googleAccessTokenState, found[0], selectedYear);
+              handlePositionImported(imported);
+            }
+          })
+          .catch((err) => {
+            console.warn("Auto-search Valeria Maros on Drive:", err);
+          });
+      }
+    }
+  }, [googleAccessTokenState]);
 
   const handleGoogleLogin = async () => {
     try {
@@ -986,7 +1046,7 @@ export default function App() {
       const allF24Entries = activePosition.f24Entries || [];
 
       // --- INVOICE SYNC ---
-      const driveInvoicesMap = new Map(driveInvoices.map(f => [f.id, f]));
+      const driveInvoicesMap = new Map<string, any>(driveInvoices.map((f): [string, any] => [f.id, f]));
       const newInvoicesList: Invoice[] = [];
       const unlinkedDriveInvoices = [...driveInvoices];
       let invoicesChanged = false;
@@ -1054,7 +1114,7 @@ export default function App() {
       }
 
       // --- F24 SYNC ---
-      const driveF24sMap = new Map(driveF24s.map(f => [f.id, f]));
+      const driveF24sMap = new Map<string, any>(driveF24s.map((f): [string, any] => [f.id, f]));
       const newF24FilesList: any[] = [];
       const unlinkedDriveF24s = [...driveF24s];
       let f24FilesChanged = false;
@@ -1512,13 +1572,26 @@ export default function App() {
         <div className="px-5 py-4 border-b border-slate-800 bg-slate-950/25 flex flex-col gap-2 shrink-0">
           <div className="flex items-center justify-between">
             <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Soggetto / P.IVA</span>
-            <button
-              onClick={() => setIsPositionModalOpen(true)}
-              className="text-[10px] uppercase font-extrabold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer"
-              title="Aggiungi nuova posizione contabile"
-            >
-              <PlusCircle className="w-3.5 h-3.5" /> Nuovo
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setDriveSearchInitialQuery('Valeria Maros');
+                  setIsDriveSearchModalOpen(true);
+                }}
+                className="text-[10px] uppercase font-extrabold text-sky-400 hover:text-sky-300 transition-colors flex items-center gap-1 cursor-pointer"
+                title="Cerca contabilità esistente su Google Drive (es. Valeria Maros)"
+              >
+                <Search className="w-3 h-3" /> Cerca su Drive
+              </button>
+              <button
+                onClick={() => setIsPositionModalOpen(true)}
+                className="text-[10px] uppercase font-extrabold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer"
+                title="Aggiungi nuova posizione contabile"
+              >
+                <PlusCircle className="w-3.5 h-3.5" /> Nuovo
+              </button>
+            </div>
           </div>
           
           <div className="flex items-center gap-1.5 w-full">
@@ -1559,6 +1632,20 @@ export default function App() {
               </a>
             )}
           </div>
+
+          {!positions.some(p => p.profile?.fullName?.toLowerCase().includes('maros') || p.name.toLowerCase().includes('maros')) && (
+            <button
+              type="button"
+              onClick={() => {
+                setDriveSearchInitialQuery('Valeria Maros');
+                setIsDriveSearchModalOpen(true);
+              }}
+              className="w-full mt-1 px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Search className="w-3 h-3 text-emerald-400" />
+              <span>Trova "Valeria Maros" su Drive</span>
+            </button>
+          )}
         </div>
 
         {/* Sidebar Navigation */}
@@ -1716,6 +1803,19 @@ export default function App() {
               </button>
             )}
 
+            {/* Cerca su Google Drive Button */}
+            <button
+              onClick={() => {
+                setDriveSearchInitialQuery('Valeria Maros');
+                setIsDriveSearchModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+              title="Cerca contabilità su Google Drive (es. Valeria Maros)"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>Cerca su Drive</span>
+            </button>
+
             {/* Global Manual Save Button */}
             <button
               onClick={handleGlobalSave}
@@ -1790,6 +1890,39 @@ export default function App() {
         <div className="flex-grow overflow-y-auto p-4 sm:p-8 bg-slate-50/50">
           <div className="max-w-6xl mx-auto space-y-6">
           
+          {/* Missing Valeria Maros Banner if not yet present in positions */}
+          {!positions.some(p => p.profile?.fullName?.toLowerCase().includes('maros') || p.name.toLowerCase().includes('maros')) && (
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 to-slate-950 border border-emerald-500/40 rounded-2xl sm:rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                  <FolderSearch className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-extrabold text-white">Non vedi la contabilità di Valeria Maros?</p>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                      Google Drive
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    La posizione contabile è memorizzata su Google Drive. Clicca per cercarla e importarla automaticamente nel gestionale.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDriveSearchInitialQuery('Valeria Maros');
+                  setIsDriveSearchModalOpen(true);
+                }}
+                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-xl text-xs flex items-center gap-2 transition-all shrink-0 cursor-pointer shadow-lg shadow-emerald-950/50"
+              >
+                <Search className="w-4 h-4" />
+                <span>Cerca Valeria Maros su Drive</span>
+              </button>
+            </div>
+          )}
+
           {/* Dashboard Section */}
           <div id="section-dashboard" className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
             <button
@@ -1898,6 +2031,25 @@ export default function App() {
         onClose={() => setIsPositionModalOpen(false)}
         onCreate={handleCreatePosition}
         accessToken={googleAccessTokenState}
+        onOpenDriveSearch={() => {
+          setDriveSearchInitialQuery('Valeria Maros');
+          setIsDriveSearchModalOpen(true);
+        }}
+      />
+
+      <DriveSearchModal
+        isOpen={isDriveSearchModalOpen}
+        onClose={() => setIsDriveSearchModalOpen(false)}
+        accessToken={googleAccessTokenState}
+        onGoogleLogin={handleGoogleLogin}
+        existingPositions={positions}
+        onPositionImported={handlePositionImported}
+        onSelectPosition={(id) => {
+          setActivePositionId(id);
+          addSyncLog(`📁 Posizione contabile selezionata.`);
+        }}
+        initialQuery={driveSearchInitialQuery}
+        selectedYear={selectedYear}
       />
 
       <DeletePositionModal

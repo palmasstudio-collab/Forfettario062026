@@ -21,9 +21,10 @@ interface AccountingPositionModalProps {
     fileGenericiFolderId?: string;
   }) => void;
   accessToken: string | null;
+  onOpenDriveSearch?: () => void;
 }
 
-export default function AccountingPositionModal({ isOpen, onClose, onCreate, accessToken }: AccountingPositionModalProps) {
+export default function AccountingPositionModal({ isOpen, onClose, onCreate, accessToken, onOpenDriveSearch }: AccountingPositionModalProps) {
   // Step model state: 'details' then 'destination'
   const [step, setStep] = useState<'details' | 'destination'>('details');
 
@@ -248,6 +249,26 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
         {/* Form Container (Scrollable) */}
         <div className="flex-1 overflow-y-auto p-6 sm:p-8">
           
+          {onOpenDriveSearch && (
+            <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-slate-800">Hai già una cartella cliente su Google Drive?</p>
+                <p className="text-[11px] text-slate-500">Cerca automaticamente tra le cartelle su Drive (es. Valeria Maros) per importare fatture e dati.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenDriveSearch();
+                }}
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer shadow-sm flex items-center gap-1.5"
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span>Cerca su Drive</span>
+              </button>
+            </div>
+          )}
+
           <form onSubmit={(e) => { e.preventDefault(); handleFinalSubmit(); }} className="space-y-6">
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
