@@ -109,13 +109,21 @@ export interface F24Entry {
   id: string;
   date: string; // The date of payment or entry (YYYY-MM-DD)
   taxCode: string; // Codice Tributo e.g., 4001, 1792, 1790, 1791, PXX, P10, AP, CP ecc.
-  amount: number; // Importo versato
+  amount: number; // Importo netto versato o registrato
+  debtAmount?: number; // Importo a debito versato
+  creditAmount?: number; // Importo a credito compensato (Compensazione)
+  netAmount?: number; // Saldo netto del rigo (Debito - Credito)
+  section?: string; // Sezione ministeriale (Erario, INPS, Regioni, Enti Locali)
   description?: string;
   source: string; // "Manuale" o "PDF"
+  fileName?: string; // Nome del file PDF di provenienza
   driveFileId?: string;
   isAcconto?: boolean; // Se è un acconto (1790, 1791, PXX acconto)
   targetYear?: string; // Anno di competenza a cui si riferisce l'acconto (es. versato nel 2025 per il 2026)
   accontoType?: '1_acconto' | '2_acconto' | 'saldo' | 'altro';
+  totalDebtF24?: number; // Totale debiti del modello F24 (Totale A)
+  totalCreditF24?: number; // Totale compensazioni del modello F24 (Totale B)
+  netDueF24?: number; // Netto effettivo da pagare / quietanzato del modello F24 (Saldo A - B)
 }
 
 export interface AccountingPosition {

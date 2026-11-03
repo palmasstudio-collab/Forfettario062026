@@ -27,7 +27,7 @@ import {
   Info
 } from 'lucide-react';
 import { BusinessProfile, TaxReturnCalculation } from '../types';
-import { extractF24DataFromPdf } from '../utils/pdfF24Parser';
+import { extractF24DataFromPdf, extractDetailedF24Document, ParsedF24Document } from '../utils/pdfF24Parser';
 import { generateF24PDF, generateRavvedimentoF24PDF } from '../utils/f24PdfGenerator';
 
 // Initialize PDFJS Worker
@@ -85,6 +85,7 @@ export default function F24PreviewCanvas({
   const [isRendering, setIsRendering] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [extractedF24Entries, setExtractedF24Entries] = useState<any[]>([]);
+  const [detailedParsedDoc, setDetailedParsedDoc] = useState<ParsedF24Document | null>(null);
   
   // Field copy states
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -357,25 +358,25 @@ export default function F24PreviewCanvas({
 
     try {
       if (isPdf) {
-        const parsedEntries = await extractF24DataFromPdf(selectedFile);
-        setExtractedF24Entries(parsedEntries);
-        if (parsedEntries.length > 0) {
-          const erarioEntry = parsedEntries.find(e => ['1790', '1791', '1792', '4001', '4002'].includes(e.taxCode));
-          const inpsEntry = parsedEntries.find(e => ['PXX', 'P10', 'AF', 'CF', 'AP', 'CP'].includes(e.taxCode));
-          const totalAmount = parsedEntries.reduce((sum, e) => sum + e.amount, 0);
+        const detailedDoc = await extractDetailedF24Document(selectedFile);
+        setDetailedParsedDoc(detailedDoc);
+        setExtractedF24Entries(detailedDoc.entries);
+
+        if (detailedDoc.entries.length > 0) {
+          const erarioEntry = detailedDoc.entries.find(e => ['1790', '1791', '1792', '4001', '4002'].includes(e.taxCode));
+          const inpsEntry = detailedDoc.entries.find(e => ['PXX', 'P10', 'AF', 'CF', 'AP', 'CP'].includes(e.taxCode));
 
           setFormState(prev => ({
             ...prev,
             erarioCodice: erarioEntry ? erarioEntry.taxCode : prev.erarioCodice,
-            erarioImporto: erarioEntry ? erarioEntry.amount.toFixed(2) : prev.erarioImporto,
+            erarioImporto: erarioEntry ? erarioEntry.debtAmount.toFixed(2) : prev.erarioImporto,
             erarioAnno: erarioEntry?.year || prev.erarioAnno,
             inpsCausale: inpsEntry ? inpsEntry.taxCode : prev.inpsCausale,
-            inpsImporto: inpsEntry ? inpsEntry.amount.toFixed(2) : prev.inpsImporto,
-            saldoFinale: totalAmount.toFixed(2)
+            inpsImporto: inpsEntry ? inpsEntry.debtAmount.toFixed(2) : prev.inpsImporto,
+            saldoFinale: detailedDoc.netDue.toFixed(2)
           }));
           
-          const detailsList = parsedEntries.map(e => `${e.taxCode}: € ${e.amount.toFixed(2)}`).join(', ');
-          setStatusMessage(`✅ Modello F24 analizzato: rilevate ${parsedEntries.length} righe (${detailsList}). Gli acconti verranno applicati al report dell'anno successivo.`);
+          setStatusMessage(`✅ Modello F24 analizzato: ${detailedDoc.entries.length} tributi. Debito: € ${detailedDoc.totalDebt.toFixed(2)} | Compensazioni: € ${detailedDoc.totalCredit.toFixed(2)} | Netto da Pagare: € ${detailedDoc.netDue.toFixed(2)}`);
         } else {
           setStatusMessage('File caricato. Nessun tributo estratto in automatico: puoi compilarlo manualmente.');
         }
@@ -552,18 +553,30 @@ export default function F24PreviewCanvas({
         extractedF24Entries.forEach(entry => {
           const isAcconto = entry.taxCode === '1790' || 
                             entry.taxCode === '1791' || 
-                            (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || entry.amount <= 100));
+                            (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || (entry.debtAmount || entry.amount) <= 100));
           const entryYear = entry.year || selectedYear;
           const targetYear = isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear;
+          const debtVal = entry.debtAmount !== undefined ? entry.debtAmount : entry.amount;
+          const creditVal = entry.creditAmount || 0;
+          const netVal = debtVal - creditVal;
+
           entriesToSave.push({
             taxCode: entry.taxCode,
-            amount: entry.amount,
-            date: `${entryYear}-06-30`,
+            amount: debtVal > 0 ? debtVal : entry.amount,
+            debtAmount: debtVal,
+            creditAmount: creditVal,
+            netAmount: netVal,
+            section: entry.section,
+            date: detailedParsedDoc?.paymentDate ? detailedParsedDoc.paymentDate.split('/').reverse().join('-') : `${entryYear}-06-30`,
             description: entry.description || `Quietanza PDF (Codice ${entry.taxCode})`,
             source: 'PDF',
+            fileName: file?.name,
             isAcconto,
             targetYear,
-            accontoType: entry.deadlineType === 'acconto1' ? '1_acconto' : (entry.deadlineType === 'acconto2' ? '2_acconto' : 'saldo')
+            accontoType: entry.deadlineType === 'acconto1' ? '1_acconto' : (entry.deadlineType === 'acconto2' ? '2_acconto' : 'saldo'),
+            totalDebtF24: detailedParsedDoc?.totalDebt,
+            totalCreditF24: detailedParsedDoc?.totalCredit,
+            netDueF24: detailedParsedDoc?.netDue
           });
         });
       } else {
@@ -1812,34 +1825,58 @@ export default function F24PreviewCanvas({
 
                   {extractedF24Entries.length > 0 && (
                     <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 space-y-2">
-                      <div className="text-[10px] font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Righe Estratte &amp; Destinazione Acconti ({extractedF24Entries.length})</span>
+                      <div className="text-[10px] font-black text-emerald-800 uppercase tracking-wider flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Dettaglio Tributi &amp; Compensazioni ({extractedF24Entries.length})</span>
+                        </span>
+                        {detailedParsedDoc && detailedParsedDoc.totalCredit > 0 && (
+                          <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded font-bold">
+                            Compensazioni Attive
+                          </span>
+                        )}
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5">
                         {extractedF24Entries.map((e, idx) => {
                           const isAcconto = e.taxCode === '1790' || e.taxCode === '1791' || 
-                            (e.taxCode === 'PXX' && (e.deadlineType === 'acconto1' || e.deadlineType === 'acconto2' || e.description?.toLowerCase().includes('acconto') || e.amount <= 100));
+                            (e.taxCode === 'PXX' && (e.deadlineType === 'acconto1' || e.deadlineType === 'acconto2' || e.description?.toLowerCase().includes('acconto') || (e.debtAmount || e.amount) <= 100));
                           const entryYear = e.year || selectedYear;
                           const targetYear = isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear;
+                          const debtVal = e.debtAmount !== undefined ? e.debtAmount : e.amount;
+                          const creditVal = e.creditAmount || 0;
+                          const netVal = debtVal - creditVal;
+
                           return (
-                            <div key={idx} className="p-2 bg-white rounded-lg border border-emerald-100 flex items-center justify-between text-xs">
-                              <div>
+                            <div key={idx} className="p-2 bg-white rounded-lg border border-emerald-100 flex flex-col gap-1 text-xs">
+                              <div className="flex items-center justify-between">
                                 <div className="font-bold text-slate-800 font-mono flex items-center gap-1.5">
-                                  <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[9px] text-slate-700">{e.taxCode}</span>
-                                  <span>€ {e.amount.toFixed(2)}</span>
+                                  <span className="px-1.5 py-0.2 bg-slate-100 rounded text-[9px] text-slate-700 font-bold border border-slate-200">{e.taxCode}</span>
+                                  <span className="text-[11px] text-slate-700 font-sans">{e.description || `Tributo ${e.taxCode}`}</span>
                                 </div>
-                                <div className="text-[10px] text-slate-500 mt-0.5">
-                                  {isAcconto ? (
-                                    <span className="text-emerald-700 font-semibold">
-                                      ✨ Acconto: confluirà nel report del {targetYear}
-                                    </span>
-                                  ) : (
-                                    <span>Saldo competenza {entryYear}</span>
-                                  )}
-                                </div>
+                                <span className="text-[10px] font-mono text-slate-400">{entryYear}</span>
                               </div>
-                              <span className="text-[10px] font-mono text-slate-400">{entryYear}</span>
+
+                              <div className="flex items-center justify-between text-[11px] font-mono pt-1 border-t border-slate-100">
+                                <span className="text-slate-500">
+                                  Deb: <strong className="text-slate-800">€ {debtVal.toFixed(2)}</strong>
+                                </span>
+                                {creditVal > 0 ? (
+                                  <span className="text-emerald-700 font-bold bg-emerald-50 px-1 rounded">
+                                    Comp: -€ {creditVal.toFixed(2)}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">Comp: € 0,00</span>
+                                )}
+                                <span className="text-slate-900 font-bold">
+                                  Netto: € {netVal.toFixed(2)}
+                                </span>
+                              </div>
+
+                              {isAcconto && (
+                                <div className="text-[9.5px] text-emerald-700 font-semibold mt-0.5">
+                                  ✨ Acconto: confluirà nel calcolo dell'anno {targetYear}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -1848,22 +1885,32 @@ export default function F24PreviewCanvas({
                   )}
 
                   <div className="space-y-2 border-t border-slate-200 pt-3">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Verifica Valori Estratti</div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Riepilogo Totali Ministeriale</div>
+                    {formState.fullName && (
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-500">Contribuente:</span>
+                        <span className="font-bold text-slate-800 truncate max-w-[150px]">{formState.fullName}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500">Contribuente:</span>
-                      <span className="font-bold text-slate-800 truncate max-w-[150px]">{formState.fullName}</span>
+                      <span className="text-slate-500">Totale Debito (A):</span>
+                      <span className="font-mono font-bold text-slate-800">
+                        € {(detailedParsedDoc?.totalDebt ?? (parseFloat(formState.erarioImporto || '0') + parseFloat(formState.inpsImporto || '0'))).toFixed(2)}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500">Erario:</span>
-                      <span className="font-mono font-bold text-indigo-600">€ {parseFloat(formState.erarioImporto || '0').toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500">INPS:</span>
-                      <span className="font-mono font-bold text-indigo-600">€ {parseFloat(formState.inpsImporto || '0').toFixed(2)}</span>
+                      <span className="text-slate-500">Compensazioni / Crediti (B):</span>
+                      <span className={`font-mono font-bold ${
+                        (detailedParsedDoc?.totalCredit || 0) > 0 ? 'text-emerald-700' : 'text-slate-400'
+                      }`}>
+                        - € {(detailedParsedDoc?.totalCredit || 0).toFixed(2)}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center text-xs border-t border-slate-200 pt-2 font-bold">
-                      <span className="text-slate-700">Totale F24:</span>
-                      <span className="font-mono text-rose-600">€ {parseFloat(formState.saldoFinale || '0').toFixed(2)}</span>
+                      <span className="text-slate-800">Saldo Netto da Pagare (A - B):</span>
+                      <span className="font-mono text-rose-700 text-sm font-black">
+                        € {(detailedParsedDoc?.netDue ?? parseFloat(formState.saldoFinale || '0')).toFixed(2)}
+                      </span>
                     </div>
                   </div>
 

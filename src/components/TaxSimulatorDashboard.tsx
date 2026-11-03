@@ -8,7 +8,7 @@ import { BusinessProfile, TaxInput, TaxReturnCalculation, Invoice, F24Entry } fr
 import { calculateTaxReturn } from '../calculateTaxReturn';
 import { findAtecoCode, findPensionFund } from '../taxData';
 import { parseInvoiceXml } from '../utils/xmlInvoiceParser';
-import { extractF24DataFromPdf } from '../utils/pdfF24Parser';
+import { extractF24DataFromPdf, extractDetailedF24Document, ParsedF24Document } from '../utils/pdfF24Parser';
 import { safeAlert, safeConfirm } from '../utils/safeWindow';
 import { 
   Calculator, 
@@ -28,12 +28,15 @@ import {
   FolderOpen,
   Key,
   RefreshCw,
-  ShieldCheck
+  ShieldCheck,
+  Eye,
+  CheckCircle2
 } from 'lucide-react';
 import { generateTaxAndInvoicePDF } from '../utils/pdfGenerator';
 import { generateInvoicePDFDocument } from '../utils/pdfInvoiceBasic';
 import { generateF24PDF } from '../utils/f24PdfGenerator';
 import F24PreviewCanvas from './F24PreviewCanvas';
+import F24DocumentBreakdownModal from './F24DocumentBreakdownModal';
 
 export const getMissingInvoiceNumbers = (invoices: Invoice[], year: string): number[] => {
   const seqNos = invoices.map(inv => {
@@ -149,8 +152,35 @@ export default function TaxSimulatorDashboard({
   const [isProcessingF24, setIsProcessingF24] = useState(false);
   const [showManualF24Form, setShowManualF24Form] = useState(false);
   const [manualF24Data, setManualF24Data] = useState({ date: `${selectedYear}-01-01`, amount: '', code: 'INPS', description: 'Inserimento manuale' });
+  const [inspectedF24Doc, setInspectedF24Doc] = useState<ParsedF24Document | null>(null);
   const xmlInputRef = useRef<HTMLInputElement>(null);
   const f24InputRef = useRef<HTMLInputElement>(null);
+
+  const handleOpenEntryInspection = (entry: F24Entry) => {
+    const debtVal = entry.debtAmount !== undefined ? entry.debtAmount : entry.amount;
+    const creditVal = entry.creditAmount || 0;
+    const netVal = entry.netAmount !== undefined ? entry.netAmount : (debtVal - creditVal);
+    const doc: ParsedF24Document = {
+      fileName: entry.fileName || `Quietanza_F24_${entry.taxCode}_${entry.date}.pdf`,
+      taxpayerFiscalCode: profile.fiscalCode || profile.vatNumber,
+      paymentDate: entry.date,
+      entries: [{
+        taxCode: entry.taxCode,
+        debtAmount: debtVal,
+        creditAmount: creditVal,
+        amount: netVal,
+        year: entry.date ? entry.date.split('-')[0] : selectedYear,
+        section: (entry.section as any) || (entry.taxCode.startsWith('P') || entry.taxCode.startsWith('C') ? 'inps' : 'erario'),
+        description: entry.description || `Quietanza ${entry.taxCode}`,
+        deadlineType: entry.accontoType === '1_acconto' ? 'acconto1' : (entry.accontoType === '2_acconto' ? 'acconto2' : 'saldo')
+      }],
+      totalDebt: entry.totalDebtF24 ?? debtVal,
+      totalCredit: entry.totalCreditF24 ?? creditVal,
+      netDue: entry.netDueF24 ?? netVal,
+      status: (netVal === 0 && (debtVal > 0 || creditVal > 0)) ? 'saldo_zero' : 'a_debito'
+    };
+    setInspectedF24Doc(doc);
+  };
 
   const prevYearContributions = useAutomaticF24 ? autoContributions : manualContributions;
   
@@ -317,6 +347,18 @@ export default function TaxSimulatorDashboard({
       const filesArray = Array.from(files) as File[];
       const allTransformedEntries: any[] = [];
       
+      // Estrai e mostra immediatamente il prospetto analitico con tributi, compensazioni e netto
+      if (filesArray.length > 0) {
+        try {
+          const detailedDoc = await extractDetailedF24Document(filesArray[0]);
+          if (detailedDoc && detailedDoc.entries.length > 0) {
+            setInspectedF24Doc(detailedDoc);
+          }
+        } catch (errDet) {
+          console.warn("Estrazione prospetto analitico F24:", errDet);
+        }
+      }
+
       if (onUploadF24s) {
         // Use optimized batch uploader on App.tsx which does single structural verify and single state update!
         await onUploadF24s(filesArray, selectedYear);
@@ -328,7 +370,8 @@ export default function TaxSimulatorDashboard({
 
           if (onAddF24Entries) {
             try {
-              const entries = await extractF24DataFromPdf(file);
+              const detailedDoc = await extractDetailedF24Document(file);
+              const entries = detailedDoc.entries;
               if (entries.length > 0) {
                 const foundYear = entries.find(entry => entry.year)?.year;
                 if (foundYear) {
@@ -336,6 +379,9 @@ export default function TaxSimulatorDashboard({
                 }
 
                 const transformedEntries = entries.map(entry => {
+                  const isAcconto = entry.taxCode === '1790' || 
+                    entry.taxCode === '1791' || 
+                    (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || entry.debtAmount <= 100));
                   const today = new Date();
                   const monthStr = String(today.getMonth() + 1).padStart(2, '0');
                   const dayStr = String(today.getDate()).padStart(2, '0');
@@ -344,10 +390,20 @@ export default function TaxSimulatorDashboard({
 
                   return {
                     taxCode: entry.taxCode,
-                    amount: entry.amount,
+                    amount: entry.debtAmount > 0 ? entry.debtAmount : entry.amount,
+                    debtAmount: entry.debtAmount,
+                    creditAmount: entry.creditAmount,
+                    netAmount: entry.debtAmount - entry.creditAmount,
+                    section: entry.section,
                     date: entryDate,
-                    description: `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
-                    source: 'PDF'
+                    description: entry.description || `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
+                    source: 'PDF',
+                    fileName: file.name,
+                    isAcconto,
+                    targetYear: isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear,
+                    totalDebtF24: detailedDoc.totalDebt,
+                    totalCreditF24: detailedDoc.totalCredit,
+                    netDueF24: detailedDoc.netDue
                   };
                 });
                 allTransformedEntries.push(...transformedEntries);
@@ -365,8 +421,6 @@ export default function TaxSimulatorDashboard({
           onAddF24Entries(allTransformedEntries);
         }
       }
-
-      safeAlert(`Caricamento massivo F24 completato con successo: ${filesArray.length} file elaborati.`);
     } catch (err: any) {
       safeAlert("Errore elaborazione F24: " + err.message);
     } finally {
@@ -888,18 +942,59 @@ export default function TaxSimulatorDashboard({
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
-                    {f24Entries.map((e) => (
-                      <div key={e.id} className="bg-theme-card p-2.5 rounded-xl border border-theme-border flex items-center justify-between text-xs hover:border-theme-accent/50 transition-colors shadow-sm">
-                        <div className="min-w-0 pr-2">
-                          <div className="font-bold text-theme-text">Tributo {e.taxCode}</div>
-                          <div className="text-[10px] text-theme-text-muted mt-0.5 font-mono flex items-center gap-1.5">
+                    {f24Entries.map((e) => {
+                      const debtVal = e.debtAmount !== undefined ? e.debtAmount : e.amount;
+                      const creditVal = e.creditAmount || 0;
+                      const netVal = e.netAmount !== undefined ? e.netAmount : (debtVal - creditVal);
+                      const hasComp = creditVal > 0;
+
+                      return (
+                      <div key={e.id} className="bg-theme-card p-2.5 rounded-xl border border-theme-border flex items-center justify-between text-xs hover:border-theme-accent/50 transition-colors shadow-xs gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-theme-text flex items-center gap-1.5 flex-wrap">
+                            <span className="px-1.5 py-0.2 bg-slate-100 rounded text-[10px] font-mono border border-slate-200 text-slate-800">
+                              {e.taxCode}
+                            </span>
+                            <span className="truncate">{e.description || `Tributo ${e.taxCode}`}</span>
+                            {e.isAcconto && (
+                              <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-bold border border-emerald-200">
+                                Acconto
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-theme-text-muted mt-1 font-mono flex items-center gap-1.5 flex-wrap">
                             <span className="font-bold uppercase tracking-wider text-[9px] px-1 py-0.2 bg-theme-bg text-theme-text-muted rounded">{e.source}</span>
                             <span>·</span>
                             <span>{e.date}</span>
+                            {hasComp && (
+                              <span className="text-emerald-700 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
+                                Comp: -€ {creditVal.toFixed(2)}
+                              </span>
+                            )}
                           </div>
                         </div>
+
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="font-mono font-extrabold text-theme-text">€ {e.amount.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <div className="text-right">
+                            {hasComp && (
+                              <div className="text-[10px] text-slate-400 font-mono">
+                                Deb: € {debtVal.toFixed(2)}
+                              </div>
+                            )}
+                            <div className="font-mono font-extrabold text-theme-text">
+                              Netto: € {netVal.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEntryInspection(e)}
+                            className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer border border-indigo-200/50"
+                            title="Visualizza prospetto analitico con tributi, compensazioni e netto da pagare"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+
                           {onDeleteF24Entry && (
                             <button
                               type="button"
@@ -908,7 +1003,7 @@ export default function TaxSimulatorDashboard({
                                   onDeleteF24Entry(e.id);
                                 }
                               }}
-                              className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                               title="Elimina"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -916,7 +1011,7 @@ export default function TaxSimulatorDashboard({
                           )}
                         </div>
                       </div>
-                    ))}
+                    );})}
                   </div>
                 )}
                 
@@ -1426,6 +1521,15 @@ export default function TaxSimulatorDashboard({
       )}
  
       </div>
+
+      {/* MODALE ISTITUZIONALE ZUCCHETTI: Prospetto Analitico F24 (Tributi, Compensazioni, Netto) */}
+      {inspectedF24Doc && (
+        <F24DocumentBreakdownModal
+          document={inspectedF24Doc}
+          onClose={() => setInspectedF24Doc(null)}
+        />
+      )}
+
     </div>
   );
 }

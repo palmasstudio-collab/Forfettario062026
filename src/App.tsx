@@ -28,7 +28,7 @@ import {
   importAccountingPositionFromDrive
 } from './utils/googleDrive';
 import { parseInvoiceXml } from './utils/xmlInvoiceParser';
-import { extractF24DataFromPdf } from './utils/pdfF24Parser';
+import { extractF24DataFromPdf, extractDetailedF24Document } from './utils/pdfF24Parser';
 import { calculateTaxReturn } from './calculateTaxReturn';
 import { findAtecoCode, findPensionFund } from './taxData';
 import { safeAlert, safeConfirm } from './utils/safeWindow';
@@ -841,15 +841,15 @@ export default function App() {
       // 2. Upload the F24 PDF into the verified F24 subfolder
       const uploadedFile = await uploadF24Pdf(token, healedFolder.id, file, activePosition.profile.fullName, healedFolder.f24FolderId, uploadYear);
       
-      // 3. Estrai tributi e acconti dal file PDF
+      // 3. Estrai tributi, compensazioni e acconti dal file PDF
       let extractedEntries: any[] = [];
       try {
-        const entries = await extractF24DataFromPdf(file);
-        if (entries.length > 0) {
-          extractedEntries = entries.map(entry => {
+        const detailedDoc = await extractDetailedF24Document(file);
+        if (detailedDoc.entries.length > 0) {
+          extractedEntries = detailedDoc.entries.map(entry => {
             const isAcconto = entry.taxCode === '1790' || 
                               entry.taxCode === '1791' || 
-                              (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || entry.amount <= 100));
+                              (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || entry.debtAmount <= 100));
             const entryYear = entry.year || uploadYear;
             const targetYear = isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear;
             const today = new Date();
@@ -860,17 +860,25 @@ export default function App() {
             return {
               id: `f24-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
               taxCode: entry.taxCode,
-              amount: entry.amount,
+              amount: entry.debtAmount > 0 ? entry.debtAmount : entry.amount,
+              debtAmount: entry.debtAmount,
+              creditAmount: entry.creditAmount,
+              netAmount: entry.debtAmount - entry.creditAmount,
+              section: entry.section,
               date: entryDate,
               description: entry.description || `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
               source: 'PDF',
+              fileName: file.name,
               driveFileId: uploadedFile.id,
               isAcconto,
               targetYear,
-              accontoType: entry.deadlineType === 'acconto1' ? '1_acconto' : (entry.deadlineType === 'acconto2' ? '2_acconto' : 'saldo')
+              accontoType: entry.deadlineType === 'acconto1' ? '1_acconto' : (entry.deadlineType === 'acconto2' ? '2_acconto' : 'saldo'),
+              totalDebtF24: detailedDoc.totalDebt,
+              totalCreditF24: detailedDoc.totalCredit,
+              netDueF24: detailedDoc.netDue
             };
           });
-          addSyncLog(`🔍 Estratti ${extractedEntries.length} tributi/acconti dal file F24 "${file.name}".`);
+          addSyncLog(`🔍 F24 "${file.name}": Rilevati ${extractedEntries.length} tributi. Debito Totale: € ${detailedDoc.totalDebt.toFixed(2)}, Compensazioni: € ${detailedDoc.totalCredit.toFixed(2)}, Netto da Pagare: € ${detailedDoc.netDue.toFixed(2)}.`);
         }
       } catch (parseErr: any) {
         console.warn("Estrazione F24 PDF non riuscita:", parseErr);
@@ -944,12 +952,12 @@ export default function App() {
           
           // Try to parse F24 data from PDF
           try {
-            const entries = await extractF24DataFromPdf(file);
-            if (entries.length > 0) {
-              const transformed = entries.map(entry => {
+            const detailedDoc = await extractDetailedF24Document(file);
+            if (detailedDoc.entries.length > 0) {
+              const transformed = detailedDoc.entries.map(entry => {
                 const isAcconto = entry.taxCode === '1790' || 
                                   entry.taxCode === '1791' || 
-                                  (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || entry.amount <= 100));
+                                  (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || entry.debtAmount <= 100));
                 const entryYear = entry.year || uploadYear;
                 const targetYear = isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear;
                 const today = new Date();
@@ -958,17 +966,26 @@ export default function App() {
                 const entryDate = `${entryYear}-${monthStr}-${dayStr}`;
                 return {
                   taxCode: entry.taxCode,
-                  amount: entry.amount,
+                  amount: entry.debtAmount > 0 ? entry.debtAmount : entry.amount,
+                  debtAmount: entry.debtAmount,
+                  creditAmount: entry.creditAmount,
+                  netAmount: entry.debtAmount - entry.creditAmount,
+                  section: entry.section,
                   date: entryDate,
                   description: entry.description || `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
                   source: 'PDF',
+                  fileName: file.name,
                   driveFileId: uploadedFile.id,
                   isAcconto,
                   targetYear,
-                  accontoType: entry.deadlineType === 'acconto1' ? '1_acconto' : (entry.deadlineType === 'acconto2' ? '2_acconto' : 'saldo')
+                  accontoType: entry.deadlineType === 'acconto1' ? '1_acconto' : (entry.deadlineType === 'acconto2' ? '2_acconto' : 'saldo'),
+                  totalDebtF24: detailedDoc.totalDebt,
+                  totalCreditF24: detailedDoc.totalCredit,
+                  netDueF24: detailedDoc.netDue
                 };
               });
               allExtractedEntries.push(...transformed);
+              addSyncLog(`🔍 F24 "${file.name}": Debito Totale € ${detailedDoc.totalDebt.toFixed(2)}, Compensazioni € ${detailedDoc.totalCredit.toFixed(2)}, Netto da Pagare € ${detailedDoc.netDue.toFixed(2)}.`);
             }
           } catch (parseErr: any) {
             console.warn(`Extraction failed for ${file.name}:`, parseErr);
