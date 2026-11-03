@@ -1,9 +1,11 @@
 {
-  "projectId": "forfettario-backup",
-  "appId": "1:300345022748:web:15530686427605943502d9",
-  "apiKey": "AIzaSyD5Ei9tWU4Z1s_VIRs1jqLL8qxWXsVa2m0",
-  "authDomain": "forfettario-backup.firebaseapp.com",
-  "storageBucket": "forfettario-backup.firebasestorage.app",
-  "messagingSenderId": "300345022748",
-  "measurementId": ""
+  "projectId": "gen-lang-client-0964702408",
+  "appId": "1:617874293487:web:2eb21aba7e3cac19be111a",
+  "apiKey": "AIzaSyB8oSAcGNVMxlEuwgANvshP1gXLqt2JBzk",
+  "authDomain": "gen-lang-client-0964702408.firebaseapp.com",
+  "storageBucket": "gen-lang-client-0964702408.firebasestorage.app",
+  "messagingSenderId": "617874293487",
+  "measurementId": "",
+  "oAuthClientId": "617874293487-8b8aio7d6ul6t9hciju69p0c6g2jhvf7.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
 }

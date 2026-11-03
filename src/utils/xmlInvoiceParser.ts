@@ -297,12 +297,14 @@ export function findMissingInvoiceSequenceGaps(
     const match = numStrWithoutYear.match(/\d+/);
     if (match) {
       const num = parseInt(match[0], 10);
-      if (num > 0 && num <= 2000) {
+      if (num > 0 && num <= 5000) {
         numbersPresent.add(num);
       }
     }
   }
 
+  // Se l'utente ha esplicitamente caricato tutte le fatture (es. da 1 a 39), o se non ci sono buchi reali, non segnalare falsi positivi
+  // Controlliamo se tutti i numeri da 1 al massimo sono presenti
   if (numbersPresent.size === 0) {
     return {
       year,
@@ -313,16 +315,20 @@ export function findMissingInvoiceSequenceGaps(
   }
 
   const sortedNumbers = Array.from(numbersPresent).sort((a, b) => a - b);
+  const minNum = sortedNumbers[0];
   const maxNum = sortedNumbers[sortedNumbers.length - 1];
 
   const missingNumbers: number[] = [];
-  for (let i = 1; i < maxNum; i++) {
+  // Se minNum è 1, controlliamo i buchi tra 1 e maxNum. Se minNum è maggiore di 1 (es. parte da 14), non consideriamo 1..13 come buco a meno che non ci siano fatture prima o dopo
+  const startCheck = minNum === 1 ? 1 : minNum;
+
+  for (let i = startCheck; i < maxNum; i++) {
     if (!numbersPresent.has(i)) {
       missingNumbers.push(i);
     }
   }
 
-  // Raggruppa i numeri consecutivi mancanti in intervalli leggibili (es. [1..13] -> "1-13", [35..39] -> "35-39")
+  // Raggruppa i numeri consecutivi mancanti in intervalli leggibili
   const formattedRanges: string[] = [];
   if (missingNumbers.length > 0) {
     let rangeStart = missingNumbers[0];
