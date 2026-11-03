@@ -59,7 +59,11 @@ import {
   ChevronUp, 
   FolderPlus,
   Search,
-  FolderSearch
+  FolderSearch,
+  BookOpen,
+  ShieldCheck,
+  DollarSign,
+  Clock
 } from 'lucide-react';
 
 const LOCAL_STORAGE_PROFILE_KEY = 'forfettario_profile_v1';
@@ -355,10 +359,13 @@ export default function App() {
   // Aesthetic Themes
   const [theme, setTheme] = useState<ThemeType>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('forfettario_theme_v1') as ThemeType) || 'vibrant';
+      return (localStorage.getItem('forfettario_theme_v1') as ThemeType) || 'zucchetti';
     }
-    return 'vibrant';
+    return 'zucchetti';
   });
+
+  // Active ERP Module
+  const [activeModule, setActiveModule] = useState<string>('overview');
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -1712,20 +1719,23 @@ export default function App() {
       {/* SIDEBAR CONTAINER */}
       <aside className={`fixed inset-y-0 left-0 w-64 bg-slate-900 border-r border-slate-800 flex flex-col z-50 transform transition-transform duration-300 md:relative md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         
-        {/* Sidebar Header Brand */}
-        <div className="p-6 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center font-black text-slate-950 italic text-base">
-              F
+        {/* Sidebar Header Brand Zucchetti Style */}
+        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-[#7a0c10] via-[#8b0000] to-[#5a080b]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-white text-[#8b0000] rounded-lg flex items-center justify-center font-black text-sm shadow-xs">
+              Z
             </div>
-            <span className="font-bold tracking-tight text-xl text-white">
-              Forfettario<span className="text-emerald-400 text-sm align-top ml-0.5 font-black">+</span>
-            </span>
+            <div>
+              <span className="font-extrabold tracking-tight text-sm text-white block leading-tight">
+                Zucchetti Ago
+              </span>
+              <span className="text-[10px] text-red-200 font-mono tracking-tight">Studio Commerciale</span>
+            </div>
           </div>
           {/* Close button inside mobile sidebar */}
           <button 
             onClick={() => setSidebarOpen(false)}
-            className="p-1 text-slate-400 hover:text-white md:hidden"
+            className="p-1 text-red-200 hover:text-white md:hidden"
             aria-label="Chiudi menu"
           >
             <X className="w-5 h-5" />
@@ -1733,9 +1743,9 @@ export default function App() {
         </div>
 
         {/* Gestione Posizione Contabile */}
-        <div className="px-5 py-4 border-b border-slate-800 bg-slate-950/25 flex flex-col gap-2 shrink-0">
+        <div className="px-4 py-3.5 border-b border-slate-800 bg-slate-950/30 flex flex-col gap-2 shrink-0">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Soggetto / P.IVA</span>
+            <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Soggetto / P.IVA</span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -1743,17 +1753,17 @@ export default function App() {
                   setDriveSearchInitialQuery('Valeria Maros');
                   setIsDriveSearchModalOpen(true);
                 }}
-                className="text-[10px] uppercase font-extrabold text-sky-400 hover:text-sky-300 transition-colors flex items-center gap-1 cursor-pointer"
+                className="text-[9px] uppercase font-extrabold text-sky-400 hover:text-sky-300 transition-colors flex items-center gap-1 cursor-pointer"
                 title="Cerca contabilità esistente su Google Drive (es. Valeria Maros)"
               >
-                <Search className="w-3 h-3" /> Cerca su Drive
+                <Search className="w-2.5 h-2.5" /> Cerca Drive
               </button>
               <button
                 onClick={() => setIsPositionModalOpen(true)}
-                className="text-[10px] uppercase font-extrabold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer"
+                className="text-[9px] uppercase font-extrabold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer"
                 title="Aggiungi nuova posizione contabile"
               >
-                <PlusCircle className="w-3.5 h-3.5" /> Nuovo
+                <PlusCircle className="w-3 h-3" /> Nuovo
               </button>
             </div>
           </div>
@@ -1762,7 +1772,7 @@ export default function App() {
             <select
               value={activePositionId}
               onChange={(e) => setActivePositionId(e.target.value)}
-              className="flex-grow bg-slate-800 border border-slate-700 hover:border-slate-600 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 outline-none transition-all cursor-pointer"
+              className="flex-grow bg-slate-800 border border-slate-700 hover:border-slate-600 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-200 outline-none transition-all cursor-pointer"
             >
               {positions.map((pos) => {
                 const isPlaceholderProfile = !pos.profile?.fullName || pos.profile.fullName === 'Nuovo Cliente';
@@ -1778,7 +1788,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsDeleteModalOpen(true)}
-              className="p-2 bg-slate-850 hover:bg-rose-500/10 border border-slate-700 hover:border-rose-500/20 text-slate-400 hover:text-rose-400 rounded-xl transition-all cursor-pointer shrink-0"
+              className="p-1.5 bg-slate-850 hover:bg-rose-500/10 border border-slate-700 hover:border-rose-500/20 text-slate-400 hover:text-rose-400 rounded-lg transition-all cursor-pointer shrink-0"
               title="Elimina posizione corrente"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -1789,7 +1799,7 @@ export default function App() {
                 href={activePosition.driveFolderUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-2 bg-slate-850 hover:bg-emerald-500/10 border border-slate-700 hover:border-emerald-500/20 text-slate-400 hover:text-emerald-400 rounded-xl transition-all cursor-pointer shrink-0 flex items-center justify-center"
+                className="p-1.5 bg-slate-850 hover:bg-emerald-500/10 border border-slate-700 hover:border-emerald-500/20 text-slate-400 hover:text-emerald-400 rounded-lg transition-all cursor-pointer shrink-0 flex items-center justify-center"
                 title="Apri cartella Google Drive"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
@@ -1804,7 +1814,7 @@ export default function App() {
                 setDriveSearchInitialQuery('Valeria Maros');
                 setIsDriveSearchModalOpen(true);
               }}
-              className="w-full mt-1 px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              className="w-full mt-1 px-2 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <Search className="w-3 h-3 text-emerald-400" />
               <span>Trova "Valeria Maros" su Drive</span>
@@ -1812,23 +1822,40 @@ export default function App() {
           )}
         </div>
 
-        {/* Sidebar Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
-          <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider px-4 mb-2">Menu Di Gestione</p>
+        {/* Sidebar Navigation - Moduli ERP Zucchetti */}
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          <p className="text-[9px] uppercase font-bold text-slate-500 tracking-wider px-3 mb-1.5">Moduli Contabili</p>
           
-          <button
-            onClick={() => {
-              openAndScrollToSection('dashboard');
-            }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-xs transition-all ${
-              expandedSections['dashboard']
-                ? 'bg-emerald-500/10 text-emerald-400'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
-            }`}
-          >
-            <Calculator className="w-4.5 h-4.5 shrink-0" />
-            <span>Ottimizzatore Fiscale Forfettario</span>
-          </button>
+          {[
+            { id: 'overview', label: 'Cruscotto Generale', icon: Calculator },
+            { id: 'quadro_lm', label: 'Quadro LM (Imposte)', icon: BookOpen },
+            { id: 'quadro_rr', label: 'Quadro RR (Previdenza)', icon: ShieldCheck },
+            { id: 'f24_acconti', label: 'F24 & Acconti', icon: FileText },
+            { id: 'invoices', label: 'Fatture XML & Cassa', icon: DollarSign },
+            { id: 'ravvedimento', label: 'Scadenzario & Ravvedimento', icon: Clock },
+            { id: 'anagrafica', label: 'Anagrafica & Studio', icon: Folder },
+          ].map((item) => {
+            const Icon = item.icon;
+            const isActive = activeModule === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setActiveModule(item.id);
+                  setSidebarOpen(false);
+                }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg font-medium text-xs transition-colors cursor-pointer ${
+                  isActive
+                    ? 'bg-[#8b0000] text-white shadow-xs font-bold'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                <span className="truncate">{item.label}</span>
+              </button>
+            );
+          })}
         </nav>
 
         {/* Real-time Flat-rate revenue threshold (Limite Ricavi) widget at sidebar bottom */}
@@ -1867,103 +1894,104 @@ export default function App() {
       {/* CORE WORKSPACE */}
       <main className="flex-1 flex flex-col min-w-0 bg-theme-bg" id="main-content-window">
         
-        {/* Top Professional Sleek Header */}
-        <header className="h-16 bg-theme-card border-b border-theme-border flex items-center justify-between px-6 sm:px-8 shrink-0">
+        {/* Top Institutional Zucchetti Header */}
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 shrink-0 shadow-xs">
           
           <div className="flex items-center gap-3">
             {/* Hamburger menu for small devices */}
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-1.5 text-theme-text-muted hover:bg-theme-bg rounded-lg md:hidden transition-colors"
+              className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg md:hidden transition-colors"
               aria-label="Apri menu"
             >
-              <Menu className="w-5.5 h-5.5" />
+              <Menu className="w-5 h-5" />
             </button>
             
-            <div className="flex items-center gap-2 sm:gap-3">
-              <h2 className="text-sm sm:text-base font-extrabold text-theme-text tracking-tight">
-                Pannello di Controllo Fiscale
-              </h2>
-              <div className="relative inline-flex items-center" id="fiscal-year-selector">
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  className="bg-theme-bg hover:bg-theme-border text-theme-text font-extrabold px-3 py-1 pr-8 rounded-full text-[11px] outline-none border-none cursor-pointer transition-all appearance-none"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23475569' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`,
-                    backgroundPosition: 'right 0.5rem center',
-                    backgroundSize: '1.25em 1.25em',
-                    backgroundRepeat: 'no-repeat'
-                  }}
-                >
-                  <option value="2026">Esercizio 2026</option>
-                  <option value="2025">Esercizio 2025</option>
-                  <option value="2024">Esercizio 2024</option>
-                </select>
+            {/* Soggetto Attivo Zucchetti Card Badge */}
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-[#8b0000] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                {getInitials(profile.fullName)}
               </div>
-              {!isOnline ? (
-                <span className="bg-amber-50 text-amber-700 border border-amber-200 font-black px-2.5 py-0.5 rounded-full text-[10px] flex items-center gap-1.5 animate-pulse">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                  Modalità Locale (Offline)
-                </span>
-              ) : (
-                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-black px-2.5 py-0.5 rounded-full text-[10px] flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  Locale (Online)
-                </span>
-              )}
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight truncate max-w-[200px] sm:max-w-xs">
+                    {profile.fullName || 'Mario Rossi'}
+                  </span>
+                  <span className="hidden sm:inline-block text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-red-50 text-[#8b0000] border border-red-200">
+                    {profile.isStartup ? 'FORFETTARIO 5%' : 'FORFETTARIO 15%'}
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5">
+                  <span>{profile.vatNumber ? `P.IVA ${profile.vatNumber}` : 'P.IVA non config.'}</span>
+                  {profile.fiscalCode && (
+                    <>
+                      <span>·</span>
+                      <span className="hidden md:inline">CF {profile.fiscalCode}</span>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
+
+            {/* Selettore Esercizio Fiscale */}
+            <div className="relative inline-flex items-center ml-2 border-l border-slate-200 pl-3" id="fiscal-year-selector">
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="bg-slate-100 hover:bg-slate-200/70 text-slate-800 font-bold px-2.5 py-1 rounded-lg text-xs outline-none border border-slate-300 cursor-pointer transition-all"
+              >
+                <option value="2026">Esercizio 2026</option>
+                <option value="2025">Esercizio 2025</option>
+                <option value="2024">Esercizio 2024</option>
+              </select>
+            </div>
+
+            {!isOnline ? (
+              <span className="hidden lg:flex bg-amber-50 text-amber-700 border border-amber-200 font-bold px-2 py-0.5 rounded text-[10px] items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                Locale Offline
+              </span>
+            ) : (
+              <span className="hidden lg:flex bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-2 py-0.5 rounded text-[10px] items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Locale Protetto
+              </span>
+            )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             
-            {/* Aesthetic Theme Selector */}
-            <ThemeSelector currentTheme={theme} onThemeChange={setTheme} />
-
-            {/* Real Webhook trigger styled precisely as the theme */}
-            <button
-              onClick={handleTriggerBackupSync}
-              disabled={syncStatus === 'syncing'}
-              className={`p-2 rounded-full text-theme-text-muted hover:bg-theme-bg border border-theme-border hover:text-theme-text transition-colors shrink-0 flex items-center justify-center relative group`}
-              title="Backup asincrono Spreadsheet"
-            >
-              <RefreshCw className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin text-emerald-500' : ''}`} />
-              {syncStatus === 'success' && (
-                <span className="absolute right-0 top-full mt-1.5 bg-emerald-600 text-white text-[9px] font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap animate-fade-in z-25">
-                  Archiviato!
-                </span>
-              )}
-            </button>
+            {/* Soglia 85k Quick Pill */}
+            <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-mono">
+              <span className="text-[10px] text-slate-500 font-sans font-bold">Ricavi Cassa:</span>
+              <span className="font-bold text-slate-900">€ {totalPaidRevenue.toLocaleString('it-IT', { maximumFractionDigits: 0 })}</span>
+              <span className="text-[10px] text-slate-400">/ 85k</span>
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-bold">
+                {progressPercent.toFixed(0)}%
+              </span>
+            </div>
 
             {/* Google Drive Connection Button */}
             {!googleUser ? (
               <button
                 onClick={handleGoogleLogin}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-[#4285F4] hover:bg-[#3367D6] text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#4285F4] hover:bg-[#3367D6] text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
                 title="Connetti Google Drive con palmasstudio@gmail.com"
               >
-                <div className="bg-white p-0.5 rounded-full">
-                  <svg className="w-3 h-3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                  </svg>
-                </div>
-                <span>Connetti Drive</span>
+                <Cloud className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Connetti Drive</span>
               </button>
             ) : (
               <button
                 onClick={async () => {
                   await handleGoogleLogout();
                 }}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-[11px] font-bold transition-all shadow-sm cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 py-1 border border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100/70 text-emerald-800 rounded-lg text-[11px] font-bold transition-all shadow-xs cursor-pointer"
                 title={`Disconnetti Google Drive (${googleUser.email})`}
               >
-                <div className="w-4 h-4 rounded-full overflow-hidden shrink-0 filter brightness-90">
-                  <img src={googleUser.photoURL || `https://ui-avatars.com/api/?name=${googleUser.email || 'U'}&background=random`} alt="Google Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                </div>
-                <span className="max-w-[100px] truncate">{googleUser.email}</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="max-w-[120px] truncate hidden sm:inline">Drive: {googleUser.email}</span>
+                <span className="sm:hidden">Drive</span>
               </button>
             )}
 
@@ -1973,42 +2001,30 @@ export default function App() {
                 setDriveSearchInitialQuery('Valeria Maros');
                 setIsDriveSearchModalOpen(true);
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
               title="Cerca contabilità su Google Drive (es. Valeria Maros)"
             >
-              <Search className="w-3.5 h-3.5" />
-              <span>Cerca su Drive</span>
+              <Search className="w-3.5 h-3.5 text-sky-600" />
+              <span className="hidden md:inline">Cerca Drive</span>
             </button>
 
             {/* Global Manual Save Button */}
             <button
               onClick={handleGlobalSave}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#8b0000] hover:bg-[#700000] text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
               title="Salva modifiche localmente e su cloud, e ricarica il software"
             >
               <Database className="w-3.5 h-3.5" />
-              <span>Salva Modifiche</span>
+              <span className="hidden sm:inline">Salva</span>
             </button>
 
-            {/* Profile badge from the Sleek Design */}
-            <div className="flex items-center gap-2.5 pl-3 border-l border-slate-200">
-              <div className="text-right hidden sm:block">
-                <p className="text-xs font-extrabold text-slate-800 max-w-[120px] truncate leading-tight">
-                  {profile.fullName || 'Mario Rossi'}
-                </p>
-                <p className="text-[10px] text-slate-400 font-mono tracking-tight font-medium mt-0.5">
-                  {profile.vatNumber ? `P.IVA ${profile.vatNumber}` : 'Configura P.IVA'}
-                  {profile.fiscalCode ? ` · CF ${profile.fiscalCode}` : ''}
-                </p>
-              </div>
-              <div className="w-9 h-9 bg-slate-150 border border-slate-200/60 rounded-full flex items-center justify-center font-bold text-xs text-slate-700 shrink-0">
-                {getInitials(profile.fullName)}
-              </div>
-            </div>
+            {/* Aesthetic Theme Selector */}
+            <ThemeSelector currentTheme={theme} onThemeChange={setTheme} />
 
           </div>
 
         </header>
+
 
         {/* Dynamic connection lost banner notification */}
         {showOfflineBanner && !isOnline && (
@@ -2087,93 +2103,108 @@ export default function App() {
             </div>
           )}
 
-          {/* Dashboard Section */}
-          <div id="section-dashboard" className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
-            <button
-              onClick={() => toggleSection('dashboard')}
-              className="w-full flex items-center justify-between p-5 sm:p-6 bg-white hover:bg-slate-50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-                  <Calculator className="w-5 h-5" />
+          {/* Main ERP Module View */}
+          {activeModule === 'anagrafica' ? (
+            <div className="space-y-4 animate-fade-in">
+              <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-red-50 text-[#8b0000] rounded-lg">
+                    <Folder className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-extrabold text-slate-900">Anagrafica Contribuente & Configurazione Drive</h2>
+                    <p className="text-[11px] text-slate-500">Gestione Codice ATECO, aliquota d'imposta (5% o 15%) e alberatura Google Drive dal 2025 ad oggi.</p>
+                  </div>
                 </div>
-                <h2 className="text-sm sm:text-base font-extrabold text-slate-800">Ottimizzatore Fiscale Forfettario</h2>
+                <button
+                  type="button"
+                  onClick={() => setActiveModule('overview')}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                >
+                  Torna al Cruscotto
+                </button>
               </div>
-              {expandedSections['dashboard'] ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-            </button>
-            
-            {expandedSections['dashboard'] && (
-              <div className="p-5 sm:p-6 pt-0 border-t border-slate-100 space-y-6 animate-fade-in bg-slate-50/30">
-                <BusinessProfileCard 
-                  profile={profile} 
-                  onChange={setProfile}
-                  isCreatingFolder={isCreatingDriveFolder}
-                  driveFolderCreated={!!activePosition?.driveFolderId}
-                  driveFolderUrl={activePosition?.driveFolderUrl}
-                  isUnselected={!isPositionSelected}
-                  onCreateDriveFolder={async () => {
-                    const token = googleAccessTokenState;
-                    if (!token) {
-                      safeAlert("Connetti prima Google Drive dall'apposito pulsante nell'header in alto a destra.");
-                      return;
-                    }
-                    
-                    handleOpenFolderPicker(token);
-                  }}
-                  onRecreateDriveFolder={handleRecreateDriveFolder}
-                  isRecreatingFolder={isRecreatingDriveFolder}
-                  onSaveAnagrafica={() => {
-                      safeAlert("Anagrafica configurata e salvata correttamente!");
-                  }}
-                />
-                
-                {isPositionSelected && (
-                  <>
-                    <div className="bg-slate-900 text-slate-300 p-4 rounded-2xl border border-slate-800 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                      <div>
-                        <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                          Statistiche Consolidate Regime Forfettario
-                        </h3>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Motore matematico deterministico aggiornato al Decreto Fiscale vigente</p>
-                      </div>
-                      <div className="bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-1.5 rounded-xl text-emerald-400 text-xs font-extrabold flex items-center gap-1.5 font-mono">
-                        Base Imponibile Incassata: € {totalPaidRevenue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </div>
-                    </div>
 
-                    <TaxSimulatorDashboard 
-                      key={`${activePosition?.id || 'none'}-${selectedYear}`}
-                      profile={profile} 
-                      revenue={totalPaidRevenue} 
-                      invoices={invoices} 
-                      allInvoices={allInvoices}
-                      googleConnected={!!googleUser}
-                      driveFolderId={activePosition?.driveFolderId}
-                      driveFolderUrl={activePosition?.driveFolderUrl}
-                      f24Files={activePosition?.f24Files || []}
-                      onUploadF24={handleUploadF24Pdf}
-                      onUploadF24s={handleUploadF24s}
-                      onDeleteF24={handleDeleteF24Pdf}
-                      onConnectGoogle={handleGoogleLogin}
-                      f24Entries={f24Entries}
-                      allF24Entries={allF24Entries}
-                      selectedYear={selectedYear}
-                      onAddInvoice={handleAddInvoice}
-                      onAddInvoices={handleAddInvoices}
-                      onDeleteInvoice={handleDeleteInvoice}
-                      onAddF24Entries={handleAddF24Entries}
-                      onDeleteF24Entry={handleDeleteF24Entry}
-                      onUploadInvoiceXmlToDrive={handleUploadInvoiceXmlToDrive}
-                      onSyncDriveInvoices={handleDriveInvoiceSync}
-                      isSyncingDriveInvoices={isSyncingDriveList}
-                      onChangeProfile={setProfile}
-                    />
-                  </>
-                )}
+              <BusinessProfileCard 
+                profile={profile} 
+                onChange={setProfile}
+                isCreatingFolder={isCreatingDriveFolder}
+                driveFolderCreated={!!activePosition?.driveFolderId}
+                driveFolderUrl={activePosition?.driveFolderUrl}
+                isUnselected={!isPositionSelected}
+                onCreateDriveFolder={async () => {
+                  const token = googleAccessTokenState;
+                  if (!token) {
+                    safeAlert("Connetti prima Google Drive dall'apposito pulsante nell'header in alto a destra.");
+                    return;
+                  }
+                  handleOpenFolderPicker(token);
+                }}
+                onRecreateDriveFolder={handleRecreateDriveFolder}
+                isRecreatingFolder={isRecreatingDriveFolder}
+                onSaveAnagrafica={() => {
+                  safeAlert("Anagrafica configurata e salvata correttamente!");
+                }}
+              />
+            </div>
+          ) : (
+            <div className="space-y-4 animate-fade-in">
+              {/* Quick Anagrafica Bar */}
+              <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 bg-slate-100 text-slate-600 rounded">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <div className="text-xs">
+                    <span className="font-extrabold text-slate-900">{profile.fullName || 'Valeria Maros'}</span>
+                    <span className="text-slate-400 mx-1.5">·</span>
+                    <span className="text-slate-500 font-mono">ATECO {profile.atecoCode}</span>
+                    <span className="text-slate-400 mx-1.5">·</span>
+                    <span className="text-slate-500 font-mono">{profile.isStartup ? 'Regime Startup (5%)' : 'Regime Ordinario (15%)'}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveModule('anagrafica')}
+                  className="text-xs text-[#8b0000] hover:text-[#700000] font-bold hover:underline cursor-pointer"
+                >
+                  Modifica Dati Ditta & Drive
+                </button>
               </div>
-            )}
-          </div>
+
+              {isPositionSelected && (
+                <TaxSimulatorDashboard 
+                  key={`${activePosition?.id || 'none'}-${selectedYear}`}
+                  profile={profile} 
+                  revenue={totalPaidRevenue} 
+                  invoices={invoices} 
+                  allInvoices={allInvoices}
+                  googleConnected={!!googleUser}
+                  driveFolderId={activePosition?.driveFolderId}
+                  driveFolderUrl={activePosition?.driveFolderUrl}
+                  f24Files={activePosition?.f24Files || []}
+                  onUploadF24={handleUploadF24Pdf}
+                  onUploadF24s={handleUploadF24s}
+                  onDeleteF24={handleDeleteF24Pdf}
+                  onConnectGoogle={handleGoogleLogin}
+                  f24Entries={f24Entries}
+                  allF24Entries={allF24Entries}
+                  selectedYear={selectedYear}
+                  onAddInvoice={handleAddInvoice}
+                  onAddInvoices={handleAddInvoices}
+                  onDeleteInvoice={handleDeleteInvoice}
+                  onAddF24Entries={handleAddF24Entries}
+                  onDeleteF24Entry={handleDeleteF24Entry}
+                  onUploadInvoiceXmlToDrive={handleUploadInvoiceXmlToDrive}
+                  onSyncDriveInvoices={handleDriveInvoiceSync}
+                  isSyncingDriveInvoices={isSyncingDriveList}
+                  onChangeProfile={setProfile}
+                  activeModule={activeModule}
+                  onSelectModule={setActiveModule}
+                />
+              )}
+            </div>
+          )}
           </div>
         </div>
 

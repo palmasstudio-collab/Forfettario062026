@@ -18,13 +18,26 @@
 
 /* Theme Definitions */
 :root {
-  /* Default: Modern Vibrant / Standard */
-  --theme-bg: #fcfdfd;
+  /* Default: Zucchetti Style Professional ERP */
+  --theme-bg: #f1f5f9;
   --theme-card: #ffffff;
   --theme-text: #0f172a;
-  --theme-text-muted: #64748b;
-  --theme-accent: #6366f1;
-  --theme-border: #e2e8f0;
+  --theme-text-muted: #475569;
+  --theme-accent: #8b0000;
+  --theme-accent-hover: #700000;
+  --theme-border: #cbd5e1;
+  --font-main: var(--font-sans);
+  --font-heading: var(--font-sans);
+}
+
+[data-theme='zucchetti'] {
+  --theme-bg: #f1f5f9;
+  --theme-card: #ffffff;
+  --theme-text: #0f172a;
+  --theme-text-muted: #475569;
+  --theme-accent: #8b0000;
+  --theme-accent-hover: #700000;
+  --theme-border: #cbd5e1;
   --font-main: var(--font-sans);
   --font-heading: var(--font-sans);
 }

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { BusinessProfile, TaxInput, TaxReturnCalculation, Invoice, F24Entry } from '../types';
 import { calculateTaxReturn } from '../calculateTaxReturn';
 import { findAtecoCode, findPensionFund } from '../taxData';
@@ -27,7 +27,8 @@ import {
   ExternalLink,
   FolderOpen,
   Key,
-  RefreshCw
+  RefreshCw,
+  ShieldCheck
 } from 'lucide-react';
 import { generateTaxAndInvoicePDF } from '../utils/pdfGenerator';
 import { generateInvoicePDFDocument } from '../utils/pdfInvoiceBasic';
@@ -82,6 +83,8 @@ interface TaxSimulatorDashboardProps {
   onSyncDriveInvoices?: () => Promise<void>;
   isSyncingDriveInvoices?: boolean;
   onChangeProfile?: (profile: BusinessProfile) => void;
+  activeModule?: string;
+  onSelectModule?: (moduleName: string) => void;
 }
 
 export default function TaxSimulatorDashboard({ 
@@ -109,7 +112,9 @@ export default function TaxSimulatorDashboard({
   onUploadInvoiceXmlToDrive,
   onSyncDriveInvoices,
   isSyncingDriveInvoices = false,
-  onChangeProfile
+  onChangeProfile,
+  activeModule = 'overview',
+  onSelectModule
 }: TaxSimulatorDashboardProps) {
   // Calcolo dei contributi inseriti dagli F24 per l'anno selezionato
   const excludedTaxCodes = ['2501', '2524'];
@@ -475,37 +480,135 @@ export default function TaxSimulatorDashboard({
     generateTaxAndInvoicePDF(profile, filteredInvoices, targetResults, selectedAteco, selectedFund, yearOfActivity, yearToExport, filteredF24, f24Files, missingForExport);
   };
 
+  const [internalTab, setInternalTab] = useState<string>(activeModule || 'overview');
+
+  useEffect(() => {
+    if (activeModule && activeModule !== 'anagrafica') {
+      setInternalTab(activeModule);
+    }
+  }, [activeModule]);
+
+  const handleTabClick = (tabId: string) => {
+    setInternalTab(tabId);
+    if (onSelectModule) {
+      onSelectModule(tabId);
+    }
+  };
+
+  const ERP_TABS = [
+    { id: 'overview', label: 'Cruscotto Generale', icon: Calculator },
+    { id: 'quadro_lm', label: 'Quadro LM (Imposte)', badge: `€ ${(results.substituteTaxNetDue ?? results.substituteTax).toFixed(0)}`, icon: BookOpen },
+    { id: 'quadro_rr', label: 'Quadro RR (Previdenza)', badge: `€ ${(results.inpsNetDue ?? results.inpsGestioneSeparataDue ?? 0).toFixed(0)}`, icon: ShieldCheck },
+    { id: 'f24_acconti', label: 'F24 & Acconti', badge: `${f24Entries.length}`, icon: FileText },
+    { id: 'invoices', label: 'Fatture XML & Cassa', badge: `${invoices.length}`, icon: DollarSign },
+    { id: 'ravvedimento', label: 'Scadenzario & Ravvedimento', icon: Clock },
+  ];
+
   return (
-    <div className="flex flex-col gap-6 animate-fade-in text-theme-text" id="tax-simulator-dashboard">
+    <div className="flex flex-col gap-5 animate-fade-in text-theme-text" id="tax-simulator-dashboard">
       
-      {/* Barra Azioni Principali: Esportazione PDF */}
-      <div className="bg-theme-card rounded-3xl shadow-sm border border-theme-border p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-theme-bg rounded-xl text-theme-text hidden sm:block">
-            <FileText className="w-5 h-5 text-theme-text-muted" />
+      {/* BARRA SUPERIORE ZUCCHETTI ERP: Ribbon Navigazione Moduli */}
+      <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+        {/* Strip Testata Zucchetti */}
+        <div className="bg-gradient-to-r from-[#7a0c10] via-[#8b0000] to-[#5a080b] text-white px-4 py-2.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-red-950">
+          <div className="flex items-center gap-2.5">
+            <div className="w-6 h-6 bg-white text-[#8b0000] rounded font-black text-xs flex items-center justify-center shadow-xs">
+              Z
+            </div>
+            <div>
+              <span className="font-extrabold text-xs tracking-wider uppercase">Ago Infinity</span>
+              <span className="text-red-200 text-[10px] ml-2 font-mono">Modello Fiscale Forfettario {selectedYear}</span>
+            </div>
           </div>
-          <div>
-            <h4 className="text-sm font-extrabold text-theme-text">Copia Esportabile del Fascicolo</h4>
-            <p className="text-[11px] text-theme-text-muted">Scarica localmente l'intero bilancio fiscale simulato con il registro cronologico delle fatture.</p>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleGeneratePDFClick}
+              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-3 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Esporta bilancio e fascicolo ufficiale in PDF"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Esporta Fascicolo PDF</span>
+            </button>
           </div>
         </div>
-        <button
-          onClick={handleGeneratePDFClick}
-          className="bg-theme-accent hover:opacity-90 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm w-full sm:w-auto shrink-0"
-          id="btn-export-pdf-main"
-        >
-          <Download className="w-4 h-4 text-emerald-400 stroke-[2.5]" />
-          <span>Esporta Report in PDF</span>
-        </button>
+
+        {/* Tab Ribbon Zucchetti */}
+        <div className="flex items-center overflow-x-auto bg-slate-50 border-b border-slate-200 px-2 scrollbar-none">
+          {ERP_TABS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = internalTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabClick(tab.id)}
+                className={`flex items-center gap-2 px-3.5 py-2.5 text-xs border-b-2 font-bold whitespace-nowrap transition-colors cursor-pointer ${
+                  isActive
+                    ? 'border-[#8b0000] text-[#8b0000] bg-white shadow-xs'
+                    : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#8b0000]' : 'text-slate-400'}`} />
+                <span>{tab.label}</span>
+                {tab.badge && (
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
+                    isActive ? 'bg-red-50 text-[#8b0000] border border-red-200' : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Barra KPI Rapida / Indicatori Zucchetti */}
+        <div className="bg-white px-4 py-2 flex items-center justify-between gap-4 text-xs font-mono overflow-x-auto divide-x divide-slate-100">
+          <div className="flex items-center gap-1.5 pr-4 shrink-0">
+            <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">Cassa {selectedYear}:</span>
+            <span className="font-extrabold text-slate-900">€ {activeRevenue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-4 shrink-0">
+            <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">LM34 Lordo:</span>
+            <span className="font-extrabold text-slate-800">€ {results.grossTaxableIncome.toFixed(0)}</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-4 shrink-0">
+            <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">LM35 Deduzioni:</span>
+            <span className="font-extrabold text-emerald-600">€ {results.deductibleContributions.toFixed(0)}</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-4 shrink-0">
+            <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">LM43 Imposta Netta:</span>
+            <span className="font-extrabold text-rose-600">€ {(results.substituteTaxNetDue ?? results.substituteTax).toFixed(2)}</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-4 shrink-0">
+            <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">INPS Netto:</span>
+            <span className="font-extrabold text-blue-600">€ {(results.inpsNetDue ?? results.inpsGestioneSeparataDue ?? 0).toFixed(2)}</span>
+          </div>
+          <div className="flex items-center gap-1.5 pl-4 shrink-0 bg-slate-50 px-2 py-0.5 rounded">
+            <span className="text-[10px] uppercase font-bold text-slate-500 font-sans">Netto Stimato:</span>
+            <span className="font-black text-slate-900">€ {results.netIncome.toFixed(0)}</span>
+            <span className="text-[10px] text-emerald-600 font-bold">({netPercentage.toFixed(0)}%)</span>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={`grid gap-6 ${
+        internalTab === 'invoices' || internalTab === 'f24_acconti' || internalTab === 'ravvedimento'
+          ? 'grid-cols-1'
+          : 'grid-cols-1 lg:grid-cols-3'
+      }`}>
       
-      {/* Colonna Sinistra: Input aggiuntivi e Sintesi Matematica */}
-      <div className="lg:col-span-2 flex flex-col gap-6">
+      {/* Colonna Sinistra / Workspace Principale */}
+      <div className={`flex flex-col gap-6 ${
+        internalTab === 'invoices' || internalTab === 'f24_acconti' || internalTab === 'ravvedimento'
+          ? 'col-span-1'
+          : 'lg:col-span-2'
+      }`}>
         
         {/* Card Input di Simulazione */}
-        <div className="bg-theme-card rounded-3xl shadow-sm border border-theme-border p-6 sm:p-8">
+        {(internalTab === 'overview' || internalTab === 'quadro_lm' || internalTab === 'quadro_rr') && (
+        <div className="bg-theme-card rounded-2xl shadow-xs border border-theme-border p-5 sm:p-6">
           <div className="flex items-center gap-3.5 mb-4">
             <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-600 animate-pulse">
               <Calculator className="w-6 h-6" />
@@ -625,9 +728,11 @@ export default function TaxSimulatorDashboard({
             </div>
           </div>
         </div>
+        )}
  
         {/* Card Upload F24 e XML Fatture */}
-        <div className="bg-theme-card rounded-3xl shadow-sm border border-theme-border p-6 sm:p-8">
+        {(internalTab === 'overview' || internalTab === 'invoices') && (
+        <div className="bg-theme-card rounded-2xl shadow-xs border border-theme-border p-5 sm:p-6" id="documents-manager-section">
           <div className="flex items-center gap-3.5 mb-4">
             <div className="p-3 bg-sky-500/10 rounded-2xl text-sky-600">
               <Upload className="w-6 h-6" />
@@ -880,19 +985,24 @@ export default function TaxSimulatorDashboard({
             </div>
           </div>
         </div>
+        )}
 
         {/* Workspace Revisione Visiva Modello F24 */}
+        {(internalTab === 'overview' || internalTab === 'f24_acconti' || internalTab === 'ravvedimento') && (
         <F24PreviewCanvas
           profile={profile}
           selectedYear={selectedYear}
           results={results}
           onAddF24Entries={onAddF24Entries}
           f24Files={f24Files}
+          defaultTab={internalTab === 'ravvedimento' ? 'ravvedimento' : (internalTab === 'f24_acconti' ? 'visual' : 'assisted')}
         />
+        )}
 
       </div>
  
       {/* Colonna Destra: Risultato Netto, Grafico e Quadro LM simulato */}
+      {(internalTab === 'overview' || internalTab === 'quadro_lm' || internalTab === 'quadro_rr') && (
       <div className="flex flex-col gap-6">
         
         {/* Card Risultato Netto - Dark Sleek Container */}
@@ -983,6 +1093,7 @@ export default function TaxSimulatorDashboard({
  
           <div className="space-y-3.5 font-mono text-xs">
             {/* Quadro LM - Sezione I */}
+            {(internalTab === 'overview' || internalTab === 'quadro_lm') && (
             <div className="p-3 bg-white rounded-2xl border border-slate-100">
               <div className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-50 pb-1.5">QUADRO LM - Regime Forfettario</div>
               
@@ -1075,8 +1186,10 @@ export default function TaxSimulatorDashboard({
                 </div>
               </div>
             </div>
+            )}
  
             {/* Quadro RR */}
+            {(internalTab === 'overview' || internalTab === 'quadro_rr') && (
             <div className="p-3 bg-white rounded-2xl border border-slate-100">
               <div className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-50 pb-1.5">QUADRO RR - Contributi Previdenziali</div>
               
@@ -1266,7 +1379,7 @@ export default function TaxSimulatorDashboard({
                           </div>
                           <div className="grid grid-cols-3 gap-1">
                             <button
-                              type="button; "
+                              type="button"
                               onClick={() => generateF24PDF(profile, results.currentYearContributions, 'contributi', 'saldo', selectedYear, selectedFund.id)}
                               className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
                               title="Genera F24 Saldo"
@@ -1305,13 +1418,14 @@ export default function TaxSimulatorDashboard({
                 </div>
               </div>
             </div>
+            )}
  
           </div>
         </div>
+      </div>
+      )}
  
       </div>
-
-    </div>
     </div>
   );
 }

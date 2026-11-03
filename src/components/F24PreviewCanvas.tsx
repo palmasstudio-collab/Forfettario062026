@@ -43,6 +43,7 @@ interface F24PreviewCanvasProps {
   results?: TaxReturnCalculation;
   onAddF24Entries?: (entries: any[]) => void;
   f24Files?: { name: string; id: string; url: string; dateAdded: string }[];
+  defaultTab?: 'assisted' | 'ravvedimento' | 'visual';
 }
 
 export type SchedulePreset = 'june_saldo' | 'june_acconto1' | 'june_both' | 'july_surcharge' | 'nov_acconto2';
@@ -52,13 +53,20 @@ export default function F24PreviewCanvas({
   selectedYear,
   results,
   onAddF24Entries,
-  f24Files = []
+  f24Files = [],
+  defaultTab = 'assisted'
 }: F24PreviewCanvasProps) {
   // Navigation tabs:
   // - assisted: Compilazione Assistita con Scadenze Ordinarie (30 Giugno / 30 Luglio / 30 Novembre)
   // - ravvedimento: Calcolatore Ravvedimento Operoso (art. 13 D.Lgs. 472/97)
   // - visual: Revisione Visiva da File PDF/Immagine
-  const [activeTab, setActiveTab] = useState<'assisted' | 'ravvedimento' | 'visual'>('assisted');
+  const [activeTab, setActiveTab] = useState<'assisted' | 'ravvedimento' | 'visual'>(defaultTab);
+
+  useEffect(() => {
+    if (defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [defaultTab]);
   
   // Schedule preset in assisted mode
   const [selectedSchedule, setSelectedSchedule] = useState<SchedulePreset>('june_both');
