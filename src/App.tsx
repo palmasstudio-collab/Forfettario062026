@@ -797,56 +797,156 @@ export default function App() {
       throw new Error("Nessuna posizione contabile attiva selezionata.");
     }
     const token = googleAccessTokenState;
-    if (!token) {
-      addSyncLog("⚠️ Connetti prima Google Drive per caricare i file F24.");
-      throw new Error("Google Drive non connesso.");
-    }
-
     const uploadYear = year || selectedYear;
     const posStartYear = activePosition.profile?.startYear || '2025';
-    addSyncLog(`🔍 Verifica preventiva obbligatoria dell'esistenza delle cartelle di archiviazione per "${activePosition.profile.fullName || 'Cliente'}"...`);
 
+    let uploadedFile: any = null;
+    let healedFolder: any = null;
+
+    if (token) {
+      addSyncLog(`🔍 Verifica preventiva dell'esistenza delle cartelle per "${activePosition.profile.fullName || 'Cliente'}"...`);
+      try {
+        healedFolder = await verifyAndRecreateFolderStructure(
+          token,
+          activePosition.name,
+          activePosition.profile.fullName,
+          activePosition.driveFolderId,
+          uploadYear,
+          undefined,
+          posStartYear
+        );
+
+        addSyncLog(`✅ Struttura cartelle verificata.`);
+        addSyncLog(`⏱️ Caricamento file F24 "${file.name}" su Drive...`);
+        uploadedFile = await uploadF24Pdf(token, healedFolder.id, file, activePosition.profile.fullName, healedFolder.f24FolderId, uploadYear);
+        addSyncLog(`✅ File F24 "${file.name}" salvato su Google Drive.`);
+      } catch (err: any) {
+        console.warn("Upload Drive F24 non riuscito:", err);
+        addSyncLog(`⚠️ Sincronizzazione Drive non disponibile per "${file.name}": ${err.message || err}. Elaborazione in locale.`);
+      }
+    } else {
+      addSyncLog("ℹ️ Google Drive non connesso: elaborazione ed estrazione F24 in locale.");
+    }
+
+    // Estrai tributi, compensazioni e acconti dal file PDF
+    let extractedEntries: any[] = [];
     try {
-      // 1. Verify and automatically recreate any missing folders in the hierarchy
-      const healedFolder = await verifyAndRecreateFolderStructure(
-        token,
-        activePosition.name,
-        activePosition.profile.fullName,
-        activePosition.driveFolderId,
-        uploadYear,
-        undefined,
-        posStartYear
-      );
+      const detailedDoc = await extractDetailedF24Document(file);
+      if (detailedDoc.entries.length > 0) {
+        extractedEntries = detailedDoc.entries.map(entry => {
+          const isAcconto = entry.taxCode === '1790' || 
+                            entry.taxCode === '1791' || 
+                            (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || entry.debtAmount <= 100));
+          const entryYear = entry.year || uploadYear;
+          const targetYear = isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear;
+          const today = new Date();
+          const monthStr = String(today.getMonth() + 1).padStart(2, '0');
+          const dayStr = String(today.getDate()).padStart(2, '0');
+          const entryDate = `${entryYear}-${monthStr}-${dayStr}`;
 
-      // Save healed structure in the state
-      setPositions((prev) =>
-        prev.map((pos) => {
-          if (pos.id === activePositionId) {
-            return {
-              ...pos,
+          return {
+            id: `f24-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            taxCode: entry.taxCode,
+            amount: entry.debtAmount > 0 ? entry.debtAmount : entry.amount,
+            debtAmount: entry.debtAmount,
+            creditAmount: entry.creditAmount,
+            netAmount: entry.debtAmount - entry.creditAmount,
+            section: entry.section,
+            date: entryDate,
+            description: entry.description || `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
+            source: 'PDF',
+            fileName: file.name,
+            driveFileId: uploadedFile?.id,
+            isAcconto,
+            targetYear,
+            accontoType: entry.deadlineType === 'acconto1' ? '1_acconto' : (entry.deadlineType === 'acconto2' ? '2_acconto' : 'saldo'),
+            totalDebtF24: detailedDoc.totalDebt,
+            totalCreditF24: detailedDoc.totalCredit,
+            netDueF24: detailedDoc.netDue
+          };
+        });
+        addSyncLog(`🔍 F24 "${file.name}": Rilevati ${extractedEntries.length} tributi. Debito Totale: € ${detailedDoc.totalDebt.toFixed(2)}, Compensazioni: € ${detailedDoc.totalCredit.toFixed(2)}, Netto da Pagare: € ${detailedDoc.netDue.toFixed(2)}.`);
+      }
+    } catch (parseErr: any) {
+      console.warn("Estrazione F24 PDF non riuscita:", parseErr);
+    }
+
+    // Update position state locally
+    setPositions((prev) =>
+      prev.map((pos) => {
+        if (pos.id === activePositionId) {
+          const currentF24s = pos.f24Files || [];
+          const currentEntries = pos.f24Entries || [];
+          return {
+            ...pos,
+            f24Files: uploadedFile ? [uploadedFile, ...currentF24s] : currentF24s,
+            f24Entries: [...currentEntries, ...extractedEntries],
+            ...(healedFolder ? {
               driveFolderId: healedFolder.id,
-              driveFolderUrl: healedFolder.url,
-              fattureEmesseFolderId: healedFolder.fattureEmesseFolderId,
               f24FolderId: healedFolder.f24FolderId,
+              fattureEmesseFolderId: healedFolder.fattureEmesseFolderId,
               fileGenericiFolderId: healedFolder.fileGenericiFolderId,
-            };
-          }
-          return pos;
-        })
-      );
+            } : {})
+          };
+        }
+        return pos;
+      })
+    );
+  };
 
-      addSyncLog(`✅ Struttura cartelle verificata e pronta per il caricamento dell'F24.`);
-      addSyncLog(`⏱️ Inizio caricamento del file F24 "${file.name}" su Drive...`);
+  const handleUploadF24s = async (files: File[], year?: string) => {
+    if (!activePosition) {
+      throw new Error("Nessuna posizione contabile attiva selezionata.");
+    }
+    const token = googleAccessTokenState;
+    const uploadYear = year || selectedYear;
+    const posStartYear = activePosition.profile?.startYear || '2025';
 
-      // 2. Upload the F24 PDF into the verified F24 subfolder
-      const uploadedFile = await uploadF24Pdf(token, healedFolder.id, file, activePosition.profile.fullName, healedFolder.f24FolderId, uploadYear);
-      
-      // 3. Estrai tributi, compensazioni e acconti dal file PDF
-      let extractedEntries: any[] = [];
+    let healedFolder: any = null;
+    if (token) {
+      addSyncLog(`🔍 [Massivo] Verifica preventiva cartelle per "${activePosition.profile.fullName || 'Cliente'}"...`);
+      try {
+        healedFolder = await verifyAndRecreateFolderStructure(
+          token,
+          activePosition.name,
+          activePosition.profile.fullName,
+          activePosition.driveFolderId,
+          uploadYear,
+          undefined,
+          posStartYear
+        );
+        addSyncLog(`✅ Struttura cartelle verificata per caricamento massivo.`);
+      } catch (err: any) {
+        console.warn("Verifica cartelle Drive fallita:", err);
+      }
+    } else {
+      addSyncLog("ℹ️ Google Drive non connesso: elaborazione ed estrazione F24 in locale.");
+    }
+
+    const uploadedFiles: any[] = [];
+    const allExtractedEntries: any[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      let uploadedFile: any = null;
+
+      if (token && healedFolder) {
+        addSyncLog(`⏱️ [${i+1}/${files.length}] Caricamento file F24 "${file.name}" su Drive...`);
+        try {
+          uploadedFile = await uploadF24Pdf(token, healedFolder.id, file, activePosition.profile.fullName, healedFolder.f24FolderId, uploadYear);
+          uploadedFiles.push(uploadedFile);
+          addSyncLog(`✅ [${i+1}/${files.length}] File F24 "${file.name}" caricato.`);
+        } catch (uploadErr: any) {
+          console.error(`Upload failed for ${file.name}:`, uploadErr);
+          addSyncLog(`⚠️ [${i+1}/${files.length}] Upload Drive non riuscito per "${file.name}": ${uploadErr.message || uploadErr}`);
+        }
+      }
+
+      // Try to parse F24 data from PDF
       try {
         const detailedDoc = await extractDetailedF24Document(file);
         if (detailedDoc.entries.length > 0) {
-          extractedEntries = detailedDoc.entries.map(entry => {
+          const transformed = detailedDoc.entries.map(entry => {
             const isAcconto = entry.taxCode === '1790' || 
                               entry.taxCode === '1791' || 
                               (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || entry.debtAmount <= 100));
@@ -856,7 +956,6 @@ export default function App() {
             const monthStr = String(today.getMonth() + 1).padStart(2, '0');
             const dayStr = String(today.getDate()).padStart(2, '0');
             const entryDate = `${entryYear}-${monthStr}-${dayStr}`;
-
             return {
               id: `f24-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
               taxCode: entry.taxCode,
@@ -869,7 +968,7 @@ export default function App() {
               description: entry.description || `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
               source: 'PDF',
               fileName: file.name,
-              driveFileId: uploadedFile.id,
+              driveFileId: uploadedFile?.id,
               isAcconto,
               targetYear,
               accontoType: entry.deadlineType === 'acconto1' ? '1_acconto' : (entry.deadlineType === 'acconto2' ? '2_acconto' : 'saldo'),
@@ -878,157 +977,39 @@ export default function App() {
               netDueF24: detailedDoc.netDue
             };
           });
-          addSyncLog(`🔍 F24 "${file.name}": Rilevati ${extractedEntries.length} tributi. Debito Totale: € ${detailedDoc.totalDebt.toFixed(2)}, Compensazioni: € ${detailedDoc.totalCredit.toFixed(2)}, Netto da Pagare: € ${detailedDoc.netDue.toFixed(2)}.`);
+          allExtractedEntries.push(...transformed);
+          addSyncLog(`🔍 F24 "${file.name}": Debito Totale € ${detailedDoc.totalDebt.toFixed(2)}, Compensazioni € ${detailedDoc.totalCredit.toFixed(2)}, Netto da Pagare € ${detailedDoc.netDue.toFixed(2)}.`);
         }
       } catch (parseErr: any) {
-        console.warn("Estrazione F24 PDF non riuscita:", parseErr);
+        console.warn(`Extraction failed for ${file.name}:`, parseErr);
       }
+    }
 
-      // Update the active position's f24 list and f24 entries
-      setPositions((prev) =>
-        prev.map((pos) => {
-          if (pos.id === activePositionId) {
-            const currentF24s = pos.f24Files || [];
-            const currentEntries = pos.f24Entries || [];
-            return {
-              ...pos,
-              f24Files: [uploadedFile, ...currentF24s],
-              f24Entries: [...currentEntries, ...extractedEntries],
+    // Atomic update of position state locally
+    setPositions((prev) =>
+      prev.map((pos) => {
+        if (pos.id === activePositionId) {
+          const currentF24Files = pos.f24Files || [];
+          const currentF24Entries = pos.f24Entries || [];
+
+          return {
+            ...pos,
+            f24Files: [...uploadedFiles, ...currentF24Files],
+            f24Entries: [...currentF24Entries, ...allExtractedEntries],
+            ...(healedFolder ? {
               driveFolderId: healedFolder.id,
               f24FolderId: healedFolder.f24FolderId,
               fattureEmesseFolderId: healedFolder.fattureEmesseFolderId,
               fileGenericiFolderId: healedFolder.fileGenericiFolderId,
-            };
-          }
-          return pos;
-        })
-      );
-      addSyncLog(`✅ File F24 "${file.name}" caricato correttamente nella sottocartella "F24" dell'anno ${uploadYear} su Google Drive!`);
-    } catch (err: any) {
-      console.error(err);
-      addSyncLog(`❌ Errore durante la verifica preventiva o il caricamento di "${file.name}": ${err.message || err}`);
-      throw err;
-    }
-  };
-
-  const handleUploadF24s = async (files: File[], year?: string) => {
-    if (!activePosition) {
-      throw new Error("Nessuna posizione contabile attiva selezionata.");
-    }
-    const token = googleAccessTokenState;
-    if (!token) {
-      addSyncLog("⚠️ Connetti prima Google Drive per caricare i file F24.");
-      throw new Error("Google Drive non connesso.");
-    }
-
-    const uploadYear = year || selectedYear;
-    const posStartYear = activePosition.profile?.startYear || '2025';
-    addSyncLog(`🔍 [Massivo] Verifica preventiva obbligatoria delle cartelle per "${activePosition.profile.fullName || 'Cliente'}"...`);
-
-    try {
-      // 1. Verify structure once
-      const healedFolder = await verifyAndRecreateFolderStructure(
-        token,
-        activePosition.name,
-        activePosition.profile.fullName,
-        activePosition.driveFolderId,
-        uploadYear,
-        undefined,
-        posStartYear
-      );
-
-      addSyncLog(`✅ Struttura cartelle verificata per caricamento massivo.`);
-      
-      const uploadedFiles: any[] = [];
-      const allExtractedEntries: any[] = [];
-
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        addSyncLog(`⏱️ [${i+1}/${files.length}] Caricamento file F24 "${file.name}" su Drive...`);
-        try {
-          const uploadedFile = await uploadF24Pdf(token, healedFolder.id, file, activePosition.profile.fullName, healedFolder.f24FolderId, uploadYear);
-          uploadedFiles.push(uploadedFile);
-          addSyncLog(`✅ [${i+1}/${files.length}] File F24 "${file.name}" caricato.`);
-          
-          // Try to parse F24 data from PDF
-          try {
-            const detailedDoc = await extractDetailedF24Document(file);
-            if (detailedDoc.entries.length > 0) {
-              const transformed = detailedDoc.entries.map(entry => {
-                const isAcconto = entry.taxCode === '1790' || 
-                                  entry.taxCode === '1791' || 
-                                  (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || entry.debtAmount <= 100));
-                const entryYear = entry.year || uploadYear;
-                const targetYear = isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear;
-                const today = new Date();
-                const monthStr = String(today.getMonth() + 1).padStart(2, '0');
-                const dayStr = String(today.getDate()).padStart(2, '0');
-                const entryDate = `${entryYear}-${monthStr}-${dayStr}`;
-                return {
-                  taxCode: entry.taxCode,
-                  amount: entry.debtAmount > 0 ? entry.debtAmount : entry.amount,
-                  debtAmount: entry.debtAmount,
-                  creditAmount: entry.creditAmount,
-                  netAmount: entry.debtAmount - entry.creditAmount,
-                  section: entry.section,
-                  date: entryDate,
-                  description: entry.description || `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
-                  source: 'PDF',
-                  fileName: file.name,
-                  driveFileId: uploadedFile.id,
-                  isAcconto,
-                  targetYear,
-                  accontoType: entry.deadlineType === 'acconto1' ? '1_acconto' : (entry.deadlineType === 'acconto2' ? '2_acconto' : 'saldo'),
-                  totalDebtF24: detailedDoc.totalDebt,
-                  totalCreditF24: detailedDoc.totalCredit,
-                  netDueF24: detailedDoc.netDue
-                };
-              });
-              allExtractedEntries.push(...transformed);
-              addSyncLog(`🔍 F24 "${file.name}": Debito Totale € ${detailedDoc.totalDebt.toFixed(2)}, Compensazioni € ${detailedDoc.totalCredit.toFixed(2)}, Netto da Pagare € ${detailedDoc.netDue.toFixed(2)}.`);
-            }
-          } catch (parseErr: any) {
-            console.warn(`Extraction failed for ${file.name}:`, parseErr);
-          }
-        } catch (uploadErr: any) {
-          console.error(`Upload failed for ${file.name}:`, uploadErr);
-          addSyncLog(`❌ [${i+1}/${files.length}] Errore durante il caricamento di "${file.name}": ${uploadErr.message || uploadErr}`);
+            } : {})
+          };
         }
-      }
+        return pos;
+      })
+    );
 
-      // 2. Perform a single atomic state update
-      setPositions((prev) =>
-        prev.map((pos) => {
-          if (pos.id === activePositionId) {
-            const currentF24Files = pos.f24Files || [];
-            const currentF24Entries = pos.f24Entries || [];
-            
-            const entriesWithIds = allExtractedEntries.map(e => ({
-              ...e,
-              id: `f24-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
-            }));
-
-            return {
-              ...pos,
-              f24Files: [...uploadedFiles, ...currentF24Files],
-              f24Entries: [...currentF24Entries, ...entriesWithIds],
-              driveFolderId: healedFolder.id,
-              f24FolderId: healedFolder.f24FolderId,
-              fattureEmesseFolderId: healedFolder.fattureEmesseFolderId,
-              fileGenericiFolderId: healedFolder.fileGenericiFolderId,
-            };
-          }
-          return pos;
-        })
-      );
-
-      addSyncLog(`✅ Caricamento massivo completato: ${uploadedFiles.length} file elaborati.`);
-      return uploadedFiles;
-    } catch (err: any) {
-      console.error(err);
-      addSyncLog(`❌ Errore caricamento massivo F24: ${err.message || err}`);
-      throw err;
-    }
+    addSyncLog(`✅ Elaborazione F24 completata: ${files.length} file analizzati, ${allExtractedEntries.length} tributi/compensazioni registrati.`);
+    return uploadedFiles;
   };
 
   const handleDeleteF24Pdf = async (fileId: string) => {

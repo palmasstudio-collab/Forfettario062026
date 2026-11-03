@@ -30,13 +30,15 @@ import {
   RefreshCw,
   ShieldCheck,
   Eye,
-  CheckCircle2
+  CheckCircle2,
+  Layers
 } from 'lucide-react';
 import { generateTaxAndInvoicePDF } from '../utils/pdfGenerator';
 import { generateInvoicePDFDocument } from '../utils/pdfInvoiceBasic';
 import { generateF24PDF } from '../utils/f24PdfGenerator';
 import F24PreviewCanvas from './F24PreviewCanvas';
 import F24DocumentBreakdownModal from './F24DocumentBreakdownModal';
+import ProspettoF24View from './ProspettoF24View';
 
 export const getMissingInvoiceNumbers = (invoices: Invoice[], year: string): number[] => {
   const seqNos = invoices.map(inv => {
@@ -353,7 +355,28 @@ export default function TaxSimulatorDashboard({
           const detailedDoc = await extractDetailedF24Document(filesArray[0]);
           if (detailedDoc && detailedDoc.entries.length > 0) {
             setInspectedF24Doc(detailedDoc);
+          } else {
+            // Documento fallback per garantire sempre la comparsa del modale analitico Zucchetti ERP
+            setInspectedF24Doc({
+              fileName: filesArray[0].name,
+              paymentDate: new Date().toLocaleDateString('it-IT'),
+              entries: [{
+                taxCode: 'QUIETANZA',
+                debtAmount: detailedDoc?.totalDebt || 0,
+                creditAmount: detailedDoc?.totalCredit || 0,
+                amount: detailedDoc?.netDue || 0,
+                year: selectedYear,
+                section: 'erario',
+                description: 'Quietanza F24 PDF Elaborata'
+              }],
+              totalDebt: detailedDoc?.totalDebt || 0,
+              totalCredit: detailedDoc?.totalCredit || 0,
+              netDue: detailedDoc?.netDue || 0,
+              status: 'a_debito'
+            });
           }
+          // AUTO-SWITCH AL MODULO PROSPETTO F24
+          handleTabClick('prospetto_f24');
         } catch (errDet) {
           console.warn("Estrazione prospetto analitico F24:", errDet);
         }
@@ -551,6 +574,7 @@ export default function TaxSimulatorDashboard({
 
   const ERP_TABS = [
     { id: 'overview', label: 'Cruscotto Generale', icon: Calculator },
+    { id: 'prospetto_f24', label: 'Prospetto F24', badge: `${f24Entries.length}`, icon: Layers },
     { id: 'quadro_lm', label: 'Quadro LM (Imposte)', badge: `€ ${(results.substituteTaxNetDue ?? results.substituteTax).toFixed(0)}`, icon: BookOpen },
     { id: 'quadro_rr', label: 'Quadro RR (Previdenza)', badge: `€ ${(results.inpsNetDue ?? results.inpsGestioneSeparataDue ?? 0).toFixed(0)}`, icon: ShieldCheck },
     { id: 'f24_acconti', label: 'F24 & Acconti', badge: `${f24Entries.length}`, icon: FileText },
@@ -647,6 +671,20 @@ export default function TaxSimulatorDashboard({
         </div>
       </div>
 
+      {internalTab === 'prospetto_f24' ? (
+        <ProspettoF24View
+          profile={profile}
+          selectedYear={selectedYear}
+          f24Entries={f24Entries}
+          f24Files={f24Files}
+          inspectedF24Doc={inspectedF24Doc}
+          onUploadF24Pdf={handleF24Upload}
+          isProcessingF24={isProcessingF24}
+          onDeleteF24Entry={onDeleteF24Entry}
+          onInspectDoc={(doc) => setInspectedF24Doc(doc)}
+          f24InputRef={f24InputRef}
+        />
+      ) : (
       <div className={`grid gap-6 ${
         internalTab === 'invoices' || internalTab === 'f24_acconti' || internalTab === 'ravvedimento'
           ? 'grid-cols-1'
@@ -1519,8 +1557,9 @@ export default function TaxSimulatorDashboard({
         </div>
       </div>
       )}
- 
+
       </div>
+      )}
 
       {/* MODALE ISTITUZIONALE ZUCCHETTI: Prospetto Analitico F24 (Tributi, Compensazioni, Netto) */}
       {inspectedF24Doc && (
