@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { BusinessProfile, F24Entry } from '../types';
 import { ParsedF24Document, ParsedF24Entry } from '../utils/pdfF24Parser';
+import { generateProspettoF24PDF, generateF24PDF } from '../utils/f24PdfGenerator';
 
 interface ProspettoF24ViewProps {
   profile: BusinessProfile;
@@ -150,8 +151,18 @@ export default function ProspettoF24View({
             </div>
           </div>
 
-          {/* Action Upload PDF Button */}
-          <div className="flex items-center gap-2">
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => generateProspettoF24PDF(f24Entries, profile, selectedYear, totals)}
+              className="bg-white/10 hover:bg-white/20 text-white border border-white/30 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+              title="Scarica il Prospetto Analitico in PDF"
+            >
+              <Download className="w-4 h-4 text-emerald-300" />
+              <span>Stampa Prospetto PDF</span>
+            </button>
+
             <button
               type="button"
               onClick={() => f24InputRef?.current?.click()}
@@ -257,6 +268,76 @@ export default function ProspettoF24View({
                 ? 'F24 interamente azzerato via compensazioni (Saldo Zero)'
                 : 'Importo netto effettivo addebitato tramite delega F24 telematico'}
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* CARD DEDICATA: Riporto Acconti e Destinazione Anno Successivo (Quadro LM / Quadro RR) */}
+      <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 text-white rounded-2xl p-5 sm:p-6 border border-slate-800 shadow-md">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-extrabold text-white">
+                Prospetto Riporto Acconti e Riconciliazione Anno Successivo
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Tutti gli acconti versati via F24 vengono trasferiti e scomputati automaticamente nelle dichiarazioni dell'anno successivo
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] font-mono font-bold bg-slate-800 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700">
+            Regola Fiscale Zucchetti ERP
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          {/* Sezione Erario: Imposta Sostitutiva (LM42) */}
+          <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/80 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase text-red-400 tracking-wider font-mono">
+                  SEZIONE ERARIO · Imposta Sostitutiva
+                </span>
+                <span className="text-[9px] font-bold bg-red-900/60 text-red-200 px-1.5 py-0.5 rounded font-mono border border-red-700/50">
+                  Quadro LM (LM42)
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
+                Gli acconti versati con codice <strong className="text-white">1790 (1° Acconto 50%)</strong> e <strong className="text-white">1791 (2° Acconto 50%)</strong> vengono accreditati nell'esercizio successivo per abbattere l'imposta netta a debito.
+              </p>
+            </div>
+            <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-750 flex items-center justify-between font-mono text-xs mt-2">
+              <span className="text-slate-400 font-sans text-[11px]">Totale Acconti Erario Riportati:</span>
+              <span className="font-extrabold text-emerald-400 text-sm">
+                € {f24Entries.filter(e => (e.taxCode === '1790' || e.taxCode === '1791' || (e.isAcconto && e.section === 'erario'))).reduce((s, e) => s + e.amount, 0).toFixed(2)}
+              </span>
+            </div>
+          </div>
+
+          {/* Sezione INPS: Gestione Separata (PXX - Quadro RR) */}
+          <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/80 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase text-blue-400 tracking-wider font-mono">
+                  SEZIONE INPS · Gestione Separata (PXX)
+                </span>
+                <span className="text-[9px] font-bold bg-blue-900/60 text-blue-200 px-1.5 py-0.5 rounded font-mono border border-blue-700/50">
+                  Quadro RR (col. 5/6)
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
+                Gli acconti previdenziali causale <strong className="text-white">PXX</strong> (es. <strong className="text-white">€ 46,00 a Giugno</strong> e <strong className="text-white">€ 68,00 a Novembre</strong>) vengono riportati nel Quadro RR dell'anno successivo e detratti direttamente dal contributo dovuto.
+              </p>
+            </div>
+            <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-750 flex items-center justify-between font-mono text-xs mt-2">
+              <span className="text-slate-400 font-sans text-[11px]">Totale Acconti INPS PXX Riportati:</span>
+              <span className="font-extrabold text-blue-400 text-sm">
+                € {f24Entries.filter(e => (e.taxCode === 'PXX' || e.taxCode === 'P10' || (e.isAcconto && e.section === 'inps'))).reduce((s, e) => s + e.amount, 0).toFixed(2)}
+              </span>
+            </div>
           </div>
         </div>
       </div>

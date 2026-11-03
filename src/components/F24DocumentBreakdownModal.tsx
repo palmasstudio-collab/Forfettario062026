@@ -56,6 +56,11 @@ export default function F24DocumentBreakdownModal({
                 <span className="text-[10px] font-black uppercase tracking-wider bg-red-900/80 px-2 py-0.5 rounded text-red-200 font-mono">
                   Esito Lettura Quietanza F24
                 </span>
+                {document.pageCount && document.pageCount > 1 && (
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-purple-500 text-white px-2 py-0.5 rounded shadow-xs font-mono">
+                    Modello Multi-Pagina ({document.pageCount} Pagine)
+                  </span>
+                )}
                 {isSaldoZero ? (
                   <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-white px-2 py-0.5 rounded shadow-xs">
                     F24 a Saldo Zero

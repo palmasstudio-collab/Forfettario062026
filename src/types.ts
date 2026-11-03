@@ -91,6 +91,13 @@ export interface Invoice {
   driveFileUrl?: string;
 }
 
+export interface SecondaryAtecoCode {
+  code: string;
+  description: string;
+  coefficient: number;
+  percentageShare: number; // e.g. 30 for 30% of total revenue
+}
+
 export interface BusinessProfile {
   fullName: string;
   vatNumber: string;
@@ -103,6 +110,38 @@ export interface BusinessProfile {
   inpsReduction35?: boolean;
   manualContributionsByYear?: Record<string, number>;
   useAutomaticF24ByYear?: Record<string, boolean>;
+  secondaryAtecoCodes?: SecondaryAtecoCode[];
+}
+
+export interface RavvedimentoInput {
+  taxCode: string;
+  originalDueDate: string; // YYYY-MM-DD
+  actualPaymentDate: string; // YYYY-MM-DD
+  originalAmount: number;
+  year: string;
+}
+
+export interface RavvedimentoResult {
+  daysLate: number;
+  penaltyCode: string;
+  penaltyRate: number; // e.g. 0.001 per day or 0.015
+  penaltyAmount: number;
+  interestCode: string;
+  annualInterestRate: number; // e.g. 0.025 for 2.5% in 2026
+  interestAmount: number;
+  totalToPay: number;
+  ravvedimentoType: 'sprint' | 'breve' | 'medio' | 'lungo' | 'ordinario';
+}
+
+export interface ReconciliationStatus {
+  category: 'IMPOSTA_SOSTITUTIVA' | 'INPS_GESTIONE_SEPARATA' | 'INPS_ARTIGIANI_COMMERCIANTI' | 'MARCA_BOLLO';
+  title: string;
+  taxCode: string;
+  dueAmount: number;
+  paidAmount: number;
+  difference: number; // dueAmount - paidAmount
+  status: 'RICONCILIATO' | 'A_DEBITO_PARZIALE' | 'NON_VERSATO' | 'ECCEDENZA_CREDITO';
+  details: string;
 }
 
 export interface F24Entry {

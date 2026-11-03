@@ -7,7 +7,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { BusinessProfile, TaxInput, TaxReturnCalculation, Invoice, F24Entry } from '../types';
 import { calculateTaxReturn } from '../calculateTaxReturn';
 import { findAtecoCode, findPensionFund } from '../taxData';
-import { parseInvoiceXml } from '../utils/xmlInvoiceParser';
+import { parseInvoiceXml, findMissingInvoiceSequenceGaps, InvoiceSequenceGapReport } from '../utils/xmlInvoiceParser';
 import { extractF24DataFromPdf, extractDetailedF24Document, ParsedF24Document } from '../utils/pdfF24Parser';
 import { safeAlert, safeConfirm } from '../utils/safeWindow';
 import { 
@@ -39,26 +39,17 @@ import { generateF24PDF } from '../utils/f24PdfGenerator';
 import F24PreviewCanvas from './F24PreviewCanvas';
 import F24DocumentBreakdownModal from './F24DocumentBreakdownModal';
 import ProspettoF24View from './ProspettoF24View';
+import CommandPaletteModal from './CommandPaletteModal';
+import QuadroLMRRVisualizer from './QuadroLMRRVisualizer';
+import RavvedimentoOperosoCalculator from './RavvedimentoOperosoCalculator';
+import MultiYearTaxForecast from './MultiYearTaxForecast';
+import TaxCalendarPlanner from './TaxCalendarPlanner';
+import { calculateF24Reconciliation } from '../utils/f24Reconciliation';
+import { Command } from 'lucide-react';
 
 export const getMissingInvoiceNumbers = (invoices: Invoice[], year: string): number[] => {
-  const seqNos = invoices.map(inv => {
-    const withoutYear = inv.number.replace(new RegExp(year, 'g'), '');
-    const match = withoutYear.match(/\d+/);
-    return match ? parseInt(match[0], 10) : null;
-  }).filter((n): n is number => n !== null);
-  
-  if (seqNos.length === 0) return [];
-  
-  const maxSeq = Math.max(...seqNos);
-  if (maxSeq > 1000) return []; // safety net against format mismatch
-  
-  const missing = [];
-  for (let i = 1; i < maxSeq; i++) {
-    if (!seqNos.includes(i)) {
-      missing.push(i);
-    }
-  }
-  return missing;
+  const gapReport = findMissingInvoiceSequenceGaps(invoices, year);
+  return gapReport.missingNumbers;
 };
 
 interface TaxSimulatorDashboardProps {
@@ -153,6 +144,7 @@ export default function TaxSimulatorDashboard({
   const [isProcessingXml, setIsProcessingXml] = useState(false);
   const [isProcessingF24, setIsProcessingF24] = useState(false);
   const [showManualF24Form, setShowManualF24Form] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [manualF24Data, setManualF24Data] = useState({ date: `${selectedYear}-01-01`, amount: '', code: 'INPS', description: 'Inserimento manuale' });
   const [inspectedF24Doc, setInspectedF24Doc] = useState<ParsedF24Document | null>(null);
   const xmlInputRef = useRef<HTMLInputElement>(null);
@@ -515,7 +507,8 @@ export default function TaxSimulatorDashboard({
   const selectedAteco = findAtecoCode(profile.atecoCode);
   const selectedFund = findPensionFund(profile.pensionFund);
   
-  const missingInvoiceNumbers = getMissingInvoiceNumbers(invoices, selectedYear);
+  const gapReport = findMissingInvoiceSequenceGaps(invoices, selectedYear);
+  const missingInvoiceNumbers = gapReport.missingNumbers;
 
   // Calcolo delle percentuali di impatto
   const taxPercentage = activeRevenue > 0 ? (results.substituteTax / activeRevenue) * 100 : 0;
@@ -601,6 +594,16 @@ export default function TaxSimulatorDashboard({
 
           <div className="flex items-center gap-2">
             <button
+              type="button"
+              onClick={() => setIsCommandPaletteOpen(true)}
+              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-3 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Apri Command Palette (Ctrl+K)"
+            >
+              <Command className="w-3.5 h-3.5 text-amber-300" />
+              <span>Cerca (Ctrl+K)</span>
+            </button>
+
+            <button
               onClick={handleGeneratePDFClick}
               className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-3 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
               title="Esporta bilancio e fascicolo ufficiale in PDF"
@@ -684,9 +687,33 @@ export default function TaxSimulatorDashboard({
           onInspectDoc={(doc) => setInspectedF24Doc(doc)}
           f24InputRef={f24InputRef}
         />
+      ) : internalTab === 'quadro_lm' || internalTab === 'quadro_rr' ? (
+        <QuadroLMRRVisualizer
+          calculation={results}
+          profile={profile}
+          selectedYear={selectedYear}
+          atecoDescription={selectedAteco.description}
+        />
+      ) : internalTab === 'f24_acconti' ? (
+        <MultiYearTaxForecast
+          profile={profile}
+          currentYearRevenue={activeRevenue}
+          selectedYear={selectedYear}
+        />
+      ) : internalTab === 'ravvedimento' ? (
+        <div className="flex flex-col gap-6">
+          <RavvedimentoOperosoCalculator
+            selectedYear={selectedYear}
+            onAddF24Entries={onAddF24Entries}
+          />
+          <TaxCalendarPlanner
+            calculation={results}
+            selectedYear={selectedYear}
+          />
+        </div>
       ) : (
       <div className={`grid gap-6 ${
-        internalTab === 'invoices' || internalTab === 'f24_acconti' || internalTab === 'ravvedimento'
+        internalTab === 'invoices'
           ? 'grid-cols-1'
           : 'grid-cols-1 lg:grid-cols-3'
       }`}>
@@ -895,12 +922,22 @@ export default function TaxSimulatorDashboard({
                   </span>
                 </div>
                 
-                {missingInvoiceNumbers.length > 0 && (
-                  <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5">
-                    <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                    <div className="text-xs text-red-800">
-                      <strong className="block mb-0.5 font-bold">Attenzione, buco di numerazione rilevato.</strong>
-                      Mancano le fatture numero: <b>{missingInvoiceNumbers.join(', ')}</b>
+                {gapReport.hasGaps && (
+                  <div className="mb-3 p-3.5 bg-red-50/90 border border-red-200 rounded-2xl flex items-start gap-3 shadow-xs">
+                    <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5 animate-pulse" />
+                    <div className="text-xs text-red-900">
+                      <div className="font-extrabold flex items-center gap-2">
+                        <span>Attenzione, buco di numerazione rilevato (Esercizio {gapReport.year})</span>
+                        <span className="bg-red-200 text-red-900 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold">
+                          SDI Gap
+                        </span>
+                      </div>
+                      <p className="mt-1 text-red-800">
+                        Mancano le fatture numero: <strong className="font-mono bg-red-100 px-1.5 py-0.5 rounded font-bold border border-red-200">{gapReport.formattedRanges.join(', ')}</strong>
+                      </p>
+                      <p className="text-[10px] text-red-600/90 mt-1 font-sans">
+                        Carica i file XML corrispondenti o sincronizza con Google Drive per allineare la sequenza contabile.
+                      </p>
                     </div>
                   </div>
                 )}
@@ -1568,6 +1605,16 @@ export default function TaxSimulatorDashboard({
           onClose={() => setInspectedF24Doc(null)}
         />
       )}
+
+      {/* COMMAND PALETTE (CTRL+K / CMD+K) */}
+      <CommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onSelectTab={handleTabClick}
+        onTriggerPdfExport={handleGeneratePDFClick}
+        f24EntriesCount={f24Entries.length}
+        invoicesCount={invoices.length}
+      />
 
     </div>
   );

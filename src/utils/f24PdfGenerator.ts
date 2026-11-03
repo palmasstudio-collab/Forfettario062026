@@ -1390,3 +1390,121 @@ export function generateRavvedimentoF24PDF(params: RavvedimentoPdfParams) {
   doc.save(filename);
 }
 
+/**
+ * Genera il Prospetto Analitico F24 PDF in stile Zucchetti ERP per la stampa e l'archiviazione
+ */
+export function generateProspettoF24PDF(
+  f24Entries: any[],
+  profile: BusinessProfile,
+  year: string,
+  totals: { totalDebt: number; totalCredit: number; totalNet: number }
+) {
+  const doc = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageWidth = 297;
+  let currentY = 12;
+
+  // Testata ERP Zucchetti
+  doc.setFillColor(139, 0, 0); // Crimson Zucchetti #8b0000
+  doc.rect(10, currentY, 277, 14, 'F');
+
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(255, 255, 255);
+  doc.text('AGO INFINITY · PROSPETTO ANALITICO QUADRATURA F24', 14, currentY + 9);
+
+  doc.setFontSize(9);
+  doc.text(`ESERCIZIO FISCALE ${year}`, 280, currentY + 9, { align: 'right' });
+
+  currentY += 18;
+
+  // Dati Azienda
+  doc.setFillColor(245, 245, 245);
+  doc.rect(10, currentY, 277, 10, 'F');
+  doc.setDrawColor(200, 200, 200);
+  doc.rect(10, currentY, 277, 10, 'S');
+
+  doc.setFontSize(8);
+  doc.setTextColor(40, 40, 40);
+  doc.text(`CONTRIBUENTE: ${profile.fullName.toUpperCase()}   |   P.IVA/CF: ${profile.fiscalCode || profile.vatNumber}`, 14, currentY + 6.5);
+  doc.text(`Data Generazione: ${new Date().toLocaleDateString('it-IT')}`, 280, currentY + 6.5, { align: 'right' });
+
+  currentY += 14;
+
+  // Tabella Headers
+  doc.setFillColor(230, 230, 230);
+  doc.rect(10, currentY, 277, 7, 'F');
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(0, 0, 0);
+
+  doc.text('SEZIONE', 14, currentY + 5);
+  doc.text('COD. TRIBUTO', 45, currentY + 5);
+  doc.text('ANNO/DATA', 80, currentY + 5);
+  doc.text('DESCRIZIONE TRIBUTO', 125, currentY + 5);
+  doc.text('DEBITO LORDO (€)', 200, currentY + 5, { align: 'right' });
+  doc.text('COMPENSAZIONE (€)', 240, currentY + 5, { align: 'right' });
+  doc.text('SALDO NETTO (€)', 280, currentY + 5, { align: 'right' });
+
+  currentY += 8;
+
+  // Rows
+  doc.setFont('Courier', 'normal');
+  doc.setFontSize(8);
+
+  f24Entries.forEach((e) => {
+    if (currentY > 180) {
+      doc.addPage('a4', 'landscape');
+      currentY = 15;
+    }
+
+    const debt = e.debtAmount !== undefined ? e.debtAmount : e.amount;
+    const credit = e.creditAmount || 0;
+    const net = e.netAmount !== undefined ? e.netAmount : (debt - credit);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.text((e.section || 'ERARIO').toUpperCase(), 14, currentY + 4);
+
+    doc.setFont('Courier', 'bold');
+    doc.text(e.taxCode, 45, currentY + 4);
+    doc.setFont('Courier', 'normal');
+    doc.text(`${e.date || year}`, 80, currentY + 4);
+    
+    doc.setFont('Helvetica', 'normal');
+    doc.text((e.description || '').substring(0, 35), 125, currentY + 4);
+
+    doc.setFont('Courier', 'bold');
+    doc.text(`€ ${debt.toFixed(2)}`, 200, currentY + 4, { align: 'right' });
+    doc.text(`€ ${credit.toFixed(2)}`, 240, currentY + 4, { align: 'right' });
+    doc.text(`€ ${net.toFixed(2)}`, 280, currentY + 4, { align: 'right' });
+
+    doc.setDrawColor(240, 240, 240);
+    doc.line(10, currentY + 6, 287, currentY + 6);
+
+    currentY += 7;
+  });
+
+  // Totals Row
+  currentY += 4;
+  doc.setFillColor(139, 0, 0);
+  doc.rect(10, currentY, 277, 9, 'F');
+
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(255, 255, 255);
+  doc.text('TOTALI COMPLESSIVI:', 14, currentY + 6);
+
+  doc.setFont('Courier', 'bold');
+  doc.setFontSize(10);
+  doc.text(`€ ${totals.totalDebt.toFixed(2)}`, 200, currentY + 6, { align: 'right' });
+  doc.text(`- € ${totals.totalCredit.toFixed(2)}`, 240, currentY + 6, { align: 'right' });
+  doc.text(`€ ${totals.totalNet.toFixed(2)}`, 280, currentY + 6, { align: 'right' });
+
+  doc.save(`Prospetto_F24_Quadratura_${year}.pdf`);
+}
+
+

@@ -1103,8 +1103,14 @@ export default function App() {
     });
     
   const f24Entries = allF24Entries
-    .filter((e) => e.date && e.date.startsWith(selectedYear))
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    .filter((e) => {
+      if (!e) return false;
+      const isTarget = e.targetYear === selectedYear;
+      const isPaidInYear = e.date && e.date.startsWith(selectedYear);
+      const isRefYear = (e as any).year === selectedYear;
+      return isTarget || isPaidInYear || isRefYear;
+    })
+    .sort((a, b) => new Date(a.date || '2026-01-01').getTime() - new Date(b.date || '2026-01-01').getTime());
 
   const setProfile = (newProfile: BusinessProfile) => {
     setPositions((prev) =>
