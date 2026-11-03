@@ -475,9 +475,6 @@ export async function uploadInvoiceXml(
   year?: string
 ): Promise<{ name: string; id: string; url: string; dateAdded: string }> {
   try {
-    if (accessToken.includes('mock-')) {
-      throw new Error("Simulated auth token bypass");
-    }
     // 1. Use existing or find/create the dedicated "Fatture Emesse" subfolder inside the position folder
     let invoicesFolderId = '';
     if (year) {
