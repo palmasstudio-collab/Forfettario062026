@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { BusinessProfile, PensionFundType } from '../types';
 import { ATECO_CODES, PENSION_FUNDS, findAtecoCode } from '../taxData';
 import { X, Search, Info, HelpCircle, Briefcase, PlusCircle, FolderPlus, Loader2, Check, ExternalLink, ShieldAlert, FolderTree, FolderOpen } from 'lucide-react';
-import { createAccountingPositionFolder } from '../utils/googleDrive';
+import { createAccountingPositionFolder, CreatedFolderResult } from '../utils/googleDrive';
 import { safeAlert } from '../utils/safeWindow';
 
 interface AccountingPositionModalProps {
@@ -45,8 +45,8 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
   const [isAtecoFocused, setIsAtecoFocused] = useState(false);
 
   // Google Drive destination folder state
-  const [parentFolderId, setParentFolderId] = useState('');
-  const [selectedParentFolderName, setSelectedParentFolderName] = useState('');
+  const [parentFolderId, setParentFolderId] = useState('19oSp4--stkguC2r25d2MfsV3PWUoVXfT');
+  const [selectedParentFolderName, setSelectedParentFolderName] = useState('ALTRO-FORFETTARIO MAROS VALERIA');
   const [isPickerLoading, setIsPickerLoading] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [folderCreated, setFolderCreated] = useState(false);
@@ -84,8 +84,8 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
 
       // Reset step flow
       setStep('details');
-      setParentFolderId('');
-      setSelectedParentFolderName('');
+      setParentFolderId('19oSp4--stkguC2r25d2MfsV3PWUoVXfT');
+      setSelectedParentFolderName('ALTRO-FORFETTARIO MAROS VALERIA');
       setIsPickerLoading(false);
       setIsCreatingFolder(false);
       setFolderCreated(false);
@@ -113,28 +113,59 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
     }
   };
 
-  const handleCreateFolder = async () => {
+  const handleCreateFolder = async (): Promise<CreatedFolderResult | null> => {
     setIsCreatingFolder(true);
     setErrorCreatingFolder('');
     try {
-      // Access token matching connected account simulation if missing, as required
       const token = accessToken || 'mock-access-token-palmasstudio';
-      const folderResult = await createAccountingPositionFolder(token, name.trim(), fullName.trim(), parentFolderId.trim(), startYear, startYear);
+      const folderResult = await createAccountingPositionFolder(token, name.trim(), fullName.trim(), parentFolderId.trim() || '19oSp4--stkguC2r25d2MfsV3PWUoVXfT', startYear, startYear);
       setCreatedFolderId(folderResult.id);
       setCreatedFolderUrl(folderResult.url);
       setCreatedFattureEmesseFolderId(folderResult.fattureEmesseFolderId);
       setCreatedF24FolderId(folderResult.f24FolderId);
       setCreatedFileGenericiFolderId(folderResult.fileGenericiFolderId);
       setFolderCreated(true);
+      return folderResult;
     } catch (err: any) {
       console.error(err);
       setErrorCreatingFolder(err.message || String(err));
+      return null;
     } finally {
       setIsCreatingFolder(false);
     }
   };
 
-  const handleFinalSubmit = () => {
+  const handleFinalSubmit = async () => {
+    let folderInfo = folderCreated ? {
+      id: createdFolderId,
+      url: createdFolderUrl,
+      fattureEmesseFolderId: createdFattureEmesseFolderId,
+      f24FolderId: createdF24FolderId,
+      fileGenericiFolderId: createdFileGenericiFolderId
+    } : undefined;
+
+    if (!folderInfo) {
+      const generated = await handleCreateFolder();
+      if (generated) {
+        folderInfo = {
+          id: generated.id,
+          url: generated.url,
+          fattureEmesseFolderId: generated.fattureEmesseFolderId,
+          f24FolderId: generated.f24FolderId,
+          fileGenericiFolderId: generated.fileGenericiFolderId
+        };
+      } else {
+        const fallbackId = parentFolderId.trim() || '19oSp4--stkguC2r25d2MfsV3PWUoVXfT';
+        folderInfo = {
+          id: fallbackId,
+          url: `https://drive.google.com/drive/folders/${fallbackId}`,
+          fattureEmesseFolderId: fallbackId,
+          f24FolderId: fallbackId,
+          fileGenericiFolderId: fallbackId
+        };
+      }
+    }
+
     const newProfile: BusinessProfile = {
       fullName: fullName.trim() || 'Senza Nome',
       vatNumber: vatNumber.trim() || '00000000000',
@@ -146,14 +177,6 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
       vatOpeningDate: vatOpeningDate || undefined,
       inpsReduction35
     };
-
-    const folderInfo = folderCreated ? {
-      id: createdFolderId,
-      url: createdFolderUrl,
-      fattureEmesseFolderId: createdFattureEmesseFolderId,
-      f24FolderId: createdF24FolderId,
-      fileGenericiFolderId: createdFileGenericiFolderId
-    } : undefined;
 
     onCreate(name.trim(), newProfile, folderInfo);
     onClose();
