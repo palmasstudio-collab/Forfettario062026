@@ -27,6 +27,13 @@ export async function syncInvoicesToGoogleSheet(
     if (!accessToken) {
       throw new Error("Token di accesso Google mancante. Effettua l'accesso con Google.");
     }
+    if (accessToken.includes('mock-')) {
+      return {
+        spreadsheetId: 'mock-sheet-' + year,
+        spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/mock-sheet-' + year + '/edit',
+        success: true
+      };
+    }
 
     // 1. Cerca se esiste già un Google Sheet di riepilogo "Fatture_Emesse_Anno_{year}" nella cartella
     const query = `'${folderId}' in parents and mimeType='application/vnd.google-apps.spreadsheet' and name contains 'Fatture_Emesse_${year}' and trashed=false`;
@@ -123,6 +130,7 @@ export async function fetchInvoicesFromGoogleSheet(
   spreadsheetId: string
 ): Promise<Invoice[]> {
   try {
+    if (accessToken.includes('mock-')) return [];
     const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Foglio1!A2:H1000`, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });

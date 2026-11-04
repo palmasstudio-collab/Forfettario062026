@@ -632,13 +632,15 @@ export default function TaxSimulatorDashboard({
               >
                 <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#8b0000]' : 'text-slate-400'}`} />
                 <span>{tab.label}</span>
-                {tab.badge && (
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
-                    isActive ? 'bg-red-50 text-[#8b0000] border border-red-200' : 'bg-slate-200 text-slate-700'
-                  }`}>
-                    {tab.badge}
-                  </span>
-                )}
+                <span className="inline-flex items-center">
+                  {tab.badge ? (
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
+                      isActive ? 'bg-red-50 text-[#8b0000] border border-red-200' : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {tab.badge}
+                    </span>
+                  ) : null}
+                </span>
               </button>
             );
           })}
@@ -889,13 +891,17 @@ export default function TaxSimulatorDashboard({
                   onChange={handleXmlUpload}
                   disabled={isProcessingXml}
                 />
-                {isProcessingXml ? (
-                  <Loader2 className="w-8 h-8 text-sky-500 animate-spin mb-3" />
-                ) : (
-                  <FileText className="w-8 h-8 text-sky-550 mb-3 text-slate-400" />
-                )}
-                <h4 className="text-sm font-bold text-slate-700">Carica Fattura XML</h4>
-                <p className="text-[10px] text-slate-500 text-center mt-1">Trascina o clicca per importare file ministeriali XML</p>
+                <div className="flex flex-col items-center justify-center pointer-events-none">
+                  <span className="h-8 w-8 flex items-center justify-center mb-3">
+                    {isProcessingXml ? (
+                      <Loader2 className="w-8 h-8 text-sky-500 animate-spin" />
+                    ) : (
+                      <FileText className="w-8 h-8 text-slate-400" />
+                    )}
+                  </span>
+                  <span className="text-sm font-bold text-slate-700 block">Carica Fattura XML</span>
+                  <span className="text-[10px] text-slate-500 text-center mt-1 block">Trascina o clicca per importare file ministeriali XML</span>
+                </div>
               </div>
 
               {/* Riepilogo Fatture Caricate */}
@@ -996,13 +1002,17 @@ export default function TaxSimulatorDashboard({
                   onChange={handleF24Upload}
                   disabled={isProcessingF24}
                 />
-                {isProcessingF24 ? (
-                  <Loader2 className="w-8 h-8 text-purple-500 animate-spin mb-3" />
-                ) : (
-                  <BookOpen className="w-8 h-8 text-slate-400 mb-3" />
-                )}
-                <h4 className="text-sm font-bold text-slate-700">Carica Modello F24 PDF</h4>
-                <p className="text-[10px] text-slate-500 text-center mt-1">Trascina o clicca per estrapolare quietanze in PDF</p>
+                <div className="flex flex-col items-center justify-center pointer-events-none">
+                  <span className="h-8 w-8 flex items-center justify-center mb-3">
+                    {isProcessingF24 ? (
+                      <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+                    ) : (
+                      <BookOpen className="w-8 h-8 text-slate-400" />
+                    )}
+                  </span>
+                  <span className="text-sm font-bold text-slate-700 block">Carica Modello F24 PDF</span>
+                  <span className="text-[10px] text-slate-500 text-center mt-1 block">Trascina o clicca per estrapolare quietanze in PDF</span>
+                </div>
               </div>
 
               {/* Riepilogo F24 Caricati */}

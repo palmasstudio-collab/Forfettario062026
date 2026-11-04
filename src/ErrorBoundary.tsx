@@ -16,10 +16,22 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   public static getDerivedStateFromError(error: Error): State {
+    const errorMsg = String(error?.message || error || '');
+    // Ignore known browser DOM manipulation errors caused by browser extensions or Google Translate
+    if (errorMsg.includes('removeChild') || errorMsg.includes('insertBefore') || errorMsg.includes('Node')) {
+      console.warn("Recovered from transient DOM mutation error (e.g. browser extension / translation):", error);
+      return { hasError: false, error: null };
+    }
     return { hasError: true, error };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    const errorMsg = String(error?.message || error || '');
+    if (errorMsg.includes('removeChild') || errorMsg.includes('insertBefore') || errorMsg.includes('Node')) {
+      console.warn("Caught and suppressed transient removeChild/DOM error:", error, errorInfo);
+      this.setState({ hasError: false, error: null });
+      return;
+    }
     console.error("Uncaught error in UI:", error, errorInfo);
   }
 

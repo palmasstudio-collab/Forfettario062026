@@ -28,6 +28,7 @@ import {
   importAccountingPositionFromDrive
 } from './utils/googleDrive';
 import { parseInvoiceXml } from './utils/xmlInvoiceParser';
+import { syncInvoicesToGoogleSheet } from './utils/googleSheetsSync';
 import { extractF24DataFromPdf, extractDetailedF24Document } from './utils/pdfF24Parser';
 import { calculateTaxReturn } from './calculateTaxReturn';
 import { findAtecoCode, findPensionFund } from './taxData';
@@ -1535,7 +1536,24 @@ export default function App() {
       prev.map((pos) => {
         if (pos.id === activePositionId) {
           const currentInvoices = pos.invoices || [];
-          return { ...pos, invoices: [...withIds, ...currentInvoices] };
+          const updated = [...withIds, ...currentInvoices];
+
+          // Auto-sync to Google Sheet if Drive folder exists and token is active
+          if (googleAccessTokenState && pos.fattureEmesseFolderId) {
+            syncInvoicesToGoogleSheet(
+              googleAccessTokenState,
+              pos.fattureEmesseFolderId,
+              updated.filter(i => i.date?.startsWith(selectedYear)),
+              selectedYear,
+              pos.profile?.fullName || pos.name
+            ).then(res => {
+              if (res.success) {
+                addSyncLog(`📊 Foglio Google Sheet "Fatture_Emesse_${selectedYear}" aggiornato con successo!`);
+              }
+            }).catch(e => console.warn("Google Sheet sync error:", e));
+          }
+
+          return { ...pos, invoices: updated };
         }
         return pos;
       })
