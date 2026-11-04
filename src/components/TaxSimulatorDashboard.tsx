@@ -880,6 +880,7 @@ export default function TaxSimulatorDashboard({
             <div className="flex flex-col gap-4">
               <div className="border-2 border-dashed border-theme-border rounded-2xl p-6 flex flex-col items-center justify-center relative hover:bg-theme-bg transition-colors min-h-[140px]">
                 <input
+                  key="xml-input"
                   ref={xmlInputRef}
                   type="file"
                   multiple
@@ -986,6 +987,7 @@ export default function TaxSimulatorDashboard({
             <div className="flex flex-col gap-4">
               <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center relative hover:bg-slate-50 transition-colors min-h-[140px]">
                 <input
+                  key="f24-input"
                   ref={f24InputRef}
                   type="file"
                   multiple
