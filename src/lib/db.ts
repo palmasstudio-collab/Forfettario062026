@@ -1,6 +1,11 @@
 import { db } from './firebase';
 import { collection, doc, getDocs, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 
+function sanitizeForFirestore(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  return JSON.parse(JSON.stringify(obj));
+}
+
 export const dbService = {
   async getAccountingPositions(userId: string) {
     try {
@@ -19,7 +24,7 @@ export const dbService = {
   async setAccountingPosition(userId: string, position: any) {
     try {
       const posRef = doc(db, `users_data/${userId}/accountingPositions`, position.id);
-      await setDoc(posRef, position, { merge: true });
+      await setDoc(posRef, sanitizeForFirestore(position), { merge: true });
     } catch (err) {
       console.warn("Firestore position save failed (operating in offline local storage mode):", err);
     }
@@ -39,7 +44,7 @@ export const dbService = {
       const batch = writeBatch(db);
       positions.forEach(pos => {
         const posRef = doc(db, `users_data/${userId}/accountingPositions`, pos.id);
-        batch.set(posRef, pos, { merge: true });
+        batch.set(posRef, sanitizeForFirestore(pos), { merge: true });
       });
       await batch.commit();
     } catch (err) {
@@ -50,7 +55,7 @@ export const dbService = {
   async addInvoice(userId: string, positionId: string, invoice: any) {
     try {
       const invRef = doc(collection(db, `users_data/${userId}/accountingPositions/${positionId}/invoices`), invoice.id);
-      await setDoc(invRef, invoice, { merge: true });
+      await setDoc(invRef, sanitizeForFirestore(invoice), { merge: true });
     } catch (err) {
       console.warn("Firestore addInvoice failed (operating in offline local storage mode):", err);
     }
@@ -68,7 +73,7 @@ export const dbService = {
   async addF24Entry(userId: string, positionId: string, entry: any) {
     try {
       const entRef = doc(collection(db, `users_data/${userId}/accountingPositions/${positionId}/f24Entries`), entry.id);
-      await setDoc(entRef, entry, { merge: true });
+      await setDoc(entRef, sanitizeForFirestore(entry), { merge: true });
     } catch (err) {
       console.warn("Firestore addF24Entry failed (operating in offline local storage mode):", err);
     }
