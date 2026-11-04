@@ -105,66 +105,11 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
   };
 
   const handleOpenParentFolderPicker = () => {
-    setIsPickerLoading(true);
-    const token = accessToken || 'mock-access-token-palmasstudio';
-    
-    const onPickerLoad = () => {
-      const pickerOrigin =
-        window.location.ancestorOrigins &&
-        window.location.ancestorOrigins.length > 0
-          ? window.location.ancestorOrigins[window.location.ancestorOrigins.length - 1]
-          : window.location.origin;
-
-      const view = new (window as any).google.picker.DocsView((window as any).google.picker.ViewId.DOCS)
-        .setIncludeFolders(true)
-        .setSelectFolderEnabled(true)
-        .setEnableDrives(true)
-        .setMimeTypes('application/vnd.google-apps.folder');
-
-      const allView = new (window as any).google.picker.DocsView()
-        .setIncludeFolders(true)
-        .setSelectFolderEnabled(true)
-        .setEnableDrives(true)
-        .setMimeTypes('application/vnd.google-apps.folder');
-
-      const sharedDrivesView = new (window as any).google.picker.DocsView()
-        .setEnableTeamDrives(true)
-        .setIncludeFolders(true)
-        .setSelectFolderEnabled(true)
-        .setMimeTypes('application/vnd.google-apps.folder');
-
-      const picker = new (window as any).google.picker.PickerBuilder()
-        .addView(view)
-        .addView(allView)
-        .addView(sharedDrivesView)
-        .enableFeature((window as any).google.picker.Feature.SUPPORT_DRIVES)
-        .setOAuthToken(token)
-        .setCallback((data: any) => {
-          if (data.action === (window as any).google.picker.Action.PICKED) {
-            const folder = data.docs[0];
-            setParentFolderId(folder.id);
-            setSelectedParentFolderName(folder.name);
-          }
-          if (data.action === (window as any).google.picker.Action.CANCEL || data.action === (window as any).google.picker.Action.PICKED) {
-            setIsPickerLoading(false);
-          }
-        })
-        .setOrigin(pickerOrigin)
-        .setTitle("Seleziona la cartella genitore in Google Drive")
-        .build();
-      
-      picker.setVisible(true);
-    };
-
-    if (!(window as any).google?.picker) {
-      if ((window as any).gapi) {
-        (window as any).gapi.load('picker', { callback: onPickerLoad });
-      } else {
-        safeAlert("Google API non ancora caricate. Riprova tra un attimo.");
-        setIsPickerLoading(false);
-      }
-    } else {
-      onPickerLoad();
+    const input = prompt("Inserisci il link o l'ID della cartella Google Drive di destinazione:", parentFolderId || "19oSp4--stkguC2r25d2MfsV3PWUoVXfT");
+    if (input && input.trim()) {
+      const extractedId = input.includes('/folders/') ? (input.match(/\/folders\/([a-zA-Z0-9_-]+)/)?.[1] || input.trim()) : input.trim();
+      setParentFolderId(extractedId);
+      setSelectedParentFolderName(`Cartella ID: ${extractedId}`);
     }
   };
 

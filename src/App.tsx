@@ -864,54 +864,10 @@ export default function App() {
     }
   };
 
-  const onPickerApiLoad = (token: string) => {
-    const pickerOrigin =
-      window.location.ancestorOrigins &&
-      window.location.ancestorOrigins.length > 0
-        ? window.location.ancestorOrigins[window.location.ancestorOrigins.length - 1]
-        : window.location.origin;
-
-    const view = new (window as any).google.picker.DocsView((window as any).google.picker.ViewId.DOCS)
-      .setIncludeFolders(true)
-      .setSelectFolderEnabled(true)
-      .setEnableDrives(true)
-      .setMimeTypes('application/vnd.google-apps.folder');
-
-    const allView = new (window as any).google.picker.DocsView()
-      .setIncludeFolders(true)
-      .setSelectFolderEnabled(true)
-      .setEnableDrives(true)
-      .setMimeTypes('application/vnd.google-apps.folder');
-
-    const sharedDrivesView = new (window as any).google.picker.DocsView()
-      .setEnableTeamDrives(true)
-      .setIncludeFolders(true)
-      .setSelectFolderEnabled(true)
-      .setMimeTypes('application/vnd.google-apps.folder');
-
-    const picker = new (window as any).google.picker.PickerBuilder()
-      .addView(view)
-      .addView(allView)
-      .addView(sharedDrivesView)
-      .enableFeature((window as any).google.picker.Feature.SUPPORT_DRIVES)
-      .setOAuthToken(token)
-      .setCallback((data: any) => pickerCallback(data, token))
-      .setOrigin(pickerOrigin)
-      .setTitle("Seleziona la cartella genitore in Google Drive")
-      .build();
-    
-    picker.setVisible(true);
-  };
-
   const handleOpenFolderPicker = (token: string) => {
-    if (!(window as any).google?.picker) {
-      if ((window as any).gapi) {
-        (window as any).gapi.load('picker', { callback: () => onPickerApiLoad(token) });
-      } else {
-        safeAlert("Google API non ancora caricate. Riprova tra un attimo.");
-      }
-    } else {
-      onPickerApiLoad(token);
+    const input = prompt("Inserisci il link o ID della cartella Google Drive da collegare:", DEFAULT_ACCOUNTING_FOLDER_ID);
+    if (input && input.trim()) {
+      handleConnectCustomDriveFolder(input.trim());
     }
   };
 
@@ -2332,7 +2288,31 @@ export default function App() {
                     safeAlert("Connetti prima Google Drive dall'apposito pulsante nell'header in alto a destra.");
                     return;
                   }
-                  handleOpenFolderPicker(token);
+                  setIsCreatingDriveFolder(true);
+                  try {
+                    const res = await verifyAndRecreateFolderStructure(
+                      token,
+                      activePosition.name,
+                      activePosition.profile.fullName,
+                      DEFAULT_ACCOUNTING_FOLDER_ID,
+                      selectedYear,
+                      undefined,
+                      '2025'
+                    );
+                    setPositions(prev => prev.map(p => p.id === activePosition.id ? { 
+                      ...p, 
+                      driveFolderId: res.id, 
+                      driveFolderUrl: res.url,
+                      fattureEmesseFolderId: res.fattureEmesseFolderId,
+                      f24FolderId: res.f24FolderId,
+                      fileGenericiFolderId: res.fileGenericiFolderId
+                    } : p));
+                    safeAlert(`Struttura cartelle per "${activePosition.profile.fullName || 'Valeria Maros'}" generata e verificata con successo su Google Drive!\n\nLink Cartella: ${res.url}`);
+                  } catch (err: any) {
+                    safeAlert("Errore nella creazione della cartella Google Drive: " + (err.message || err.toString()));
+                  } finally {
+                    setIsCreatingDriveFolder(false);
+                  }
                 }}
                 onRecreateDriveFolder={handleRecreateDriveFolder}
                 isRecreatingFolder={isRecreatingDriveFolder}
