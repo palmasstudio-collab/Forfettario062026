@@ -589,6 +589,45 @@ export default function App() {
     }
   };
 
+  const runGoogleDriveDiagnostics = async () => {
+    addSyncLog("🔍 [DIAGNOSTICA] Avvio test di verifica autenticazione Google Drive...");
+    const token = googleAccessTokenState || (typeof window !== 'undefined' ? sessionStorage.getItem('drive_access_token') : null);
+    
+    if (!token) {
+      addSyncLog("❌ [DIAGNOSTICA] Token Google Drive NON TROVATO. Lo stato di autenticazione non è inizializzato.");
+      safeAlert("Diagnostica Drive: Nessun token attivo trovato. Connettiti a Google Drive prima di eseguire il test.");
+      return;
+    }
+
+    const isMock = token.includes('mock-');
+    if (isMock) {
+      addSyncLog(`⚠️ [DIAGNOSTICA] Rilevato token di tipo 'Simulated auth token bypass' (Mock Token: ${token.substring(0, 15)}...).`);
+      addSyncLog("ℹ️ In modalità Sandbox, le chiamate REST a Google Drive vengono emulate localmente per prevenire errori di dominio non autorizzato.");
+      safeAlert(`Diagnostica Drive:\nToken attivo: SIMULATO (Mock Token)\nRiscontro: 'Simulated auth token bypass' attivo.`);
+      return;
+    }
+
+    addSyncLog(`✅ [DIAGNOSTICA] Trovato Token OAuth Reale (${token.substring(0, 8)}...). Esecuzione test REST API v3 verso la cartella radice ${DEFAULT_ACCOUNTING_FOLDER_ID}...`);
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${DEFAULT_ACCOUNTING_FOLDER_ID}?fields=id,name,webViewLink`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        addSyncLog(`🎉 [DIAGNOSTICA] SUCCESSO! Connessione Google Drive stabilita. Cartella radice trovata: "${data.name}" (ID: ${data.id})`);
+        safeAlert(`Diagnostica Drive Completata con Successo!\nCartella verificata: ${data.name}\nID: ${data.id}`);
+      } else {
+        const errText = await res.text();
+        addSyncLog(`❌ [DIAGNOSTICA] Errore API Google Drive (${res.status}): ${errText}`);
+        safeAlert(`Diagnostica Drive: Errore API (${res.status}). Verifica la validità del token OAuth.`);
+      }
+    } catch (err: any) {
+      addSyncLog(`❌ [DIAGNOSTICA] Errore di rete durante la chiamata API: ${err.message || err}`);
+      safeAlert(`Diagnostica Drive: Errore di rete: ${err.message}`);
+    }
+  };
+
   const handleCreateFolderForActivePosition = async () => {
     const token = googleAccessTokenState;
     if (!token) {
@@ -2156,6 +2195,16 @@ export default function App() {
             >
               <Search className="w-3.5 h-3.5 text-sky-600" />
               <span className="hidden md:inline">Cerca Drive</span>
+            </button>
+
+            {/* Diagnostica Google Drive Button */}
+            <button
+              onClick={runGoogleDriveDiagnostics}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+              title="Esegui test diagnostica autenticazione Google Drive e mostra stato token"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+              <span className="hidden lg:inline">Diagnostica Drive</span>
             </button>
 
             {/* Global Manual Save Button */}

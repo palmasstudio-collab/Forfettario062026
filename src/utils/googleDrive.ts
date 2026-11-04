@@ -321,65 +321,60 @@ export async function createAccountingPositionFolder(
   year: string,
   startYear?: string
 ): Promise<CreatedFolderResult> {
-  const defaultParentFolderId = '19oSp4--stkguC2r25d2MfsV3PWUoVXfT';
-  const parent = customParentId && customParentId.trim() !== '' ? customParentId : defaultParentFolderId;
+  const targetParentId = customParentId && customParentId.trim() !== '' ? customParentId.trim() : '19oSp4--stkguC2r25d2MfsV3PWUoVXfT';
+  const parent = targetParentId;
 
-  if (accessToken && !accessToken.includes('mock-')) {
-    try {
-      const cleanedFullName = clientFullName.trim();
-      const finalFolderTitle = `Forfettario ${cleanedFullName || positionName.trim() || 'Senza Nome'}`;
-      const childFolder = await findOrCreateFolder(accessToken, finalFolderTitle, parent);
+  if (!accessToken || accessToken.includes('mock-')) {
+    return {
+      id: targetParentId,
+      url: `https://drive.google.com/drive/folders/${targetParentId}`,
+      fattureEmesseFolderId: targetParentId,
+      f24FolderId: targetParentId,
+      fileGenericiFolderId: targetParentId
+    };
+  }
 
-      const currentYearNum = new Date().getFullYear();
-      const startYearNum = Math.min(
-        parseInt(startYear || year || '2025', 10) || 2025,
-        currentYearNum
-      );
-      const endYearNum = Math.max(currentYearNum, parseInt(year || '2026', 10) || currentYearNum);
+  const cleanedFullName = clientFullName.trim();
+  const finalFolderTitle = `Forfettario ${cleanedFullName || positionName.trim() || 'Senza Nome'}`;
+  const childFolder = await findOrCreateFolder(accessToken, finalFolderTitle, parent);
 
-      let selectedYearFattureId = '';
-      let selectedYearF24Id = '';
-      let selectedYearFileGenericiId = '';
+  const currentYearNum = new Date().getFullYear();
+  const startYearNum = Math.min(
+    parseInt(startYear || year || '2025', 10) || 2025,
+    currentYearNum
+  );
+  const endYearNum = Math.max(currentYearNum, parseInt(year || '2026', 10) || currentYearNum);
 
-      for (let y = startYearNum; y <= endYearNum; y++) {
-        const yearFolder = await findOrCreateFolder(accessToken, `Anno ${y}`, childFolder.id);
+  let selectedYearFattureId = '';
+  let selectedYearF24Id = '';
+  let selectedYearFileGenericiId = '';
 
-        const fattureFolder = await findOrCreateFolder(accessToken, 'Fatture Emesse', yearFolder.id);
-        const f24Folder = await findOrCreateFolder(accessToken, 'F24', yearFolder.id);
-        const fileGenericiFolder = await findOrCreateFolder(accessToken, 'File Generici', yearFolder.id);
+  for (let y = startYearNum; y <= endYearNum; y++) {
+    const yearFolder = await findOrCreateFolder(accessToken, `Anno ${y}`, childFolder.id);
 
-        if (String(y) === year || y === endYearNum || !selectedYearFattureId) {
-          selectedYearFattureId = fattureFolder.id;
-          selectedYearF24Id = f24Folder.id;
-          selectedYearFileGenericiId = fileGenericiFolder.id;
-        }
-      }
+    const fattureFolder = await findOrCreateFolder(accessToken, 'Fatture Emesse', yearFolder.id);
+    const f24Folder = await findOrCreateFolder(accessToken, 'F24', yearFolder.id);
+    const fileGenericiFolder = await findOrCreateFolder(accessToken, 'File Generici', yearFolder.id);
 
-      try {
-        await createDriveShortcut(accessToken, finalFolderTitle, childFolder.id, parent);
-      } catch (shortcutErr) {
-        console.warn("Could not create Drive shortcut in central shared folder:", shortcutErr);
-      }
-
-      return {
-        id: childFolder.id,
-        url: childFolder.webViewLink || `https://drive.google.com/drive/folders/${childFolder.id}`,
-        fattureEmesseFolderId: selectedYearFattureId,
-        f24FolderId: selectedYearF24Id,
-        fileGenericiFolderId: selectedYearFileGenericiId
-      };
-    } catch (err) {
-      console.warn("Notice in createAccountingPositionFolder Google Drive API:", err);
+    if (String(y) === year || y === endYearNum || !selectedYearFattureId) {
+      selectedYearFattureId = fattureFolder.id;
+      selectedYearF24Id = f24Folder.id;
+      selectedYearFileGenericiId = fileGenericiFolder.id;
     }
   }
 
-  const targetParentId = customParentId && customParentId.trim() !== '' ? customParentId.trim() : '19oSp4--stkguC2r25d2MfsV3PWUoVXfT';
+  try {
+    await createDriveShortcut(accessToken, finalFolderTitle, childFolder.id, parent);
+  } catch (shortcutErr) {
+    console.warn("Could not create Drive shortcut in central shared folder:", shortcutErr);
+  }
+
   return {
-    id: targetParentId,
-    url: `https://drive.google.com/drive/folders/${targetParentId}`,
-    fattureEmesseFolderId: targetParentId,
-    f24FolderId: targetParentId,
-    fileGenericiFolderId: targetParentId
+    id: childFolder.id,
+    url: childFolder.webViewLink || `https://drive.google.com/drive/folders/${childFolder.id}`,
+    fattureEmesseFolderId: selectedYearFattureId,
+    f24FolderId: selectedYearF24Id,
+    fileGenericiFolderId: selectedYearFileGenericiId
   };
 }
 
