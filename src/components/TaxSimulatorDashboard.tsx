@@ -26,12 +26,14 @@ import {
   AlertTriangle,
   ExternalLink,
   FolderOpen,
+  Folder,
   Key,
   RefreshCw,
   ShieldCheck,
   Eye,
   CheckCircle2,
-  Layers
+  Layers,
+  FileSpreadsheet
 } from 'lucide-react';
 import { generateTaxAndInvoicePDF } from '../utils/pdfGenerator';
 import { generateInvoicePDFDocument } from '../utils/pdfInvoiceBasic';
@@ -78,6 +80,8 @@ interface TaxSimulatorDashboardProps {
   onUploadInvoiceXmlToDrive?: (file: File, year?: string) => Promise<{name: string, id: string, url: string, dateAdded: string}>;
   onSyncDriveInvoices?: () => Promise<void>;
   isSyncingDriveInvoices?: boolean;
+  onConnectDriveFolder?: (urlOrId: string) => Promise<void> | void;
+  googleSheetUrl?: string;
   onChangeProfile?: (profile: BusinessProfile) => void;
   activeModule?: string;
   onSelectModule?: (moduleName: string) => void;
@@ -98,6 +102,7 @@ export default function TaxSimulatorDashboard({
   onConnectGoogle,
   driveFolderId,
   driveFolderUrl,
+  googleSheetUrl,
   f24Files = [],
   googleConnected,
   onAddInvoice,
@@ -108,10 +113,12 @@ export default function TaxSimulatorDashboard({
   onUploadInvoiceXmlToDrive,
   onSyncDriveInvoices,
   isSyncingDriveInvoices = false,
+  onConnectDriveFolder,
   onChangeProfile,
   activeModule = 'overview',
   onSelectModule
 }: TaxSimulatorDashboardProps) {
+  const [manualDriveUrlInput, setManualDriveUrlInput] = useState('');
   // Calcolo dei contributi inseriti dagli F24 per l'anno selezionato
   const excludedTaxCodes = ['2501', '2524'];
   const autoContributions = f24Entries
@@ -859,21 +866,96 @@ export default function TaxSimulatorDashboard({
               <Upload className="w-6 h-6" />
             </div>
             <div className="flex-1">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-extrabold text-theme-text tracking-tight">Caricamento Dati Intelligente</h3>
-                {driveFolderUrl && (
-                  <a 
-                    href={driveFolderUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-theme-bg hover:bg-theme-border text-theme-text-muted hover:text-theme-text rounded-xl text-[10px] font-bold transition-all border border-theme-border"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                    <span>Apri Cartella Drive</span>
-                  </a>
-                )}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-lg font-extrabold text-theme-text tracking-tight">Fatture XML, Cassa & Google Drive</h3>
+                  <p className="text-xs text-theme-text-muted">Carica o sincronizza le fatture XML con Google Drive e il Foglio di calcolo Quadro LM</p>
+                </div>
+                <div className="flex items-center flex-wrap gap-2">
+                  {onSyncDriveInvoices && (
+                    <button 
+                      type="button"
+                      onClick={onSyncDriveInvoices} 
+                      disabled={isSyncingDriveInvoices}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                      title={`Verifica tutti i file XML presenti nella cartella Drive 'Fatture Emesse' per l'anno ${selectedYear} e aggiorna il gestionale e il Google Sheet`}
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncingDriveInvoices ? 'animate-spin' : ''}`} />
+                      <span>{isSyncingDriveInvoices ? `Controllo Drive (${selectedYear})...` : `Controllo Fatture Presenti su Drive & Aggiorna (${selectedYear})`}</span>
+                    </button>
+                  )}
+                  {googleSheetUrl && (
+                    <a
+                      href={googleSheetUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition-all shadow-xs"
+                      title="Apri il Google Sheet sincronizzato con l'elenco delle fatture e il calcolo ministeriale del Quadro LM"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Apri Google Sheet Quadro LM</span>
+                    </a>
+                  )}
+                  {driveFolderUrl && (
+                    <a 
+                      href={driveFolderUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-theme-bg hover:bg-theme-border text-theme-text-muted hover:text-theme-text rounded-xl text-xs font-bold transition-all border border-theme-border"
+                      title="Apri la cartella di archiviazione Google Drive dell'anno contabile"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Apri Cartella Drive</span>
+                    </a>
+                  )}
+                </div>
               </div>
-              <p className="text-xs text-theme-text-muted">Carica o rimuovi i documenti e monitora il riepilogo in tempo reale</p>
+
+              {/* Box Collegamento Cartella Google Drive Contabilità */}
+              <div className="mt-4 p-3 bg-slate-50 rounded-2xl border border-slate-200/90 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 overflow-hidden flex-wrap">
+                  <span className="flex items-center gap-1.5 font-bold text-slate-800 shrink-0">
+                    <Folder className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Cartella Contabilità Drive:</span>
+                  </span>
+                  <a 
+                    href={driveFolderUrl || `https://drive.google.com/drive/folders/${driveFolderId || '16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb'}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-sky-600 hover:text-sky-700 font-semibold hover:underline truncate max-w-[240px] sm:max-w-md inline-flex items-center gap-1"
+                    title={driveFolderUrl || `https://drive.google.com/drive/folders/${driveFolderId || '16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb'}`}
+                  >
+                    <span>{driveFolderId || '16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb'}</span>
+                    <ExternalLink className="w-3 h-3 shrink-0" />
+                  </a>
+                  <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold shrink-0">
+                    ✓ Collegata
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                  <input
+                    type="text"
+                    placeholder="Incolla link o ID cartella Drive..."
+                    value={manualDriveUrlInput}
+                    onChange={(e) => setManualDriveUrlInput(e.target.value)}
+                    className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 flex-1 md:w-64"
+                  />
+                  <button
+                    type="button"
+                    disabled={!manualDriveUrlInput.trim()}
+                    onClick={() => {
+                      if (onConnectDriveFolder && manualDriveUrlInput.trim()) {
+                        onConnectDriveFolder(manualDriveUrlInput.trim());
+                        setManualDriveUrlInput('');
+                      }
+                    }}
+                    className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xs transition-colors shrink-0 cursor-pointer shadow-xs"
+                  >
+                    Collega Cartella
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
           

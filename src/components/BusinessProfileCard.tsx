@@ -20,6 +20,7 @@ interface BusinessProfileCardProps {
   isRecreatingFolder?: boolean;
   onSaveAnagrafica?: () => void;
   isUnselected?: boolean;
+  onConnectDriveFolder?: (urlOrId: string) => Promise<void> | void;
 }
 
 export default function BusinessProfileCard({ 
@@ -32,9 +33,11 @@ export default function BusinessProfileCard({
   onRecreateDriveFolder,
   isRecreatingFolder = false,
   onSaveAnagrafica,
-  isUnselected = false
+  isUnselected = false,
+  onConnectDriveFolder
 }: BusinessProfileCardProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [manualDriveInput, setManualDriveInput] = useState('');
   const [showAtecoDropdown, setShowAtecoDropdown] = useState(false);
   const [isAtecoFocused, setIsAtecoFocused] = useState(false);
   const [isImportingAteco, setIsImportingAteco] = useState(false);
@@ -478,6 +481,31 @@ export default function BusinessProfileCard({
             (Clicca "Creazione Cartella Drive" per generare l'albero di directory prima di poter confermare l'anagrafica)
           </p>
         )}
+
+        {/* Input collegamento manuale Cartella Drive o Link esistente */}
+        <div className="mt-3 pt-3 border-t border-slate-200/80 flex flex-col sm:flex-row items-center gap-2">
+          <input
+            type="text"
+            disabled={isUnselected}
+            placeholder="Incolla link o ID cartella Drive (es. 16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb)..."
+            value={manualDriveInput}
+            onChange={(e) => setManualDriveInput(e.target.value)}
+            className="flex-1 w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 disabled:opacity-50"
+          />
+          <button
+            type="button"
+            disabled={isUnselected || !manualDriveInput.trim()}
+            onClick={() => {
+              if (onConnectDriveFolder && manualDriveInput.trim()) {
+                onConnectDriveFolder(manualDriveInput.trim());
+                setManualDriveInput('');
+              }
+            }}
+            className="w-full sm:w-auto px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-xl transition-all shadow-xs shrink-0 cursor-pointer"
+          >
+            Collega Cartella
+          </button>
+        </div>
       </div>
 
     </div>

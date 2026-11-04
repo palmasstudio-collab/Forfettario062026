@@ -177,4 +177,6 @@ export interface AccountingPosition {
   fattureEmesseFolderId?: string;
   f24FolderId?: string;
   fileGenericiFolderId?: string;
+  googleSheetId?: string;
+  googleSheetUrl?: string;
 }

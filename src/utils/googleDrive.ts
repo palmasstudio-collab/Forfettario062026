@@ -477,6 +477,24 @@ export async function listDriveFolders(accessToken: string): Promise<DriveFile[]
 }
 
 /**
+/**
+ * Extracts a Google Drive folder ID from a URL or raw ID string.
+ */
+export function extractGoogleDriveFolderId(input: string): string {
+  if (!input) return '';
+  const trimmed = input.trim();
+  const match = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) {
+    return match[1];
+  }
+  const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idMatch && idMatch[1]) {
+    return idMatch[1];
+  }
+  return trimmed;
+}
+
+/**
  * Uploads an XML invoice file to the "Fatture Emesse" folder inside the parent folder on Google Drive.
  */
 export async function uploadInvoiceXml(
@@ -492,13 +510,13 @@ export async function uploadInvoiceXml(
     }
     // 1. Use existing or find/create the dedicated "Fatture Emesse" subfolder inside the position folder
     let invoicesFolderId = '';
-    if (year) {
+    if (customFattureFolderId && customFattureFolderId.trim() !== '') {
+      invoicesFolderId = customFattureFolderId;
+    } else if (year) {
       const resolved = await resolveYearFolderAndSubfolder(accessToken, parentPositionFolderId, year, 'Fatture Emesse', true);
       invoicesFolderId = resolved.subfolderId;
     } else {
-      invoicesFolderId = customFattureFolderId && customFattureFolderId.trim() !== ''
-        ? customFattureFolderId
-        : (await findOrCreateFolder(accessToken, 'Fatture Emesse', parentPositionFolderId)).id;
+      invoicesFolderId = (await findOrCreateFolder(accessToken, 'Fatture Emesse', parentPositionFolderId)).id;
     }
 
     // 2. Create the metadata

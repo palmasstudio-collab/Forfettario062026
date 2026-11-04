@@ -25,7 +25,8 @@ import {
   resolveYearFolderAndSubfolder, 
   verifyAndRecreateFolderStructure,
   searchDriveForAccountingPositions,
-  importAccountingPositionFromDrive
+  importAccountingPositionFromDrive,
+  extractGoogleDriveFolderId
 } from './utils/googleDrive';
 import { parseInvoiceXml } from './utils/xmlInvoiceParser';
 import { syncInvoicesToGoogleSheet } from './utils/googleSheetsSync';
@@ -132,9 +133,12 @@ import { ErrorBoundary } from './ErrorBoundary';
 
 import { initAuth, googleSignIn, logout as firebaseLogout, getAccessToken } from './lib/firebaseAuth';
 
+export const DEFAULT_ACCOUNTING_FOLDER_ID = '16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb';
+export const DEFAULT_ACCOUNTING_FOLDER_URL = 'https://drive.google.com/drive/folders/16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb';
+
 export const VALERIA_MAROS_POSITION_ID = 'pos-valeria-maros-univoca';
-export const VALERIA_MAROS_FOLDER_ID = '1ogkOOPa-fallback-valeria-maros';
-export const VALERIA_MAROS_FOLDER_URL = 'https://drive.google.com/drive/folders/1ogkOOPa-fallback-valeria-maros';
+export const VALERIA_MAROS_FOLDER_ID = DEFAULT_ACCOUNTING_FOLDER_ID;
+export const VALERIA_MAROS_FOLDER_URL = DEFAULT_ACCOUNTING_FOLDER_URL;
 
 export const PERMANENT_MAROS_POSITION: AccountingPosition = {
   id: VALERIA_MAROS_POSITION_ID,
@@ -149,8 +153,8 @@ export const PERMANENT_MAROS_POSITION: AccountingPosition = {
     isStartup: true,
     inpsReduction35: false
   },
-  driveFolderId: VALERIA_MAROS_FOLDER_ID,
-  driveFolderUrl: VALERIA_MAROS_FOLDER_URL,
+  driveFolderId: DEFAULT_ACCOUNTING_FOLDER_ID,
+  driveFolderUrl: DEFAULT_ACCOUNTING_FOLDER_URL,
   invoices: [
     {
       id: 'inv-maros-1',
@@ -261,11 +265,12 @@ const getInitialPositions = (): AccountingPosition[] => {
     // Garantisci che la posizione di Valeria Maros abbia sempre il driveFolderId univoco
     loadedList = loadedList.map(p => {
       if (p.id === VALERIA_MAROS_POSITION_ID || p.profile?.fullName?.toLowerCase().includes('maros')) {
+        const needsFolderUpdate = !p.driveFolderId || p.driveFolderId.includes('fallback') || p.driveFolderId.includes('mock');
         return {
           ...p,
           id: VALERIA_MAROS_POSITION_ID,
-          driveFolderId: p.driveFolderId || VALERIA_MAROS_FOLDER_ID,
-          driveFolderUrl: p.driveFolderUrl || VALERIA_MAROS_FOLDER_URL
+          driveFolderId: needsFolderUpdate ? DEFAULT_ACCOUNTING_FOLDER_ID : p.driveFolderId,
+          driveFolderUrl: needsFolderUpdate ? DEFAULT_ACCOUNTING_FOLDER_URL : p.driveFolderUrl
         };
       }
       return p;
@@ -596,6 +601,51 @@ export default function App() {
     }
   };
 
+  const handleConnectCustomDriveFolder = async (folderInput: string) => {
+    const folderId = extractGoogleDriveFolderId(folderInput);
+    if (!folderId) {
+      safeAlert("Inserisci un link o ID di cartella Google Drive valido.");
+      return;
+    }
+
+    const folderUrl = `https://drive.google.com/drive/folders/${folderId}`;
+    addSyncLog(`🔗 Collegamento cartella Google Drive: ${folderId}...`);
+
+    let targetFattureId = '';
+    let targetF24Id = '';
+
+    const token = googleAccessTokenState;
+    if (token) {
+      try {
+        const resolvedFatture = await resolveYearFolderAndSubfolder(token, folderId, selectedYear, 'Fatture Emesse', true);
+        targetFattureId = resolvedFatture.subfolderId;
+        const resolvedF24 = await resolveYearFolderAndSubfolder(token, folderId, selectedYear, 'F24', true);
+        targetF24Id = resolvedF24.subfolderId;
+        addSyncLog(`✅ Sottocartelle "Anno ${selectedYear}/Fatture Emesse" e "F24" verificate con successo.`);
+      } catch (err: any) {
+        console.warn("Impossibile verificare immediatamente le sottocartelle:", err);
+      }
+    }
+
+    setPositions((prev) =>
+      prev.map((pos) => {
+        if (pos.id === activePositionId) {
+          return {
+            ...pos,
+            driveFolderId: folderId,
+            driveFolderUrl: folderUrl,
+            fattureEmesseFolderId: targetFattureId || pos.fattureEmesseFolderId,
+            f24FolderId: targetF24Id || pos.f24FolderId,
+          };
+        }
+        return pos;
+      })
+    );
+
+    addSyncLog(`✅ Cartella Google Drive collegata con successo: ${folderUrl}`);
+    safeAlert(`Cartella contabilità Google Drive collegata con successo!\n${folderUrl}`);
+  };
+
   const handleUploadInvoiceXmlToDrive = async (file: File, year?: string) => {
     if (!activePosition) {
       throw new Error("Nessuna posizione contabile attiva selezionata.");
@@ -606,46 +656,49 @@ export default function App() {
     }
     
     const uploadYear = year || selectedYear;
-    const posStartYear = activePosition.profile?.startYear || '2025';
-    addSyncLog(`🔍 Verifica preventiva obbligatoria dell'esistenza delle cartelle di archiviazione per "${activePosition.profile.fullName || 'Cliente'}"...`);
+    const targetFolderId = activePosition.driveFolderId || DEFAULT_ACCOUNTING_FOLDER_ID;
+
+    addSyncLog(`🔍 Risoluzione cartella "Anno ${uploadYear}/Fatture Emesse" nella cartella contabilità...`);
 
     try {
-      // Verify existing structure or recreate if missing
-      const healedFolder = await verifyAndRecreateFolderStructure(
+      const resolved = await resolveYearFolderAndSubfolder(
         token,
-        activePosition.name,
-        activePosition.profile.fullName,
-        activePosition.driveFolderId,
+        targetFolderId,
         uploadYear,
-        undefined,
-        posStartYear
+        'Fatture Emesse',
+        true
       );
-
-      // Save healed structure in the state
-      setPositions((prev) =>
-        prev.map((pos) => {
-          if (pos.id === activePositionId) {
-            return {
-              ...pos,
-              driveFolderId: healedFolder.id,
-              driveFolderUrl: healedFolder.url,
-              fattureEmesseFolderId: healedFolder.fattureEmesseFolderId,
-              f24FolderId: healedFolder.f24FolderId,
-              fileGenericiFolderId: healedFolder.fileGenericiFolderId,
-            };
-          }
-          return pos;
-        })
-      );
-
-      addSyncLog(`✅ Struttura cartelle verificata e pronta per l'archiviazione della fattura.`);
       
-      // Proceed to upload the XML into the verified invoices folder
-      return await uploadInvoiceXml(token, healedFolder.id, file, healedFolder.fattureEmesseFolderId, uploadYear);
+      const invoicesFolderId = resolved.subfolderId;
+
+      addSyncLog(`📁 Salvataggio file XML "${file.name}" nella cartella Drive "Fatture Emesse"...`);
+      
+      const uploadResult = await uploadInvoiceXml(token, targetFolderId, file, invoicesFolderId, uploadYear);
+      
+      addSyncLog(`✅ Fattura "${file.name}" archiviata su Google Drive con successo (ID: ${uploadResult.id})`);
+
+      // Aggiorna lo stato delle sottocartelle della posizione se necessario
+      if (invoicesFolderId && activePosition.fattureEmesseFolderId !== invoicesFolderId) {
+        setPositions((prev) =>
+          prev.map((pos) => {
+            if (pos.id === activePositionId) {
+              return {
+                ...pos,
+                driveFolderId: targetFolderId,
+                driveFolderUrl: `https://drive.google.com/drive/folders/${targetFolderId}`,
+                fattureEmesseFolderId: invoicesFolderId,
+              };
+            }
+            return pos;
+          })
+        );
+      }
+
+      return uploadResult;
     } catch (err: any) {
-      console.error(err);
-      addSyncLog(`❌ Errore durante la verifica/ripristino preventivo delle cartelle: ${err.message || err}`);
-      throw new Error(`Archiviazione sospesa per sicurezza: ${err.message || err}`);
+      console.error("Errore upload XML su Drive:", err);
+      addSyncLog(`❌ Errore durante il salvataggio su Drive: ${err.message || err}`);
+      throw err;
     }
   };
 
@@ -1395,7 +1448,35 @@ export default function App() {
           })
         );
       }
-      addSyncLog(`✅ Sincronizzazione in tempo reale completata con successo per l'anno ${selectedYear}!`);
+
+      // 4. Sincronizzazione contestuale del file Google Sheet con le fatture XML e il calcolo del Quadro LM
+      const finalInvoices = invoicesChanged ? newInvoicesList : (activePosition.invoices || []);
+      const yearInvoices = finalInvoices.filter(i => i.date ? i.date.startsWith(selectedYear) : true);
+      if (fattureFolderId) {
+        addSyncLog(`📊 Aggiornamento contestuale del Google Sheet con XML e Quadro LM per il ${selectedYear}...`);
+        syncInvoicesToGoogleSheet(
+          token,
+          fattureFolderId,
+          yearInvoices,
+          selectedYear,
+          activePosition.profile?.fullName || activePosition.name,
+          activePosition.profile,
+          activePosition.f24Entries || []
+        ).then(res => {
+          if (res.success && res.spreadsheetUrl) {
+            addSyncLog(`✅ Google Sheet Quadro LM sincronizzato: ${res.spreadsheetUrl}`);
+            setPositions(prev =>
+              prev.map(p =>
+                p.id === activePositionId
+                  ? { ...p, googleSheetId: res.spreadsheetId, googleSheetUrl: res.spreadsheetUrl }
+                  : p
+              )
+            );
+          }
+        }).catch(err => console.warn("Google Sheet sync error:", err));
+      }
+
+      addSyncLog(`✅ Controllo e allineamento Drive completati con successo per l'anno ${selectedYear}!`);
     } catch (err: any) {
       addSyncLog("❌ Errore durante la scansione di Drive: " + err.message);
     } finally {
@@ -1545,10 +1626,19 @@ export default function App() {
               pos.fattureEmesseFolderId,
               updated.filter(i => i.date?.startsWith(selectedYear)),
               selectedYear,
-              pos.profile?.fullName || pos.name
+              pos.profile?.fullName || pos.name,
+              pos.profile,
+              pos.f24Entries || []
             ).then(res => {
-              if (res.success) {
-                addSyncLog(`📊 Foglio Google Sheet "Fatture_Emesse_${selectedYear}" aggiornato con successo!`);
+              if (res.success && res.spreadsheetUrl) {
+                addSyncLog(`📊 Foglio Google Sheet Quadro LM aggiornato con successo: ${res.spreadsheetUrl}`);
+                setPositions(currentPositions =>
+                  currentPositions.map(p =>
+                    p.id === activePositionId
+                      ? { ...p, googleSheetId: res.spreadsheetId, googleSheetUrl: res.spreadsheetUrl }
+                      : p
+                  )
+                );
               }
             }).catch(e => console.warn("Google Sheet sync error:", e));
           }
@@ -2171,6 +2261,7 @@ export default function App() {
                 onSaveAnagrafica={() => {
                   safeAlert("Anagrafica configurata e salvata correttamente!");
                 }}
+                onConnectDriveFolder={handleConnectCustomDriveFolder}
               />
             </div>
           ) : (
@@ -2208,6 +2299,7 @@ export default function App() {
                   googleConnected={!!googleUser}
                   driveFolderId={activePosition?.driveFolderId}
                   driveFolderUrl={activePosition?.driveFolderUrl}
+                  googleSheetUrl={activePosition?.googleSheetUrl}
                   f24Files={activePosition?.f24Files || []}
                   onUploadF24={handleUploadF24Pdf}
                   onUploadF24s={handleUploadF24s}
@@ -2224,6 +2316,7 @@ export default function App() {
                   onUploadInvoiceXmlToDrive={handleUploadInvoiceXmlToDrive}
                   onSyncDriveInvoices={handleDriveInvoiceSync}
                   isSyncingDriveInvoices={isSyncingDriveList}
+                  onConnectDriveFolder={handleConnectCustomDriveFolder}
                   onChangeProfile={setProfile}
                   activeModule={activeModule}
                   onSelectModule={setActiveModule}
