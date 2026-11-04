@@ -487,7 +487,7 @@ export default function BusinessProfileCard({
           <input
             type="text"
             disabled={isUnselected}
-            placeholder="Incolla link o ID cartella Drive (es. 16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb)..."
+            placeholder="Incolla link o ID cartella Drive (es. 19oSp4--stkguC2r25d2MfsV3PWUoVXfT)..."
             value={manualDriveInput}
             onChange={(e) => setManualDriveInput(e.target.value)}
             className="flex-1 w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 disabled:opacity-50"

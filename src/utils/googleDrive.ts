@@ -788,7 +788,7 @@ export async function verifyAndRecreateFolderStructure(
       throw new Error("Simulated auth token bypass");
     }
 
-    const defaultRootId = '16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb';
+    const defaultRootId = '19oSp4--stkguC2r25d2MfsV3PWUoVXfT';
     let mainFolderId = currentDriveFolderId && currentDriveFolderId.trim() !== '' ? currentDriveFolderId : defaultRootId;
     let mainFolderUrl = `https://drive.google.com/drive/folders/${mainFolderId}`;
 
@@ -843,7 +843,7 @@ export async function verifyAndRecreateFolderStructure(
     };
   } catch (err) {
     console.warn("Using smart sandbox simulation fallback for Google Drive folder healing:", err);
-    const mockFolderId = currentDriveFolderId || '16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb';
+    const mockFolderId = currentDriveFolderId || '19oSp4--stkguC2r25d2MfsV3PWUoVXfT';
     const mockFattureId = 'mock-fatture-' + Math.random().toString(36).substring(2, 8);
     const mockF24Id = 'mock-f24-' + Math.random().toString(36).substring(2, 8);
     const mockGenericiId = 'mock-generici-' + Math.random().toString(36).substring(2, 8);

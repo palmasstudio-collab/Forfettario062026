@@ -133,8 +133,8 @@ import { ErrorBoundary } from './ErrorBoundary';
 
 import { initAuth, googleSignIn, logout as firebaseLogout, getAccessToken } from './lib/firebaseAuth';
 
-export const DEFAULT_ACCOUNTING_FOLDER_ID = '16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb';
-export const DEFAULT_ACCOUNTING_FOLDER_URL = 'https://drive.google.com/drive/folders/16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb';
+export const DEFAULT_ACCOUNTING_FOLDER_ID = '19oSp4--stkguC2r25d2MfsV3PWUoVXfT';
+export const DEFAULT_ACCOUNTING_FOLDER_URL = 'https://drive.google.com/drive/folders/19oSp4--stkguC2r25d2MfsV3PWUoVXfT';
 
 export const VALERIA_MAROS_POSITION_ID = 'pos-valeria-maros-univoca';
 export const VALERIA_MAROS_FOLDER_ID = DEFAULT_ACCOUNTING_FOLDER_ID;
@@ -309,9 +309,74 @@ export default function App() {
     return '2026';
   });
 
+  const [availableYears, setAvailableYears] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('forfettario_available_years_v1');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {}
+      }
+    }
+    return ['2025', '2026'];
+  });
+
   useEffect(() => {
-    localStorage.setItem('forfettario_selected_year_v1', selectedYear);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('forfettario_selected_year_v1', selectedYear);
+    }
   }, [selectedYear]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('forfettario_available_years_v1', JSON.stringify(availableYears));
+    }
+  }, [availableYears]);
+
+  const handleEnsureYear = (yr: string) => {
+    if (yr && /^\d{4}$/.test(yr) && !availableYears.includes(yr)) {
+      setAvailableYears(prev => [...prev, yr].sort());
+    }
+  };
+
+  const handleAddYear = async (newYearInput?: string) => {
+    let targetYear = newYearInput;
+    if (!targetYear) {
+      const currentMax = Math.max(...availableYears.map(y => parseInt(y, 10)).filter(Boolean));
+      const nextYearStr = String(isNaN(currentMax) ? 2027 : currentMax + 1);
+      const input = prompt(`Inserisci il nuovo esercizio fiscale da aggiungere alla contabilità (es. ${nextYearStr}):`, nextYearStr);
+      if (!input || !input.trim()) return;
+      targetYear = input.trim();
+    }
+
+    if (!/^\d{4}$/.test(targetYear)) {
+      safeAlert("Anno non valido. Inserisci un anno di 4 cifre (es. 2027).");
+      return;
+    }
+
+    if (!availableYears.includes(targetYear)) {
+      setAvailableYears(prev => [...prev, targetYear].sort());
+    }
+
+    setSelectedYear(targetYear);
+
+    const token = googleAccessTokenState;
+    const rootFolderId = activePosition?.driveFolderId || DEFAULT_ACCOUNTING_FOLDER_ID;
+    if (token && rootFolderId) {
+      addSyncLog(`📁 Inizializzazione cartelle per il nuovo esercizio ${targetYear} su Google Drive...`);
+      try {
+        await resolveYearFolderAndSubfolder(token, rootFolderId, targetYear, 'FATTURE EMESSE', true);
+        await resolveYearFolderAndSubfolder(token, rootFolderId, targetYear, 'F24', true);
+        await resolveYearFolderAndSubfolder(token, rootFolderId, targetYear, 'FILE GENERICI', true);
+        addSyncLog(`✅ Cartelle per l'esercizio ${targetYear} ("FATTURE EMESSE", "F24", "FILE GENERICI") pronte su Google Drive.`);
+      } catch (err: any) {
+        console.warn("Creazione cartelle nuovo anno su Drive:", err);
+      }
+    }
+
+    safeAlert(`Esercizio ${targetYear} aggiunto con successo alla contabilità!`);
+  };
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     dashboard: true,
@@ -2049,17 +2114,30 @@ export default function App() {
               </div>
             </div>
 
-            {/* Selettore Esercizio Fiscale */}
-            <div className="relative inline-flex items-center ml-2 border-l border-slate-200 pl-3" id="fiscal-year-selector">
+            {/* Selettore Esercizio Fiscale e Aggiungi Anno */}
+            <div className="relative inline-flex items-center gap-1.5 ml-2 border-l border-slate-200 pl-3" id="fiscal-year-selector">
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
                 className="bg-slate-100 hover:bg-slate-200/70 text-slate-800 font-bold px-2.5 py-1 rounded-lg text-xs outline-none border border-slate-300 cursor-pointer transition-all"
               >
-                <option value="2026">Esercizio 2026</option>
-                <option value="2025">Esercizio 2025</option>
-                <option value="2024">Esercizio 2024</option>
+                {availableYears.map((yr) => (
+                  <option key={yr} value={yr}>
+                    Esercizio {yr}
+                  </option>
+                ))}
               </select>
+
+              <button
+                type="button"
+                onClick={() => handleAddYear()}
+                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-all flex items-center gap-1 shadow-xs cursor-pointer shrink-0"
+                title="Aggiungi un nuovo anno d'esercizio alla contabilità"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Aggiungi Anno</span>
+                <span className="sm:hidden">+ Anno</span>
+              </button>
             </div>
 
             {!isOnline ? (

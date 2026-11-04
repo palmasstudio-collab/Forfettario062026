@@ -919,13 +919,13 @@ export default function TaxSimulatorDashboard({
                     <span>Cartella Contabilità Drive:</span>
                   </span>
                   <a 
-                    href={driveFolderUrl || `https://drive.google.com/drive/folders/${driveFolderId || '16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb'}`}
+                    href={driveFolderUrl || `https://drive.google.com/drive/folders/${driveFolderId || '19oSp4--stkguC2r25d2MfsV3PWUoVXfT'}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-mono text-sky-600 hover:text-sky-700 font-semibold hover:underline truncate max-w-[240px] sm:max-w-md inline-flex items-center gap-1"
-                    title={driveFolderUrl || `https://drive.google.com/drive/folders/${driveFolderId || '16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb'}`}
+                    title={driveFolderUrl || `https://drive.google.com/drive/folders/${driveFolderId || '19oSp4--stkguC2r25d2MfsV3PWUoVXfT'}`}
                   >
-                    <span>{driveFolderId || '16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb'}</span>
+                    <span>{driveFolderId || '19oSp4--stkguC2r25d2MfsV3PWUoVXfT'}</span>
                     <ExternalLink className="w-3 h-3 shrink-0" />
                   </a>
                   <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold shrink-0">
