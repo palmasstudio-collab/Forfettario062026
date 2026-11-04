@@ -114,11 +114,14 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
   };
 
   const handleCreateFolder = async (): Promise<CreatedFolderResult | null> => {
+    if (!accessToken || accessToken.includes('mock-')) {
+      setErrorCreatingFolder("Autenticazione richiesta: Connetti prima il tuo account Google Drive per creare la cartella.");
+      return null;
+    }
     setIsCreatingFolder(true);
     setErrorCreatingFolder('');
     try {
-      const token = accessToken || 'mock-access-token-palmasstudio';
-      const folderResult = await createAccountingPositionFolder(token, name.trim(), fullName.trim(), parentFolderId.trim() || '19oSp4--stkguC2r25d2MfsV3PWUoVXfT', startYear, startYear);
+      const folderResult = await createAccountingPositionFolder(accessToken, name.trim(), fullName.trim(), parentFolderId.trim() || '19oSp4--stkguC2r25d2MfsV3PWUoVXfT', startYear, startYear);
       setCreatedFolderId(folderResult.id);
       setCreatedFolderUrl(folderResult.url);
       setCreatedFattureEmesseFolderId(folderResult.fattureEmesseFolderId);

@@ -70,9 +70,14 @@ export default function DriveSearchModal({
     setErrorMsg(null);
     setHasSearched(true);
 
+    if (!accessToken || accessToken.includes('mock-')) {
+      setIsSearching(false);
+      setErrorMsg("Connetti prima il tuo account Google Drive dall'apposito pulsante per cercare le contabilità.");
+      return;
+    }
+
     try {
-      const token = accessToken || 'mock-token-palmasstudio';
-      const searchRes = await searchDriveForAccountingPositions(token, term);
+      const searchRes = await searchDriveForAccountingPositions(accessToken, term);
       setResults(searchRes);
     } catch (err: any) {
       console.error("Search error:", err);
@@ -86,9 +91,14 @@ export default function DriveSearchModal({
     setImportingId(item.id);
     setErrorMsg(null);
 
+    if (!accessToken || accessToken.includes('mock-')) {
+      setImportingId(null);
+      setErrorMsg("Connetti prima il tuo account Google Drive per importare la posizione.");
+      return;
+    }
+
     try {
-      const token = accessToken || 'mock-token-palmasstudio';
-      const newPos = await importAccountingPositionFromDrive(token, item, selectedYear);
+      const newPos = await importAccountingPositionFromDrive(accessToken, item, selectedYear);
       onPositionImported(newPos);
       onClose();
     } catch (err: any) {
