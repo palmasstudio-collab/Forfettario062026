@@ -27,31 +27,32 @@ const FIREBASE_BACKUP_FOLDER_ID = '13X4iMZ9Z1rF4s-vVz4GVs3MZaPhTegMv';
 /**
  * Find or create a folder with a specific name and optional parentId.
  */
+/**
+ * Find or create a folder with a specific name and optional parentId.
+ * Supports case-insensitive matching and flexible alias checks.
+ */
 export async function findOrCreateFolder(
   accessToken: string,
   folderName: string,
   parentId?: string
 ): Promise<DriveFile> {
-  const queryParts = [
-    `mimeType = 'application/vnd.google-apps.folder'`,
-    `trashed = false`
-  ];
-
-  // Escape single quotes for safety
-  const escapedName = folderName.replace(/'/g, "\\'");
-  queryParts.push(`name = '${escapedName}'`);
-
-  if (parentId) {
-    queryParts.push(`'${parentId}' in parents`);
-  }
-
-  const q = queryParts.join(' and ');
-  const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,webViewLink)`;
-
   try {
     if (accessToken.includes('mock-')) {
       throw new Error("Simulated auth token bypass");
     }
+
+    const queryParts = [
+      `mimeType = 'application/vnd.google-apps.folder'`,
+      `trashed = false`
+    ];
+
+    if (parentId) {
+      queryParts.push(`'${parentId}' in parents`);
+    }
+
+    const q = queryParts.join(' and ');
+    const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,webViewLink)&pageSize=100`;
+
     const searchRes = await fetch(searchUrl, {
       method: 'GET',
       headers: {
@@ -59,14 +60,37 @@ export async function findOrCreateFolder(
       },
     });
 
-    if (!searchRes.ok) {
-      const errText = await searchRes.text();
-      throw new Error(`Errore durante la ricerca della cartella: ${errText}`);
-    }
+    if (searchRes.ok) {
+      const searchData = await searchRes.json();
+      const files: DriveFile[] = searchData.files || [];
+      const targetLower = folderName.trim().toLowerCase();
 
-    const searchData = await searchRes.json();
-    if (searchData.files && searchData.files.length > 0) {
-      return searchData.files[0];
+      // 1. Exact case-insensitive match
+      const exactMatch = files.find(f => f.name.trim().toLowerCase() === targetLower);
+      if (exactMatch) return exactMatch;
+
+      // 2. Semantic matching for standard subfolders
+      if (targetLower.includes('fatture') || targetLower.includes('emesse')) {
+        const feMatch = files.find(f => {
+          const nl = f.name.toLowerCase();
+          return nl.includes('fattur') || nl.includes('emess');
+        });
+        if (feMatch) return feMatch;
+      }
+
+      if (targetLower.includes('f24')) {
+        const f24Match = files.find(f => f.name.toLowerCase().includes('f24'));
+        if (f24Match) return f24Match;
+      }
+
+      if (targetLower.includes('generic')) {
+        const genMatch = files.find(f => f.name.toLowerCase().includes('generic') || f.name.toLowerCase().includes('file'));
+        if (genMatch) return genMatch;
+      }
+
+      if (files.length > 0 && !parentId) {
+        return files[0];
+      }
     }
 
     // Not found, let's create it
@@ -99,7 +123,7 @@ export async function findOrCreateFolder(
 
 /**
  * Resolves the nested folder structure for a given fiscal year.
- * Flexible: searches for 'Anno 2026' or '2026', and finds or creates the subfolder (e.g. 'Fatture Emesse' or 'F24').
+ * Flexible: searches for '2025', '2026', 'Anno 2026', and finds subfolders ('FATTURE EMESSE', 'F24', 'FILE GENERICI').
  */
 export async function resolveYearFolderAndSubfolder(
   accessToken: string,
@@ -108,22 +132,29 @@ export async function resolveYearFolderAndSubfolder(
   subfolderName: string,
   autoCreate: boolean = true
 ): Promise<{ yearFolderId: string; subfolderId: string }> {
-  // 1. Cerca la cartella dell'anno (può chiamarsi "Anno 2026" o semplicemente "2026")
-  const query = `mimeType = 'application/vnd.google-apps.folder' and (name = 'Anno ${selectedYear}' or name = '${selectedYear}') and '${parentFolderId}' in parents and trashed = false`;
-  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`;
-  
   let yearFolderId = '';
+
   try {
     if (accessToken.includes('mock-')) {
       throw new Error("Simulated auth token bypass");
     }
+
+    // 1. Fetch child folders in parentFolderId
+    const query = `'${parentFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+    const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,webViewLink)&pageSize=100`;
+
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
+
     if (res.ok) {
       const data = await res.json();
-      if (data.files && data.files.length > 0) {
-        yearFolderId = data.files[0].id;
+      const files: DriveFile[] = data.files || [];
+
+      // Match folder containing selectedYear (e.g. "2026", "Anno 2026", "ANNO 2026")
+      const matchedYearFolder = files.find(f => f.name.includes(selectedYear));
+      if (matchedYearFolder) {
+        yearFolderId = matchedYearFolder.id;
       }
     }
   } catch (err) {
@@ -139,21 +170,37 @@ export async function resolveYearFolderAndSubfolder(
     }
   }
 
-  // 2. Cerca la sottocartella specifica (es. "Fatture Emesse", "Fatture", "F24")
-  const subNames = subfolderName === 'Fatture Emesse' ? ["Fatture Emesse", "Fatture"] : [subfolderName];
-  const nameCondition = subNames.map(n => `name = '${n}'`).join(' or ');
-  const subQuery = `mimeType = 'application/vnd.google-apps.folder' and (${nameCondition}) and '${yearFolderId}' in parents and trashed = false`;
-  const subUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(subQuery)}&fields=files(id,name)`;
-  
+  // 2. Fetch subfolders inside yearFolderId
   let subfolderId = '';
   try {
+    const subQuery = `'${yearFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+    const subUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(subQuery)}&fields=files(id,name,webViewLink)&pageSize=100`;
+
     const res = await fetch(subUrl, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
+
     if (res.ok) {
       const data = await res.json();
-      if (data.files && data.files.length > 0) {
-        subfolderId = data.files[0].id;
+      const files: DriveFile[] = data.files || [];
+      const subLower = subfolderName.trim().toLowerCase();
+
+      // Case-insensitive exact or semantic match
+      const exactSub = files.find(f => f.name.trim().toLowerCase() === subLower);
+      if (exactSub) {
+        subfolderId = exactSub.id;
+      } else if (subLower.includes('fatture') || subLower.includes('emesse')) {
+        const feMatch = files.find(f => {
+          const nl = f.name.toLowerCase();
+          return nl.includes('fattur') || nl.includes('emess');
+        });
+        if (feMatch) subfolderId = feMatch.id;
+      } else if (subLower.includes('f24')) {
+        const f24Match = files.find(f => f.name.toLowerCase().includes('f24'));
+        if (f24Match) subfolderId = f24Match.id;
+      } else if (subLower.includes('generic')) {
+        const genMatch = files.find(f => f.name.toLowerCase().includes('generic') || f.name.toLowerCase().includes('file'));
+        if (genMatch) subfolderId = genMatch.id;
       }
     }
   } catch (err) {
@@ -165,7 +212,6 @@ export async function resolveYearFolderAndSubfolder(
       const createdSub = await findOrCreateFolder(accessToken, subfolderName, yearFolderId);
       subfolderId = createdSub.id;
     } else {
-      // Se non trova la sottocartella e autoCreate è false, scansioniamo direttamente la cartella dell'anno
       subfolderId = yearFolderId;
     }
   }
@@ -191,13 +237,13 @@ export async function uploadF24Pdf(
     }
     // 1. Use existing or find/create the dedicated "F24" subfolder inside the position folder
     let f24FolderId = '';
-    if (year) {
+    if (customF24FolderId && customF24FolderId.trim() !== '') {
+      f24FolderId = customF24FolderId;
+    } else if (year) {
       const resolved = await resolveYearFolderAndSubfolder(accessToken, parentPositionFolderId, year, 'F24', true);
       f24FolderId = resolved.subfolderId;
     } else {
-      f24FolderId = customF24FolderId && customF24FolderId.trim() !== ''
-        ? customF24FolderId
-        : (await findOrCreateFolder(accessToken, 'F24', parentPositionFolderId)).id;
+      f24FolderId = (await findOrCreateFolder(accessToken, 'F24', parentPositionFolderId)).id;
     }
 
     // 2. Format the file name dynamically
@@ -742,61 +788,25 @@ export async function verifyAndRecreateFolderStructure(
       throw new Error("Simulated auth token bypass");
     }
 
-    const defaultParentFolderId = '1ogkOOPaH3EwYUV-DO-GHgZ0HswocM7E8';
-    const parent = customParentId && customParentId.trim() !== '' ? customParentId : defaultParentFolderId;
-    const cleanedFullName = clientFullName.trim();
-    const finalFolderTitle = `Forfettario ${cleanedFullName || positionName.trim() || 'Senza Nome'}`;
+    const defaultRootId = '16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb';
+    let mainFolderId = currentDriveFolderId && currentDriveFolderId.trim() !== '' ? currentDriveFolderId : defaultRootId;
+    let mainFolderUrl = `https://drive.google.com/drive/folders/${mainFolderId}`;
 
-    let mainFolderId = currentDriveFolderId;
-    let mainFolder: { id: string; webViewLink?: string; name?: string } | null = null;
-
-    // 1. Verify if the main folder exists on Drive and relocate it to the new parent if needed
-    if (mainFolderId) {
-      try {
-        const checkRes = await fetch(
-          `https://www.googleapis.com/drive/v3/files/${mainFolderId}?fields=id,name,trashed,parents,webViewLink`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        if (checkRes.ok) {
-          const fileData = await checkRes.json();
-          if (!fileData.trashed) {
-            mainFolder = fileData;
-            // Check if it's already under the target parent folder
-            const currentParents: string[] = fileData.parents || [];
-            if (!currentParents.includes(parent)) {
-              // Move the existing folder into the new target destination folder
-              const removeParentsStr = currentParents.join(',');
-              const moveUrl = `https://www.googleapis.com/drive/v3/files/${mainFolderId}?addParents=${parent}${removeParentsStr ? `&removeParents=${removeParentsStr}` : ''}&fields=id,name,parents,webViewLink`;
-              const moveRes = await fetch(moveUrl, {
-                method: 'PATCH',
-                headers: { Authorization: `Bearer ${accessToken}` }
-              });
-              if (moveRes.ok) {
-                const movedData = await moveRes.json();
-                mainFolder = movedData;
-              }
-            }
-          }
+    // Verify main folder exists on Drive
+    try {
+      const checkRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${mainFolderId}?fields=id,name,trashed,webViewLink`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (checkRes.ok) {
+        const fileData = await checkRes.json();
+        if (!fileData.trashed) {
+          mainFolderId = fileData.id;
+          if (fileData.webViewLink) mainFolderUrl = fileData.webViewLink;
         }
-      } catch (err) {
-        console.warn("Could not verify or relocate existing folder:", err);
       }
-    }
-
-    if (!mainFolder) {
-      // Create or find the main folder directly under the target parent folder
-      const foundOrCreated = await findOrCreateFolder(accessToken, finalFolderTitle, parent);
-      mainFolderId = foundOrCreated.id;
-      mainFolder = foundOrCreated;
-      
-      // Create shortcut in central shared Google Drive folder
-      try {
-        await createDriveShortcut(accessToken, finalFolderTitle, mainFolderId);
-      } catch (shortcutErr) {
-        console.warn("Could not create Drive shortcut in central shared folder:", shortcutErr);
-      }
-    } else {
-      mainFolderId = mainFolder.id;
+    } catch (err) {
+      console.warn("Could not verify existing main folder:", err);
     }
 
     const currentYearNum = new Date().getFullYear();
@@ -810,31 +820,30 @@ export async function verifyAndRecreateFolderStructure(
     let selectedYearF24Id = '';
     let selectedYearFileGenericiId = '';
 
-    // Create subfolders for ALL years from startYear up to currentYear (e.g. 2025 -> 2026)
+    // Resolve subfolders for ALL years from startYear up to currentYear (e.g. 2025 -> 2026)
     for (let y = startYearNum; y <= endYearNum; y++) {
-      const yearFolder = await findOrCreateFolder(accessToken, `Anno ${y}`, mainFolderId);
+      const yrStr = String(y);
+      const resFatture = await resolveYearFolderAndSubfolder(accessToken, mainFolderId, yrStr, 'FATTURE EMESSE', true);
+      const resF24 = await resolveYearFolderAndSubfolder(accessToken, mainFolderId, yrStr, 'F24', true);
+      const resGenerici = await resolveYearFolderAndSubfolder(accessToken, mainFolderId, yrStr, 'FILE GENERICI', true);
 
-      const fattureFolder = await findOrCreateFolder(accessToken, 'Fatture Emesse', yearFolder.id);
-      const f24Folder = await findOrCreateFolder(accessToken, 'F24', yearFolder.id);
-      const fileGenericiFolder = await findOrCreateFolder(accessToken, 'File Generici', yearFolder.id);
-
-      if (String(y) === year || y === endYearNum || !selectedYearFattureId) {
-        selectedYearFattureId = fattureFolder.id;
-        selectedYearF24Id = f24Folder.id;
-        selectedYearFileGenericiId = fileGenericiFolder.id;
+      if (yrStr === year || y === endYearNum || !selectedYearFattureId) {
+        selectedYearFattureId = resFatture.subfolderId;
+        selectedYearF24Id = resF24.subfolderId;
+        selectedYearFileGenericiId = resGenerici.subfolderId;
       }
     }
 
     return {
       id: mainFolderId,
-      url: mainFolder.webViewLink || `https://drive.google.com/drive/folders/${mainFolderId}`,
+      url: mainFolderUrl,
       fattureEmesseFolderId: selectedYearFattureId,
       f24FolderId: selectedYearF24Id,
       fileGenericiFolderId: selectedYearFileGenericiId
     };
   } catch (err) {
     console.warn("Using smart sandbox simulation fallback for Google Drive folder healing:", err);
-    const mockFolderId = currentDriveFolderId || ('1Kf0SimulatedHealed' + Math.random().toString(36).substring(2, 10).toUpperCase());
+    const mockFolderId = currentDriveFolderId || '16B0ppuLpkLnsX1EoISy4zvRnA4PO6Snb';
     const mockFattureId = 'mock-fatture-' + Math.random().toString(36).substring(2, 8);
     const mockF24Id = 'mock-f24-' + Math.random().toString(36).substring(2, 8);
     const mockGenericiId = 'mock-generici-' + Math.random().toString(36).substring(2, 8);
