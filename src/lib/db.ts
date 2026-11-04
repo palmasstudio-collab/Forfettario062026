@@ -1,81 +1,50 @@
 import { db } from './firebase';
-import { collection, doc, getDocs, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
-
-function sanitizeForFirestore(obj: any): any {
-  if (obj === null || obj === undefined) return null;
-  return JSON.parse(JSON.stringify(obj));
-}
+import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc, writeBatch } from 'firebase/firestore';
 
 export const dbService = {
   async getAccountingPositions(userId: string) {
-    try {
-      const querySnapshot = await getDocs(collection(db, `users_data/${userId}/accountingPositions`));
-      const positions: any[] = [];
-      querySnapshot.forEach((doc) => {
-        positions.push(doc.data());
-      });
-      return positions;
-    } catch (err) {
-      console.warn("Firestore positions fetch failed (operating in offline local storage mode):", err);
-      return [];
-    }
+    const querySnapshot = await getDocs(collection(db, `users_data/${userId}/accountingPositions`));
+    const positions: any[] = [];
+    querySnapshot.forEach((doc) => {
+      positions.push(doc.data());
+    });
+    return positions;
   },
 
   async setAccountingPosition(userId: string, position: any) {
-    try {
-      const posRef = doc(db, `users_data/${userId}/accountingPositions`, position.id);
-      await setDoc(posRef, sanitizeForFirestore(position), { merge: true });
-    } catch (err) {
-      console.warn("Firestore position save failed (operating in offline local storage mode):", err);
-    }
+    const posRef = doc(db, `users_data/${userId}/accountingPositions`, position.id);
+    await setDoc(posRef, position);
   },
 
   async deleteAccountingPosition(userId: string, positionId: string) {
-    try {
-      const posRef = doc(db, `users_data/${userId}/accountingPositions`, positionId);
-      await deleteDoc(posRef);
-    } catch (err) {
-      console.warn("Firestore position delete failed (operating in offline local storage mode):", err);
-    }
+    const posRef = doc(db, `users_data/${userId}/accountingPositions`, positionId);
+    await deleteDoc(posRef);
   },
   
   async syncAllPositions(userId: string, positions: any[]) {
-    try {
-      const batch = writeBatch(db);
-      positions.forEach(pos => {
-        const posRef = doc(db, `users_data/${userId}/accountingPositions`, pos.id);
-        batch.set(posRef, sanitizeForFirestore(pos), { merge: true });
-      });
-      await batch.commit();
-    } catch (err) {
-      console.warn("Firestore syncAllPositions failed (operating in offline local storage mode):", err);
-    }
+    // Basic sync: just overwrite the positions in Firestore based on the current local state.
+    // In a real app, you would want to merge them or use timestamps.
+    const batch = writeBatch(db);
+    positions.forEach(pos => {
+      const posRef = doc(db, `users_data/${userId}/accountingPositions`, pos.id);
+      batch.set(posRef, pos);
+    });
+    await batch.commit();
   },
 
   async addInvoice(userId: string, positionId: string, invoice: any) {
-    try {
-      const invRef = doc(collection(db, `users_data/${userId}/accountingPositions/${positionId}/invoices`), invoice.id);
-      await setDoc(invRef, sanitizeForFirestore(invoice), { merge: true });
-    } catch (err) {
-      console.warn("Firestore addInvoice failed (operating in offline local storage mode):", err);
-    }
+    const invRef = doc(collection(db, `users_data/${userId}/accountingPositions/${positionId}/invoices`), invoice.id);
+    await setDoc(invRef, invoice);
   },
 
   async deleteInvoice(userId: string, positionId: string, invoiceId: string) {
-    try {
-      const invRef = doc(db, `users_data/${userId}/accountingPositions/${positionId}/invoices`, invoiceId);
-      await deleteDoc(invRef);
-    } catch (err) {
-      console.warn("Firestore deleteInvoice failed (operating in offline local storage mode):", err);
-    }
+    const invRef = doc(db, `users_data/${userId}/accountingPositions/${positionId}/invoices`, invoiceId);
+    await deleteDoc(invRef);
   },
 
   async addF24Entry(userId: string, positionId: string, entry: any) {
-    try {
-      const entRef = doc(collection(db, `users_data/${userId}/accountingPositions/${positionId}/f24Entries`), entry.id);
-      await setDoc(entRef, sanitizeForFirestore(entry), { merge: true });
-    } catch (err) {
-      console.warn("Firestore addF24Entry failed (operating in offline local storage mode):", err);
-    }
+    const entRef = doc(collection(db, `users_data/${userId}/accountingPositions/${positionId}/f24Entries`), entry.id);
+    await setDoc(entRef, entry);
   }
 };
+

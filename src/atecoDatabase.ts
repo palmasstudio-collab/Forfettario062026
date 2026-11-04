@@ -1,11 +1,6 @@
-// Auto-generated ATECO 2025 Database (Verified & Complete)
+// Auto-generated ATECO 2025 Database
 
-export interface AtecoRegistryItem {
-  code: string;
-  description: string;
-}
-
-export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
+export const ATECO_2025_REGISTRY = [
   {
     "code": "01.11.00",
     "description": "Coltivazione di cereali, legumi da granella e semi oleosi, escluso il riso"
@@ -2035,10 +2030,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
     "description": "Costruzione di edifici residenziali e non residenziali"
   },
   {
-    "code": "41.20.00",
-    "description": "Costruzione di edifici residenziali e non residenziali (Impresa Edile, Muratori)"
-  },
-  {
     "code": "42.11.00",
     "description": "Costruzione di strade e autostrade"
   },
@@ -2084,11 +2075,11 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "43.21.01",
-    "description": "Installazione di impianti elettrici in edifici o in altre opere di costruzione (Elettricisti)"
+    "description": "Installazione di impianti di illuminazione e fotovoltaici in edifici"
   },
   {
     "code": "43.21.02",
-    "description": "Installazione di impianti di allarme, videosorveglianza ed antincendio"
+    "description": "Installazione di cablaggi per telecomunicazioni e altre reti"
   },
   {
     "code": "43.21.03",
@@ -2104,11 +2095,11 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "43.22.01",
-    "description": "Installazione di impianti idraulici, di riscaldamento e di condizionamento dell'aria (Idraulici, Termoidraulici)"
+    "description": "Installazione di impianti geotermici"
   },
   {
     "code": "43.22.02",
-    "description": "Installazione di impianti per la distribuzione del gas"
+    "description": "Installazione di impianti di depurazione per piscine"
   },
   {
     "code": "43.22.03",
@@ -2147,10 +2138,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
     "description": "Altri lavori di installazione edili n.c.a."
   },
   {
-    "code": "43.31.00",
-    "description": "Intonacatura e stuccatura"
-  },
-  {
     "code": "43.31.01",
     "description": "Posa in opera di cartongesso"
   },
@@ -2160,19 +2147,15 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "43.32.01",
-    "description": "Posatura in opera di infissi, serramenti, porte, blindate, persiane (Serramentista)"
+    "description": "Posa in opera di porte blindate"
   },
   {
     "code": "43.32.02",
-    "description": "Posatura in opera di arredi, cucine e mobili su misura (Montatore di Mobili)"
+    "description": "Posa in opera di porte non blindate, finestre, arredi, controsoffitti, pareti mobili e simili"
   },
   {
     "code": "43.33.00",
-    "description": "Rivestimento di pavimenti e muri (Piastrellista, Posatore di Parquet)"
-  },
-  {
-    "code": "43.34.00",
-    "description": "Tinteggiatura e posa in opera di vetri (Imbianchino, Tinteggiatore)"
+    "description": "Rivestimento di pavimenti e di pareti"
   },
   {
     "code": "43.34.01",
@@ -2217,10 +2200,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   {
     "code": "43.99.09",
     "description": "Altri lavori vari di costruzione specializzati n.c.a."
-  },
-  {
-    "code": "46.11.00",
-    "description": "Intermediari del commercio di materie prime agricole, animali vivi, materie prime tessili"
   },
   {
     "code": "46.11.01",
@@ -2339,10 +2318,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
     "description": "Attività di intermediari del commercio all'ingrosso di articoli in pelle e articoli da viaggio"
   },
   {
-    "code": "46.17.00",
-    "description": "Intermediari del commercio di prodotti alimentari, bevande e tabacco"
-  },
-  {
     "code": "46.17.01",
     "description": "Attività di intermediari del commercio all'ingrosso di frutta e ortaggi"
   },
@@ -2369,10 +2344,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   {
     "code": "46.17.07",
     "description": "Attività di intermediari del commercio all'ingrosso di altri prodotti alimentari e tabacchi"
-  },
-  {
-    "code": "46.18.00",
-    "description": "Intermediari del commercio di prodotti particolari n.c.a."
   },
   {
     "code": "46.18.11",
@@ -2473,14 +2444,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   {
     "code": "46.19.00",
     "description": "Attività di intermediari del commercio all'ingrosso non specializzato"
-  },
-  {
-    "code": "46.19.01",
-    "description": "Intermediari del commercio di vari prodotti senza prevalenza di alcuno"
-  },
-  {
-    "code": "46.19.02",
-    "description": "Procacciatori d'affari di vari prodotti (Procacciatore d'affari, Business Finder)"
   },
   {
     "code": "46.21.10",
@@ -3247,18 +3210,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
     "description": "Commercio al dettaglio di altri articoli di seconda mano n.c.a."
   },
   {
-    "code": "47.81.01",
-    "description": "Commercio al dettaglio ambulante di frutta e verdura"
-  },
-  {
-    "code": "47.81.02",
-    "description": "Commercio al dettaglio ambulante di carni e prodotti a base di carne"
-  },
-  {
-    "code": "47.81.09",
-    "description": "Commercio al dettaglio ambulante di altri prodotti alimentari e bevande n.c.a."
-  },
-  {
     "code": "47.81.10",
     "description": "Commercio al dettaglio di automobili e autoveicoli leggeri"
   },
@@ -3271,14 +3222,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
     "description": "Commercio al dettaglio di parti e accessori di autoveicoli"
   },
   {
-    "code": "47.82.01",
-    "description": "Commercio al dettaglio ambulante di tessuti, articoli tessili per la casa, capi di abbigliamento"
-  },
-  {
-    "code": "47.82.02",
-    "description": "Commercio al dettaglio ambulante di calzature e articoli in pelle"
-  },
-  {
     "code": "47.83.10",
     "description": "Commercio al dettaglio di motocicli"
   },
@@ -3287,20 +3230,12 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
     "description": "Commercio al dettaglio di parti e accessori di motocicli"
   },
   {
-    "code": "47.89.01",
-    "description": "Commercio al dettaglio ambulante di chincaglieria e bigiotteria"
-  },
-  {
-    "code": "47.89.09",
-    "description": "Commercio al dettaglio ambulante di altri prodotti n.c.a."
-  },
-  {
     "code": "47.91.10",
-    "description": "Commercio al dettaglio di qualsiasi tipo di prodotto effettuato via internet (E-commerce)"
+    "description": "Attività di servizi di intermediazione per il commercio al dettaglio non specializzato di articoli di seconda mano"
   },
   {
     "code": "47.91.20",
-    "description": "Commercio al dettaglio effettuato per corrispondenza, televisione, telefono"
+    "description": "Attività di servizi di intermediazione per il commercio al dettaglio non specializzato di prodotti nuovi"
   },
   {
     "code": "47.92.10",
@@ -3375,14 +3310,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
     "description": "Altri trasporti non di linea di passeggeri su strada"
   },
   {
-    "code": "49.32.10",
-    "description": "Servizio di trasporto effettuato con taxi (Tassista)"
-  },
-  {
-    "code": "49.32.20",
-    "description": "Noleggio con conducente di autovetture (NCC)"
-  },
-  {
     "code": "49.33.10",
     "description": "Trasporto su taxi"
   },
@@ -3400,7 +3327,7 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "49.41.00",
-    "description": "Trasporto merci su strada per conto terzi (Autotrasportatore)"
+    "description": "Trasporto di merci su strada"
   },
   {
     "code": "49.42.00",
@@ -3540,7 +3467,7 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "53.20.00",
-    "description": "Altre attività postali e di corriere senza obbligo di servizio universale (Corriere espresso, Rider, Food Delivery)"
+    "description": "Altre attività postali e di corriere"
   },
   {
     "code": "53.30.00",
@@ -3548,7 +3475,7 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "55.10.00",
-    "description": "Alberghi e strutture simili"
+    "description": "Servizi di alloggio di alberghi e simili"
   },
   {
     "code": "55.20.10",
@@ -3557,10 +3484,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   {
     "code": "55.20.20",
     "description": "Rifugi e baite di montagna"
-  },
-  {
-    "code": "55.20.30",
-    "description": "Affittacamere per brevi soggiorni, case e appartamenti per vacanze, bed and breakfast, residence (Locazioni Brevi, Airbnb)"
   },
   {
     "code": "55.20.31",
@@ -3580,11 +3503,11 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "55.20.51",
-    "description": "Attività dei Bed and Breakfast (B&B)"
+    "description": "Servizi di alloggio in aziende agricole"
   },
   {
     "code": "55.20.52",
-    "description": "Attività di agriturismo"
+    "description": "Servizi di alloggio in aziende ittiche"
   },
   {
     "code": "55.30.01",
@@ -3609,26 +3532,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   {
     "code": "55.90.00",
     "description": "Altri servizi di alloggio"
-  },
-  {
-    "code": "56.10.11",
-    "description": "Ristorazione con somministrazione (Ristorante, Pizzeria, Trattoria)"
-  },
-  {
-    "code": "56.10.12",
-    "description": "Ristorazione con asporto (Fast Food, Rosticceria, Kebab, Pizzeria al Taglio)"
-  },
-  {
-    "code": "56.10.20",
-    "description": "Ristorazione ambulante e gelaterie/pasticcerie artigianali"
-  },
-  {
-    "code": "56.10.30",
-    "description": "Gelaterie e pasticcerie senza somministrazione"
-  },
-  {
-    "code": "56.10.50",
-    "description": "Catering per eventi e banqueting"
   },
   {
     "code": "56.11.11",
@@ -3693,10 +3596,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   {
     "code": "56.22.02",
     "description": "Altri servizi di ristorazione"
-  },
-  {
-    "code": "56.30.00",
-    "description": "Bar e altri esercizi simili senza cucina (Bar, Cafè, Pub, Enoteca)"
   },
   {
     "code": "56.30.01",
@@ -3811,26 +3710,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
     "description": "Altre attività di telecomunicazioni n.c.a."
   },
   {
-    "code": "62.01.00",
-    "description": "Produzione di software non connesso all'edizione, sviluppo di app, web e soluzioni IT (Software Developer, Programmatore)"
-  },
-  {
-    "code": "62.01.80",
-    "description": "Elaborazione dati, hosting e attività connesse (Cloud, Database Administration)"
-  },
-  {
-    "code": "62.02.00",
-    "description": "Consulenza nel campo delle tecnologie dell'informazione e cybersecurity (IT Consultant, System Integrator)"
-  },
-  {
-    "code": "62.03.00",
-    "description": "Gestione di strutture e apparecchiature informatiche (System Administrator, Network Engineer)"
-  },
-  {
-    "code": "62.09.09",
-    "description": "Altre attività dei servizi connessi alle tecnologie dell'informazione e dell'informatica n.c.a."
-  },
-  {
     "code": "62.10.00",
     "description": "Attività di programmazione informatica"
   },
@@ -3863,24 +3742,12 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
     "description": "Elaborazione altri dati"
   },
   {
-    "code": "63.11.00",
-    "description": "Elaborazione dati, hosting e attività connesse (Data Processing, Server Hosting)"
-  },
-  {
-    "code": "63.12.00",
-    "description": "Portali web, motori di ricerca e piattaforme digitali"
-  },
-  {
     "code": "63.91.00",
-    "description": "Attività delle agenzie di stampa"
+    "description": "Attività dei portali di ricerca sul web"
   },
   {
     "code": "63.92.00",
     "description": "Altre attività dei servizi di informazione"
-  },
-  {
-    "code": "63.99.00",
-    "description": "Altri servizi d'informazione n.c.a. (Gestione contenuti digitali, Piattaforme online)"
   },
   {
     "code": "64.11.00",
@@ -4003,10 +3870,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
     "description": "Servizi fiduciari e di custodia"
   },
   {
-    "code": "68.10.00",
-    "description": "Compravendita di beni immobili effettuata su beni propri"
-  },
-  {
     "code": "68.11.00",
     "description": "Compravendita di beni immobili effettuata su beni propri"
   },
@@ -4016,11 +3879,11 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "68.20.01",
-    "description": "Locazione immobiliare di beni propri o in leasing (Immobili residenziali)"
+    "description": "Affitto e gestione di terreni per telecomunicazioni propri o in locazione"
   },
   {
     "code": "68.20.02",
-    "description": "Locazione immobiliare di beni propri o in leasing (Immobili commerciali e industriali)"
+    "description": "Affitto e gestione di altri terreni ed edifici non residenziali, impianti e fabbriche propri o in locazione"
   },
   {
     "code": "68.20.09",
@@ -4028,11 +3891,7 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "68.31.00",
-    "description": "Attività delle agenzie immobiliari (Agente Immobiliare)"
-  },
-  {
-    "code": "68.32.00",
-    "description": "Amministrazione di condomini e gestione di beni immobili per conto terzi"
+    "description": "Attività di servizi di intermediazione per attività immobiliari"
   },
   {
     "code": "68.32.01",
@@ -4044,11 +3903,11 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "69.10.10",
-    "description": "Attività degli studi legali e avvocati"
+    "description": "Attività legali e giuridiche"
   },
   {
     "code": "69.10.20",
-    "description": "Attività dei notai"
+    "description": "Attività notarili"
   },
   {
     "code": "69.10.30",
@@ -4083,26 +3942,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
     "description": "Attività di centri di assistenza fiscale"
   },
   {
-    "code": "69.20.11",
-    "description": "Attività dei dottori commercialisti"
-  },
-  {
-    "code": "69.20.12",
-    "description": "Attività degli esperti contabili"
-  },
-  {
-    "code": "69.20.13",
-    "description": "Servizi forniti da ragionieri, periti commerciali e tenuta della contabilità"
-  },
-  {
-    "code": "69.20.20",
-    "description": "Consulenza in materia fiscale, tributaria e societaria"
-  },
-  {
-    "code": "69.20.30",
-    "description": "Attività dei consulenti del lavoro e gestione paghe"
-  },
-  {
     "code": "70.10.00",
     "description": "Attività di sedi centrali"
   },
@@ -4119,22 +3958,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
     "description": "Consulenza imprenditoriale e altre attività di consulenza gestionale n.c.a."
   },
   {
-    "code": "70.21.00",
-    "description": "Public relations e comunicazione d'impresa"
-  },
-  {
-    "code": "70.22.01",
-    "description": "Consulenza finanziaria e pianificazione patrimoniale"
-  },
-  {
-    "code": "70.22.09",
-    "description": "Altre attività di consulenza imprenditoriale, gestionale e di direzione aziendale (Business Consultant, Innovation Manager)"
-  },
-  {
-    "code": "71.11.00",
-    "description": "Attività degli studi di architettura (Architetti)"
-  },
-  {
     "code": "71.11.01",
     "description": "Progettazione, pianificazione e supervisione di scavi archeologici"
   },
@@ -4144,19 +3967,19 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "71.12.10",
-    "description": "Attività degli studi di ingegneria civile, strutturale ed edile (Ingegneri)"
+    "description": "Attività di ingegneria"
   },
   {
     "code": "71.12.20",
-    "description": "Servizi di ingegneria energetica, industriale e meccanica"
+    "description": "Gestione di progetti relativi a opere di ingegneria integrata"
   },
   {
     "code": "71.12.30",
-    "description": "Attività dei geometri e rilievi topografici"
+    "description": "Elaborazione e supervisione di progetti da parte di geometri"
   },
   {
     "code": "71.12.40",
-    "description": "Attività di studi geologici e geotecnici (Geologi)"
+    "description": "Attività di cartografia e aerofotogrammetria"
   },
   {
     "code": "71.12.50",
@@ -4208,11 +4031,11 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "73.11.01",
-    "description": "Agenzie di pubbliche relazioni e comunicazione (PR, Press Office)"
+    "description": "Ideazione di campagne pubblicitarie"
   },
   {
     "code": "73.11.02",
-    "description": "Conduzione di campagne di marketing, gestione social media, SEO/SEM e pubblicità online (Social Media Manager, Digital Marketer)"
+    "description": "Conduzione di campagne di marketing e altri servizi pubblicitari"
   },
   {
     "code": "73.11.03",
@@ -4220,11 +4043,11 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "73.12.00",
-    "description": "Attività dei concessionari di pubblicità e vendita di spazi pubblicitari"
+    "description": "Attività di concessionarie pubblicitarie"
   },
   {
     "code": "73.20.00",
-    "description": "Studi di mercato e sondaggi di opinione"
+    "description": "Ricerche di mercato e sondaggi di opinione"
   },
   {
     "code": "73.30.01",
@@ -4241,30 +4064,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   {
     "code": "73.30.09",
     "description": "Pubbliche relazioni e comunicazione n.c.a."
-  },
-  {
-    "code": "74.10.10",
-    "description": "Attività dei designer di moda e stilisti"
-  },
-  {
-    "code": "74.10.20",
-    "description": "Attività dei disegnatori grafici, web designer, UI/UX designer"
-  },
-  {
-    "code": "74.10.21",
-    "description": "Grafica di pagine web, media online e materiale pubblicitario (Web & Graphic Designer)"
-  },
-  {
-    "code": "74.10.29",
-    "description": "Altre attività dei disegnatori grafici e visual designer"
-  },
-  {
-    "code": "74.10.30",
-    "description": "Attività dei designer di interni e arredatori (Interior Design)"
-  },
-  {
-    "code": "74.10.90",
-    "description": "Altre attività di design e progettazione specializzata"
   },
   {
     "code": "74.11.10",
@@ -4296,15 +4095,15 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "74.20.11",
-    "description": "Attività di fotoreporter e fotogiornalisti"
+    "description": "Attività fotografiche fornite da fotoreporter"
   },
   {
     "code": "74.20.12",
-    "description": "Laboratori fotografici, studi fotografici, ritratti, eventi e matrimoni (Fotografo)"
+    "description": "Attività fotografiche aeree e subacquee"
   },
   {
     "code": "74.20.19",
-    "description": "Altre attività fotografiche e riprese aeree con droni"
+    "description": "Altre attività fotografiche specializzate"
   },
   {
     "code": "74.20.20",
@@ -4312,15 +4111,7 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "74.30.00",
-    "description": "Traduzione e interpretariato"
-  },
-  {
-    "code": "74.90.93",
-    "description": "Mediazione commerciale e intermediazione d'affari non immobiliare"
-  },
-  {
-    "code": "74.90.99",
-    "description": "Altre attività di consulenza tecnica e professionale n.c.a. (Consulente aziendale libero professionista)"
+    "description": "Attività di traduzione e interpretariato"
   },
   {
     "code": "74.91.00",
@@ -4640,7 +4431,7 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "82.99.99",
-    "description": "Altri servizi di supporto alle imprese n.c.a. (Virtual Assistant, Supporto operativo)"
+    "description": "Tutti gli altri servizi vari di supporto alle imprese n.c.a."
   },
   {
     "code": "84.11.10",
@@ -4771,10 +4562,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
     "description": "Istruzione terziaria universitaria di primo, secondo e terzo ciclo e a ciclo unico"
   },
   {
-    "code": "85.51.00",
-    "description": "Corsi sportivi e ricreativi (Personal Trainer, Istruttore di Fitness/Palestra/Sci/Yoga)"
-  },
-  {
     "code": "85.51.01",
     "description": "Insegnamento di pilates fornito da insegnanti e istruttori indipendenti"
   },
@@ -4784,7 +4571,7 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "85.52.01",
-    "description": "Corsi di musica e canto (Insegnante di Musica/Strumento)"
+    "description": "Corsi di danza"
   },
   {
     "code": "85.52.02",
@@ -4792,27 +4579,23 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "85.52.09",
-    "description": "Corsi di recitazione, teatro, danza ed arti visive"
+    "description": "Altra formazione culturale"
   },
   {
     "code": "85.53.00",
-    "description": "Attività delle autoscuole, scuole di pilotaggio e nautiche"
+    "description": "Attività di scuole guida"
   },
   {
     "code": "85.59.10",
-    "description": "Università popolare e corsi di lingue (Insegnante di Lingue)"
+    "description": "Corsi di lingua straniera"
   },
   {
     "code": "85.59.20",
-    "description": "Corsi di formazione e aggiornamento professionale"
+    "description": "Corsi di formazione e corsi di aggiornamento professionale"
   },
   {
     "code": "85.59.30",
     "description": "Altri servizi di istruzione e formazione n.c.a. forniti da università popolari"
-  },
-  {
-    "code": "85.59.90",
-    "description": "Altri servizi di istruzione n.c.a. (Tutor privato, Ripetizioni scolastiche, Docente autonomo)"
   },
   {
     "code": "85.59.91",
@@ -4840,11 +4623,11 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "86.21.00",
-    "description": "Servizi dei medici di medicina generale"
+    "description": "Attività di medicina generale"
   },
   {
     "code": "86.22.01",
-    "description": "Prestazioni sanitarie svolte da medici specialisti"
+    "description": "Trattamenti di chirurgia estetica"
   },
   {
     "code": "86.22.02",
@@ -4856,27 +4639,7 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "86.23.00",
-    "description": "Attività degli studi odontoiatri e dentisti"
-  },
-  {
-    "code": "86.90.11",
-    "description": "Attività delle professioni sanitarie riabilitative (Fisioterapisti, Osteopati)"
-  },
-  {
-    "code": "86.90.12",
-    "description": "Attività delle professioni sanitarie infermieristiche (Infermieri)"
-  },
-  {
-    "code": "86.90.13",
-    "description": "Attività di logopedia e ortottica"
-  },
-  {
-    "code": "86.90.21",
-    "description": "Attività di psicologia, psicoterapia e psicoanalisi (Psicologi e Psicoterapeuti)"
-  },
-  {
-    "code": "86.90.29",
-    "description": "Altre attività paramediche e sanitarie n.c.a. (Nutrizionisti, Podologi, Naturopati)"
+    "description": "Attività odontoiatriche"
   },
   {
     "code": "86.91.01",
@@ -4983,26 +4746,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
     "description": "Altre attività varie di assistenza sociale non residenziale n.c.a."
   },
   {
-    "code": "90.01.01",
-    "description": "Attività nel campo della recitazione e dello spettacolo (Attori, Cantanti, Musicisti)"
-  },
-  {
-    "code": "90.02.01",
-    "description": "Noleggio con operatore di strutture ed attrezzature per spettacoli (Service Audio/Luci)"
-  },
-  {
-    "code": "90.03.01",
-    "description": "Attività di creazioni artistiche, pittura e scultura (Pittori, Scultori, Illustratori)"
-  },
-  {
-    "code": "90.03.02",
-    "description": "Attività dei giornalisti indipendenti, scrittori e copywriter (Copywriter, Scrittore)"
-  },
-  {
-    "code": "90.03.09",
-    "description": "Altre creazioni artistiche e letterarie n.c.a. (Content Creator, Influencer, Youtuber, Streamer, Podcaster)"
-  },
-  {
     "code": "90.11.01",
     "description": "Attività di giornalisti indipendenti"
   },
@@ -5099,10 +4842,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
     "description": "Attività dei club sportivi"
   },
   {
-    "code": "93.13.00",
-    "description": "Gestione di palestre e centri per il benessere fisico"
-  },
-  {
     "code": "93.13.01",
     "description": "Attività di studi di yoga, pilates e Tai Chi"
   },
@@ -5112,7 +4851,7 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "93.19.10",
-    "description": "Attività di atleti individuali professionisti e dilettanti"
+    "description": "Attività di organizzazioni ed enti sportivi e promozione di eventi sportivi"
   },
   {
     "code": "93.19.91",
@@ -5120,7 +4859,7 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   },
   {
     "code": "93.19.92",
-    "description": "Attività delle guide alpine, accompagnatori turistici e maestri di sci"
+    "description": "Attività di guida alpina"
   },
   {
     "code": "93.19.93",
@@ -5301,38 +5040,6 @@ export const ATECO_2025_REGISTRY: AtecoRegistryItem[] = [
   {
     "code": "95.40.00",
     "description": "Attività di servizi di intermediazione per la riparazione e la manutenzione di computer, beni per uso personale e per la casa, autoveicoli e motocicli"
-  },
-  {
-    "code": "96.02.01",
-    "description": "Servizi dei saloni di barbiere e parrucchiere (Parrucchieri e Barbieri)"
-  },
-  {
-    "code": "96.02.02",
-    "description": "Servizi degli istituti di bellezza ed estetica (Estetisti, Centri Estetici, Nail Art)"
-  },
-  {
-    "code": "96.02.03",
-    "description": "Servizi di tatuaggio e piercing (Tatuatori)"
-  },
-  {
-    "code": "96.04.10",
-    "description": "Servizi dei centri per il benessere fisico, saune, bagni turchi, spa"
-  },
-  {
-    "code": "96.04.20",
-    "description": "Stabilimenti idroterapici e massaggi non terapeutici (Massaggiatori Olistici)"
-  },
-  {
-    "code": "96.09.02",
-    "description": "Servizi di cura degli animali da compagnia, toilettatura e addestramento (Pet Sitter, Dog Walker)"
-  },
-  {
-    "code": "96.09.04",
-    "description": "Servizi di organizzazione di matrimoni e feste (Wedding Planner, Event Planner)"
-  },
-  {
-    "code": "96.09.09",
-    "description": "Altre attività di servizi per la persona n.c.a. (Personal Life Coach, Astrologia, Servizi domestici)"
   },
   {
     "code": "96.10.11",

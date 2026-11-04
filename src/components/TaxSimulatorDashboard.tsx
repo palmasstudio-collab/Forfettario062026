@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { BusinessProfile, TaxInput, TaxReturnCalculation, Invoice, F24Entry } from '../types';
 import { calculateTaxReturn } from '../calculateTaxReturn';
 import { findAtecoCode, findPensionFund } from '../taxData';
-import { parseInvoiceXml, findMissingInvoiceSequenceGaps, InvoiceSequenceGapReport } from '../utils/xmlInvoiceParser';
-import { extractF24DataFromPdf, extractDetailedF24Document, ParsedF24Document } from '../utils/pdfF24Parser';
+import { parseInvoiceXml } from '../utils/xmlInvoiceParser';
+import { extractF24DataFromPdf } from '../utils/pdfF24Parser';
 import { safeAlert, safeConfirm } from '../utils/safeWindow';
 import { 
   Calculator, 
@@ -26,32 +26,33 @@ import {
   AlertTriangle,
   ExternalLink,
   FolderOpen,
-  Folder,
   Key,
-  RefreshCw,
-  ShieldCheck,
-  Eye,
-  CheckCircle2,
-  Layers,
-  FileSpreadsheet
+  RefreshCw
 } from 'lucide-react';
 import { generateTaxAndInvoicePDF } from '../utils/pdfGenerator';
 import { generateInvoicePDFDocument } from '../utils/pdfInvoiceBasic';
 import { generateF24PDF } from '../utils/f24PdfGenerator';
 import F24PreviewCanvas from './F24PreviewCanvas';
-import F24DocumentBreakdownModal from './F24DocumentBreakdownModal';
-import ProspettoF24View from './ProspettoF24View';
-import CommandPaletteModal from './CommandPaletteModal';
-import QuadroLMRRVisualizer from './QuadroLMRRVisualizer';
-import RavvedimentoOperosoCalculator from './RavvedimentoOperosoCalculator';
-import MultiYearTaxForecast from './MultiYearTaxForecast';
-import TaxCalendarPlanner from './TaxCalendarPlanner';
-import { calculateF24Reconciliation } from '../utils/f24Reconciliation';
-import { Command } from 'lucide-react';
 
 export const getMissingInvoiceNumbers = (invoices: Invoice[], year: string): number[] => {
-  const gapReport = findMissingInvoiceSequenceGaps(invoices, year);
-  return gapReport.missingNumbers;
+  const seqNos = invoices.map(inv => {
+    const withoutYear = inv.number.replace(new RegExp(year, 'g'), '');
+    const match = withoutYear.match(/\d+/);
+    return match ? parseInt(match[0], 10) : null;
+  }).filter((n): n is number => n !== null);
+  
+  if (seqNos.length === 0) return [];
+  
+  const maxSeq = Math.max(...seqNos);
+  if (maxSeq > 1000) return []; // safety net against format mismatch
+  
+  const missing = [];
+  for (let i = 1; i < maxSeq; i++) {
+    if (!seqNos.includes(i)) {
+      missing.push(i);
+    }
+  }
+  return missing;
 };
 
 interface TaxSimulatorDashboardProps {
@@ -80,11 +81,7 @@ interface TaxSimulatorDashboardProps {
   onUploadInvoiceXmlToDrive?: (file: File, year?: string) => Promise<{name: string, id: string, url: string, dateAdded: string}>;
   onSyncDriveInvoices?: () => Promise<void>;
   isSyncingDriveInvoices?: boolean;
-  onConnectDriveFolder?: (urlOrId: string) => Promise<void> | void;
-  googleSheetUrl?: string;
   onChangeProfile?: (profile: BusinessProfile) => void;
-  activeModule?: string;
-  onSelectModule?: (moduleName: string) => void;
 }
 
 export default function TaxSimulatorDashboard({ 
@@ -102,7 +99,6 @@ export default function TaxSimulatorDashboard({
   onConnectGoogle,
   driveFolderId,
   driveFolderUrl,
-  googleSheetUrl,
   f24Files = [],
   googleConnected,
   onAddInvoice,
@@ -113,12 +109,8 @@ export default function TaxSimulatorDashboard({
   onUploadInvoiceXmlToDrive,
   onSyncDriveInvoices,
   isSyncingDriveInvoices = false,
-  onConnectDriveFolder,
-  onChangeProfile,
-  activeModule = 'overview',
-  onSelectModule
+  onChangeProfile
 }: TaxSimulatorDashboardProps) {
-  const [manualDriveUrlInput, setManualDriveUrlInput] = useState('');
   // Calcolo dei contributi inseriti dagli F24 per l'anno selezionato
   const excludedTaxCodes = ['2501', '2524'];
   const autoContributions = f24Entries
@@ -151,37 +143,9 @@ export default function TaxSimulatorDashboard({
   const [isProcessingXml, setIsProcessingXml] = useState(false);
   const [isProcessingF24, setIsProcessingF24] = useState(false);
   const [showManualF24Form, setShowManualF24Form] = useState(false);
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [manualF24Data, setManualF24Data] = useState({ date: `${selectedYear}-01-01`, amount: '', code: 'INPS', description: 'Inserimento manuale' });
-  const [inspectedF24Doc, setInspectedF24Doc] = useState<ParsedF24Document | null>(null);
   const xmlInputRef = useRef<HTMLInputElement>(null);
   const f24InputRef = useRef<HTMLInputElement>(null);
-
-  const handleOpenEntryInspection = (entry: F24Entry) => {
-    const debtVal = entry.debtAmount !== undefined ? entry.debtAmount : entry.amount;
-    const creditVal = entry.creditAmount || 0;
-    const netVal = entry.netAmount !== undefined ? entry.netAmount : (debtVal - creditVal);
-    const doc: ParsedF24Document = {
-      fileName: entry.fileName || `Quietanza_F24_${entry.taxCode}_${entry.date}.pdf`,
-      taxpayerFiscalCode: profile.fiscalCode || profile.vatNumber,
-      paymentDate: entry.date,
-      entries: [{
-        taxCode: entry.taxCode,
-        debtAmount: debtVal,
-        creditAmount: creditVal,
-        amount: netVal,
-        year: entry.date ? entry.date.split('-')[0] : selectedYear,
-        section: (entry.section as any) || (entry.taxCode.startsWith('P') || entry.taxCode.startsWith('C') ? 'inps' : 'erario'),
-        description: entry.description || `Quietanza ${entry.taxCode}`,
-        deadlineType: entry.accontoType === '1_acconto' ? 'acconto1' : (entry.accontoType === '2_acconto' ? 'acconto2' : 'saldo')
-      }],
-      totalDebt: entry.totalDebtF24 ?? debtVal,
-      totalCredit: entry.totalCreditF24 ?? creditVal,
-      netDue: entry.netDueF24 ?? netVal,
-      status: (netVal === 0 && (debtVal > 0 || creditVal > 0)) ? 'saldo_zero' : 'a_debito'
-    };
-    setInspectedF24Doc(doc);
-  };
 
   const prevYearContributions = useAutomaticF24 ? autoContributions : manualContributions;
   
@@ -348,39 +312,6 @@ export default function TaxSimulatorDashboard({
       const filesArray = Array.from(files) as File[];
       const allTransformedEntries: any[] = [];
       
-      // Estrai e mostra immediatamente il prospetto analitico con tributi, compensazioni e netto
-      if (filesArray.length > 0) {
-        try {
-          const detailedDoc = await extractDetailedF24Document(filesArray[0]);
-          if (detailedDoc && detailedDoc.entries.length > 0) {
-            setInspectedF24Doc(detailedDoc);
-          } else {
-            // Documento fallback per garantire sempre la comparsa del modale analitico Zucchetti ERP
-            setInspectedF24Doc({
-              fileName: filesArray[0].name,
-              paymentDate: new Date().toLocaleDateString('it-IT'),
-              entries: [{
-                taxCode: 'QUIETANZA',
-                debtAmount: detailedDoc?.totalDebt || 0,
-                creditAmount: detailedDoc?.totalCredit || 0,
-                amount: detailedDoc?.netDue || 0,
-                year: selectedYear,
-                section: 'erario',
-                description: 'Quietanza F24 PDF Elaborata'
-              }],
-              totalDebt: detailedDoc?.totalDebt || 0,
-              totalCredit: detailedDoc?.totalCredit || 0,
-              netDue: detailedDoc?.netDue || 0,
-              status: 'a_debito'
-            });
-          }
-          // AUTO-SWITCH AL MODULO PROSPETTO F24
-          handleTabClick('prospetto_f24');
-        } catch (errDet) {
-          console.warn("Estrazione prospetto analitico F24:", errDet);
-        }
-      }
-
       if (onUploadF24s) {
         // Use optimized batch uploader on App.tsx which does single structural verify and single state update!
         await onUploadF24s(filesArray, selectedYear);
@@ -392,8 +323,7 @@ export default function TaxSimulatorDashboard({
 
           if (onAddF24Entries) {
             try {
-              const detailedDoc = await extractDetailedF24Document(file);
-              const entries = detailedDoc.entries;
+              const entries = await extractF24DataFromPdf(file);
               if (entries.length > 0) {
                 const foundYear = entries.find(entry => entry.year)?.year;
                 if (foundYear) {
@@ -401,9 +331,6 @@ export default function TaxSimulatorDashboard({
                 }
 
                 const transformedEntries = entries.map(entry => {
-                  const isAcconto = entry.taxCode === '1790' || 
-                    entry.taxCode === '1791' || 
-                    (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || entry.debtAmount <= 100));
                   const today = new Date();
                   const monthStr = String(today.getMonth() + 1).padStart(2, '0');
                   const dayStr = String(today.getDate()).padStart(2, '0');
@@ -412,20 +339,10 @@ export default function TaxSimulatorDashboard({
 
                   return {
                     taxCode: entry.taxCode,
-                    amount: entry.debtAmount > 0 ? entry.debtAmount : entry.amount,
-                    debtAmount: entry.debtAmount,
-                    creditAmount: entry.creditAmount,
-                    netAmount: entry.debtAmount - entry.creditAmount,
-                    section: entry.section,
+                    amount: entry.amount,
                     date: entryDate,
-                    description: entry.description || `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
-                    source: 'PDF',
-                    fileName: file.name,
-                    isAcconto,
-                    targetYear: isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear,
-                    totalDebtF24: detailedDoc.totalDebt,
-                    totalCreditF24: detailedDoc.totalCredit,
-                    netDueF24: detailedDoc.netDue
+                    description: `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
+                    source: 'PDF'
                   };
                 });
                 allTransformedEntries.push(...transformedEntries);
@@ -443,6 +360,8 @@ export default function TaxSimulatorDashboard({
           onAddF24Entries(allTransformedEntries);
         }
       }
+
+      safeAlert(`Caricamento massivo F24 completato con successo: ${filesArray.length} file elaborati.`);
     } catch (err: any) {
       safeAlert("Errore elaborazione F24: " + err.message);
     } finally {
@@ -469,33 +388,6 @@ export default function TaxSimulatorDashboard({
   const totalIssuedInvoicesAmount = invoices.reduce((sum, inv) => sum + inv.amount, 0);
   const activeRevenue = revenueMode === 'issued' ? totalIssuedInvoicesAmount : revenue;
 
-  // Calcolo automatico degli Acconti versati nell'anno precedente tramite F24 per l'anno in corso
-  const previousYearNum = parseInt(selectedYear, 10) - 1;
-  const previousYearStr = String(previousYearNum);
-
-  // 1. Acconti Imposta Sostitutiva versati l'anno precedente per l'anno corrente (Cod. 1790 + 1791)
-  const previousYearErarioAccontiEntries = allF24Entries.filter(e => {
-    const isTarget = e.targetYear === selectedYear;
-    const isPaidPrevYear = e.date && e.date.startsWith(previousYearStr);
-    const isErarioAccontoCode = e.taxCode === '1790' || e.taxCode === '1791' || (e.isAcconto && ['1790', '1791'].includes(e.taxCode));
-    return isTarget || (isPaidPrevYear && isErarioAccontoCode);
-  });
-  const substituteTaxAdvancesFromF24 = previousYearErarioAccontiEntries.reduce((sum, e) => sum + e.amount, 0);
-
-  // 2. Acconti INPS Gestione Separata versati l'anno precedente per l'anno corrente (Causale PXX / P10 es. 46 € a giugno e 68 € a novembre)
-  const previousYearInpsAccontiEntries = allF24Entries.filter(e => {
-    const isTarget = e.targetYear === selectedYear;
-    const isPaidPrevYear = e.date && e.date.startsWith(previousYearStr);
-    const isPxxCode = e.taxCode === 'PXX' || e.taxCode === 'P10';
-    const isAccontoMarker = e.isAcconto || 
-      e.description?.toLowerCase().includes('acconto') || 
-      e.accontoType === '1_acconto' || 
-      e.accontoType === '2_acconto' ||
-      (isPaidPrevYear && isPxxCode && e.amount <= 150); // Esempio acconti 46 € e 68 €
-    return (isTarget && isPxxCode) || (isPaidPrevYear && isPxxCode && isAccontoMarker);
-  });
-  const inpsAdvancesFromF24 = previousYearInpsAccontiEntries.reduce((sum, e) => sum + e.amount, 0);
-
   const taxInput: TaxInput = {
     revenue: activeRevenue,
     atecoCode: profile.atecoCode,
@@ -505,17 +397,14 @@ export default function TaxSimulatorDashboard({
     yearOfActivity,
     vatOpeningDate: profile.vatOpeningDate,
     calculationYear: parseInt(selectedYear, 10),
-    inpsReduction35: profile.inpsReduction35 !== false,
-    substituteTaxAdvancesPaidForCurrentYear: substituteTaxAdvancesFromF24,
-    inpsAdvancesPaidForCurrentYear: inpsAdvancesFromF24
+    inpsReduction35: profile.inpsReduction35 !== false
   };
 
   const results: TaxReturnCalculation = calculateTaxReturn(taxInput);
   const selectedAteco = findAtecoCode(profile.atecoCode);
   const selectedFund = findPensionFund(profile.pensionFund);
   
-  const gapReport = findMissingInvoiceSequenceGaps(invoices, selectedYear);
-  const missingInvoiceNumbers = gapReport.missingNumbers;
+  const missingInvoiceNumbers = getMissingInvoiceNumbers(invoices, selectedYear);
 
   // Calcolo delle percentuali di impatto
   const taxPercentage = activeRevenue > 0 ? (results.substituteTax / activeRevenue) * 100 : 0;
@@ -557,186 +446,37 @@ export default function TaxSimulatorDashboard({
     generateTaxAndInvoicePDF(profile, filteredInvoices, targetResults, selectedAteco, selectedFund, yearOfActivity, yearToExport, filteredF24, f24Files, missingForExport);
   };
 
-  const [internalTab, setInternalTab] = useState<string>(activeModule || 'overview');
-
-  useEffect(() => {
-    if (activeModule && activeModule !== 'anagrafica') {
-      setInternalTab(activeModule);
-    }
-  }, [activeModule]);
-
-  const handleTabClick = (tabId: string) => {
-    setInternalTab(tabId);
-    if (onSelectModule) {
-      onSelectModule(tabId);
-    }
-  };
-
-  const ERP_TABS = [
-    { id: 'overview', label: 'Cruscotto Generale', icon: Calculator },
-    { id: 'prospetto_f24', label: 'Prospetto F24', badge: `${f24Entries.length}`, icon: Layers },
-    { id: 'quadro_lm', label: 'Quadro LM (Imposte)', badge: `€ ${(results.substituteTaxNetDue ?? results.substituteTax).toFixed(0)}`, icon: BookOpen },
-    { id: 'quadro_rr', label: 'Quadro RR (Previdenza)', badge: `€ ${(results.inpsNetDue ?? results.inpsGestioneSeparataDue ?? 0).toFixed(0)}`, icon: ShieldCheck },
-    { id: 'f24_acconti', label: 'F24 & Acconti', badge: `${f24Entries.length}`, icon: FileText },
-    { id: 'invoices', label: 'Fatture XML & Cassa', badge: `${invoices.length}`, icon: DollarSign },
-    { id: 'ravvedimento', label: 'Scadenzario & Ravvedimento', icon: Clock },
-  ];
-
   return (
-    <div className="flex flex-col gap-5 animate-fade-in text-theme-text" id="tax-simulator-dashboard">
+    <div className="flex flex-col gap-6 animate-fade-in text-theme-text" id="tax-simulator-dashboard">
       
-      {/* BARRA SUPERIORE ZUCCHETTI ERP: Ribbon Navigazione Moduli */}
-      <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
-        {/* Strip Testata Zucchetti */}
-        <div className="bg-gradient-to-r from-[#7a0c10] via-[#8b0000] to-[#5a080b] text-white px-4 py-2.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-red-950">
-          <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 bg-white text-[#8b0000] rounded font-black text-xs flex items-center justify-center shadow-xs">
-              Z
-            </div>
-            <div>
-              <span className="font-extrabold text-xs tracking-wider uppercase">Ago Infinity</span>
-              <span className="text-red-200 text-[10px] ml-2 font-mono">Modello Fiscale Forfettario {selectedYear}</span>
-            </div>
+      {/* Barra Azioni Principali: Esportazione PDF */}
+      <div className="bg-theme-card rounded-3xl shadow-sm border border-theme-border p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-theme-bg rounded-xl text-theme-text hidden sm:block">
+            <FileText className="w-5 h-5 text-theme-text-muted" />
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsCommandPaletteOpen(true)}
-              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-3 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-              title="Apri Command Palette (Ctrl+K)"
-            >
-              <Command className="w-3.5 h-3.5 text-amber-300" />
-              <span>Cerca (Ctrl+K)</span>
-            </button>
-
-            <button
-              onClick={handleGeneratePDFClick}
-              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-3 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-              title="Esporta bilancio e fascicolo ufficiale in PDF"
-            >
-              <Download className="w-3.5 h-3.5 text-emerald-300" />
-              <span>Esporta Fascicolo PDF</span>
-            </button>
+          <div>
+            <h4 className="text-sm font-extrabold text-theme-text">Copia Esportabile del Fascicolo</h4>
+            <p className="text-[11px] text-theme-text-muted">Scarica localmente l'intero bilancio fiscale simulato con il registro cronologico delle fatture.</p>
           </div>
         </div>
-
-        {/* Tab Ribbon Zucchetti */}
-        <div className="flex items-center overflow-x-auto bg-slate-50 border-b border-slate-200 px-2 scrollbar-none">
-          {ERP_TABS.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = internalTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => handleTabClick(tab.id)}
-                className={`flex items-center gap-2 px-3.5 py-2.5 text-xs border-b-2 font-bold whitespace-nowrap transition-colors cursor-pointer ${
-                  isActive
-                    ? 'border-[#8b0000] text-[#8b0000] bg-white shadow-xs'
-                    : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-                }`}
-              >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#8b0000]' : 'text-slate-400'}`} />
-                <span>{tab.label}</span>
-                <span className="inline-flex items-center">
-                  {tab.badge ? (
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
-                      isActive ? 'bg-red-50 text-[#8b0000] border border-red-200' : 'bg-slate-200 text-slate-700'
-                    }`}>
-                      {tab.badge}
-                    </span>
-                  ) : null}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Barra KPI Rapida / Indicatori Zucchetti */}
-        <div className="bg-white px-4 py-2 flex items-center justify-between gap-4 text-xs font-mono overflow-x-auto divide-x divide-slate-100">
-          <div className="flex items-center gap-1.5 pr-4 shrink-0">
-            <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">Cassa {selectedYear}:</span>
-            <span className="font-extrabold text-slate-900">€ {activeRevenue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-4 shrink-0">
-            <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">LM34 Lordo:</span>
-            <span className="font-extrabold text-slate-800">€ {results.grossTaxableIncome.toFixed(0)}</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-4 shrink-0">
-            <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">LM35 Deduzioni:</span>
-            <span className="font-extrabold text-emerald-600">€ {results.deductibleContributions.toFixed(0)}</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-4 shrink-0">
-            <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">LM43 Imposta Netta:</span>
-            <span className="font-extrabold text-rose-600">€ {(results.substituteTaxNetDue ?? results.substituteTax).toFixed(2)}</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-4 shrink-0">
-            <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">INPS Netto:</span>
-            <span className="font-extrabold text-blue-600">€ {(results.inpsNetDue ?? results.inpsGestioneSeparataDue ?? 0).toFixed(2)}</span>
-          </div>
-          <div className="flex items-center gap-1.5 pl-4 shrink-0 bg-slate-50 px-2 py-0.5 rounded">
-            <span className="text-[10px] uppercase font-bold text-slate-500 font-sans">Netto Stimato:</span>
-            <span className="font-black text-slate-900">€ {results.netIncome.toFixed(0)}</span>
-            <span className="text-[10px] text-emerald-600 font-bold">({netPercentage.toFixed(0)}%)</span>
-          </div>
-        </div>
+        <button
+          onClick={handleGeneratePDFClick}
+          className="bg-theme-accent hover:opacity-90 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm w-full sm:w-auto shrink-0"
+          id="btn-export-pdf-main"
+        >
+          <Download className="w-4 h-4 text-emerald-400 stroke-[2.5]" />
+          <span>Esporta Report in PDF</span>
+        </button>
       </div>
 
-      {internalTab === 'prospetto_f24' ? (
-        <ProspettoF24View
-          profile={profile}
-          selectedYear={selectedYear}
-          f24Entries={f24Entries}
-          f24Files={f24Files}
-          inspectedF24Doc={inspectedF24Doc}
-          onUploadF24Pdf={handleF24Upload}
-          isProcessingF24={isProcessingF24}
-          onDeleteF24Entry={onDeleteF24Entry}
-          onInspectDoc={(doc) => setInspectedF24Doc(doc)}
-          f24InputRef={f24InputRef}
-        />
-      ) : internalTab === 'quadro_lm' || internalTab === 'quadro_rr' ? (
-        <QuadroLMRRVisualizer
-          calculation={results}
-          profile={profile}
-          selectedYear={selectedYear}
-          atecoDescription={selectedAteco.description}
-        />
-      ) : internalTab === 'f24_acconti' ? (
-        <MultiYearTaxForecast
-          profile={profile}
-          currentYearRevenue={activeRevenue}
-          selectedYear={selectedYear}
-        />
-      ) : internalTab === 'ravvedimento' ? (
-        <div className="flex flex-col gap-6">
-          <RavvedimentoOperosoCalculator
-            selectedYear={selectedYear}
-            onAddF24Entries={onAddF24Entries}
-          />
-          <TaxCalendarPlanner
-            calculation={results}
-            selectedYear={selectedYear}
-          />
-        </div>
-      ) : (
-      <div className={`grid gap-6 ${
-        internalTab === 'invoices'
-          ? 'grid-cols-1'
-          : 'grid-cols-1 lg:grid-cols-3'
-      }`}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       
-      {/* Colonna Sinistra / Workspace Principale */}
-      <div className={`flex flex-col gap-6 ${
-        internalTab === 'invoices' || internalTab === 'f24_acconti' || internalTab === 'ravvedimento'
-          ? 'col-span-1'
-          : 'lg:col-span-2'
-      }`}>
+      {/* Colonna Sinistra: Input aggiuntivi e Sintesi Matematica */}
+      <div className="lg:col-span-2 flex flex-col gap-6">
         
         {/* Card Input di Simulazione */}
-        {(internalTab === 'overview' || internalTab === 'quadro_lm' || internalTab === 'quadro_rr') && (
-        <div className="bg-theme-card rounded-2xl shadow-xs border border-theme-border p-5 sm:p-6">
+        <div className="bg-theme-card rounded-3xl shadow-sm border border-theme-border p-6 sm:p-8">
           <div className="flex items-center gap-3.5 mb-4">
             <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-600 animate-pulse">
               <Calculator className="w-6 h-6" />
@@ -856,106 +596,29 @@ export default function TaxSimulatorDashboard({
             </div>
           </div>
         </div>
-        )}
  
         {/* Card Upload F24 e XML Fatture */}
-        {(internalTab === 'overview' || internalTab === 'invoices') && (
-        <div className="bg-theme-card rounded-2xl shadow-xs border border-theme-border p-5 sm:p-6" id="documents-manager-section">
+        <div className="bg-theme-card rounded-3xl shadow-sm border border-theme-border p-6 sm:p-8">
           <div className="flex items-center gap-3.5 mb-4">
             <div className="p-3 bg-sky-500/10 rounded-2xl text-sky-600">
               <Upload className="w-6 h-6" />
             </div>
             <div className="flex-1">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-lg font-extrabold text-theme-text tracking-tight">Fatture XML, Cassa & Google Drive</h3>
-                  <p className="text-xs text-theme-text-muted">Carica o sincronizza le fatture XML con Google Drive e il Foglio di calcolo Quadro LM</p>
-                </div>
-                <div className="flex items-center flex-wrap gap-2">
-                  {onSyncDriveInvoices && (
-                    <button 
-                      type="button"
-                      onClick={onSyncDriveInvoices} 
-                      disabled={isSyncingDriveInvoices}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
-                      title={`Verifica tutti i file XML presenti nella cartella Drive 'Fatture Emesse' per l'anno ${selectedYear} e aggiorna il gestionale e il Google Sheet`}
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncingDriveInvoices ? 'animate-spin' : ''}`} />
-                      <span>{isSyncingDriveInvoices ? `Controllo Drive (${selectedYear})...` : `Controllo Fatture Presenti su Drive & Aggiorna (${selectedYear})`}</span>
-                    </button>
-                  )}
-                  {googleSheetUrl && (
-                    <a
-                      href={googleSheetUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition-all shadow-xs"
-                      title="Apri il Google Sheet sincronizzato con l'elenco delle fatture e il calcolo ministeriale del Quadro LM"
-                    >
-                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Apri Google Sheet Quadro LM</span>
-                    </a>
-                  )}
-                  {driveFolderUrl && (
-                    <a 
-                      href={driveFolderUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-theme-bg hover:bg-theme-border text-theme-text-muted hover:text-theme-text rounded-xl text-xs font-bold transition-all border border-theme-border"
-                      title="Apri la cartella di archiviazione Google Drive dell'anno contabile"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      <span>Apri Cartella Drive</span>
-                    </a>
-                  )}
-                </div>
-              </div>
-
-              {/* Box Collegamento Cartella Google Drive Contabilità */}
-              <div className="mt-4 p-3 bg-slate-50 rounded-2xl border border-slate-200/90 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2 overflow-hidden flex-wrap">
-                  <span className="flex items-center gap-1.5 font-bold text-slate-800 shrink-0">
-                    <Folder className="w-4 h-4 text-amber-500 shrink-0" />
-                    <span>Cartella Contabilità Drive:</span>
-                  </span>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-extrabold text-theme-text tracking-tight">Caricamento Dati Intelligente</h3>
+                {driveFolderUrl && (
                   <a 
-                    href={driveFolderUrl || `https://drive.google.com/drive/folders/${driveFolderId || '19oSp4--stkguC2r25d2MfsV3PWUoVXfT'}`}
-                    target="_blank"
+                    href={driveFolderUrl} 
+                    target="_blank" 
                     rel="noopener noreferrer"
-                    className="font-mono text-sky-600 hover:text-sky-700 font-semibold hover:underline truncate max-w-[240px] sm:max-w-md inline-flex items-center gap-1"
-                    title={driveFolderUrl || `https://drive.google.com/drive/folders/${driveFolderId || '19oSp4--stkguC2r25d2MfsV3PWUoVXfT'}`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-theme-bg hover:bg-theme-border text-theme-text-muted hover:text-theme-text rounded-xl text-[10px] font-bold transition-all border border-theme-border"
                   >
-                    <span>{driveFolderId || '19oSp4--stkguC2r25d2MfsV3PWUoVXfT'}</span>
-                    <ExternalLink className="w-3 h-3 shrink-0" />
+                    <ExternalLink className="w-3 h-3" />
+                    <span>Apri Cartella Drive</span>
                   </a>
-                  <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold shrink-0">
-                    ✓ Collegata
-                  </span>
-                </div>
-                
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                  <input
-                    type="text"
-                    placeholder="Incolla link o ID cartella Drive..."
-                    value={manualDriveUrlInput}
-                    onChange={(e) => setManualDriveUrlInput(e.target.value)}
-                    className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 flex-1 md:w-64"
-                  />
-                  <button
-                    type="button"
-                    disabled={!manualDriveUrlInput.trim()}
-                    onClick={() => {
-                      if (onConnectDriveFolder && manualDriveUrlInput.trim()) {
-                        onConnectDriveFolder(manualDriveUrlInput.trim());
-                        setManualDriveUrlInput('');
-                      }
-                    }}
-                    className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xs transition-colors shrink-0 cursor-pointer shadow-xs"
-                  >
-                    Collega Cartella
-                  </button>
-                </div>
+                )}
               </div>
+              <p className="text-xs text-theme-text-muted">Carica o rimuovi i documenti e monitora il riepilogo in tempo reale</p>
             </div>
           </div>
           
@@ -964,7 +627,6 @@ export default function TaxSimulatorDashboard({
             <div className="flex flex-col gap-4">
               <div className="border-2 border-dashed border-theme-border rounded-2xl p-6 flex flex-col items-center justify-center relative hover:bg-theme-bg transition-colors min-h-[140px]">
                 <input
-                  key="xml-input"
                   ref={xmlInputRef}
                   type="file"
                   multiple
@@ -973,17 +635,13 @@ export default function TaxSimulatorDashboard({
                   onChange={handleXmlUpload}
                   disabled={isProcessingXml}
                 />
-                <div className="flex flex-col items-center justify-center pointer-events-none">
-                  <span className="h-8 w-8 flex items-center justify-center mb-3">
-                    {isProcessingXml ? (
-                      <Loader2 className="w-8 h-8 text-sky-500 animate-spin" />
-                    ) : (
-                      <FileText className="w-8 h-8 text-slate-400" />
-                    )}
-                  </span>
-                  <span className="text-sm font-bold text-slate-700 block">Carica Fattura XML</span>
-                  <span className="text-[10px] text-slate-500 text-center mt-1 block">Trascina o clicca per importare file ministeriali XML</span>
-                </div>
+                {isProcessingXml ? (
+                  <Loader2 className="w-8 h-8 text-sky-500 animate-spin mb-3" />
+                ) : (
+                  <FileText className="w-8 h-8 text-sky-550 mb-3 text-slate-400" />
+                )}
+                <h4 className="text-sm font-bold text-slate-700">Carica Fattura XML</h4>
+                <p className="text-[10px] text-slate-500 text-center mt-1">Trascina o clicca per importare file ministeriali XML</p>
               </div>
 
               {/* Riepilogo Fatture Caricate */}
@@ -1011,22 +669,12 @@ export default function TaxSimulatorDashboard({
                   </span>
                 </div>
                 
-                {gapReport.hasGaps && (
-                  <div className="mb-3 p-3.5 bg-red-50/90 border border-red-200 rounded-2xl flex items-start gap-3 shadow-xs">
-                    <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5 animate-pulse" />
-                    <div className="text-xs text-red-900">
-                      <div className="font-extrabold flex items-center gap-2">
-                        <span>Attenzione, buco di numerazione rilevato (Esercizio {gapReport.year})</span>
-                        <span className="bg-red-200 text-red-900 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold">
-                          SDI Gap
-                        </span>
-                      </div>
-                      <p className="mt-1 text-red-800">
-                        Mancano le fatture numero: <strong className="font-mono bg-red-100 px-1.5 py-0.5 rounded font-bold border border-red-200">{gapReport.formattedRanges.join(', ')}</strong>
-                      </p>
-                      <p className="text-[10px] text-red-600/90 mt-1 font-sans">
-                        Carica i file XML corrispondenti o sincronizza con Google Drive per allineare la sequenza contabile.
-                      </p>
+                {missingInvoiceNumbers.length > 0 && (
+                  <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5">
+                    <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    <div className="text-xs text-red-800">
+                      <strong className="block mb-0.5 font-bold">Attenzione, buco di numerazione rilevato.</strong>
+                      Mancano le fatture numero: <b>{missingInvoiceNumbers.join(', ')}</b>
                     </div>
                   </div>
                 )}
@@ -1075,7 +723,6 @@ export default function TaxSimulatorDashboard({
             <div className="flex flex-col gap-4">
               <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center relative hover:bg-slate-50 transition-colors min-h-[140px]">
                 <input
-                  key="f24-input"
                   ref={f24InputRef}
                   type="file"
                   multiple
@@ -1084,17 +731,13 @@ export default function TaxSimulatorDashboard({
                   onChange={handleF24Upload}
                   disabled={isProcessingF24}
                 />
-                <div className="flex flex-col items-center justify-center pointer-events-none">
-                  <span className="h-8 w-8 flex items-center justify-center mb-3">
-                    {isProcessingF24 ? (
-                      <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
-                    ) : (
-                      <BookOpen className="w-8 h-8 text-slate-400" />
-                    )}
-                  </span>
-                  <span className="text-sm font-bold text-slate-700 block">Carica Modello F24 PDF</span>
-                  <span className="text-[10px] text-slate-500 text-center mt-1 block">Trascina o clicca per estrapolare quietanze in PDF</span>
-                </div>
+                {isProcessingF24 ? (
+                  <Loader2 className="w-8 h-8 text-purple-500 animate-spin mb-3" />
+                ) : (
+                  <BookOpen className="w-8 h-8 text-slate-400 mb-3" />
+                )}
+                <h4 className="text-sm font-bold text-slate-700">Carica Modello F24 PDF</h4>
+                <p className="text-[10px] text-slate-500 text-center mt-1">Trascina o clicca per estrapolare quietanze in PDF</p>
               </div>
 
               {/* Riepilogo F24 Caricati */}
@@ -1111,59 +754,18 @@ export default function TaxSimulatorDashboard({
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
-                    {f24Entries.map((e) => {
-                      const debtVal = e.debtAmount !== undefined ? e.debtAmount : e.amount;
-                      const creditVal = e.creditAmount || 0;
-                      const netVal = e.netAmount !== undefined ? e.netAmount : (debtVal - creditVal);
-                      const hasComp = creditVal > 0;
-
-                      return (
-                      <div key={e.id} className="bg-theme-card p-2.5 rounded-xl border border-theme-border flex items-center justify-between text-xs hover:border-theme-accent/50 transition-colors shadow-xs gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="font-bold text-theme-text flex items-center gap-1.5 flex-wrap">
-                            <span className="px-1.5 py-0.2 bg-slate-100 rounded text-[10px] font-mono border border-slate-200 text-slate-800">
-                              {e.taxCode}
-                            </span>
-                            <span className="truncate">{e.description || `Tributo ${e.taxCode}`}</span>
-                            {e.isAcconto && (
-                              <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-bold border border-emerald-200">
-                                Acconto
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[10px] text-theme-text-muted mt-1 font-mono flex items-center gap-1.5 flex-wrap">
+                    {f24Entries.map((e) => (
+                      <div key={e.id} className="bg-theme-card p-2.5 rounded-xl border border-theme-border flex items-center justify-between text-xs hover:border-theme-accent/50 transition-colors shadow-sm">
+                        <div className="min-w-0 pr-2">
+                          <div className="font-bold text-theme-text">Tributo {e.taxCode}</div>
+                          <div className="text-[10px] text-theme-text-muted mt-0.5 font-mono flex items-center gap-1.5">
                             <span className="font-bold uppercase tracking-wider text-[9px] px-1 py-0.2 bg-theme-bg text-theme-text-muted rounded">{e.source}</span>
                             <span>·</span>
                             <span>{e.date}</span>
-                            {hasComp && (
-                              <span className="text-emerald-700 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
-                                Comp: -€ {creditVal.toFixed(2)}
-                              </span>
-                            )}
                           </div>
                         </div>
-
                         <div className="flex items-center gap-2 shrink-0">
-                          <div className="text-right">
-                            {hasComp && (
-                              <div className="text-[10px] text-slate-400 font-mono">
-                                Deb: € {debtVal.toFixed(2)}
-                              </div>
-                            )}
-                            <div className="font-mono font-extrabold text-theme-text">
-                              Netto: € {netVal.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEntryInspection(e)}
-                            className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer border border-indigo-200/50"
-                            title="Visualizza prospetto analitico con tributi, compensazioni e netto da pagare"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-
+                          <span className="font-mono font-extrabold text-theme-text">€ {e.amount.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           {onDeleteF24Entry && (
                             <button
                               type="button"
@@ -1172,7 +774,7 @@ export default function TaxSimulatorDashboard({
                                   onDeleteF24Entry(e.id);
                                 }
                               }}
-                              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                               title="Elimina"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1180,7 +782,7 @@ export default function TaxSimulatorDashboard({
                           )}
                         </div>
                       </div>
-                    );})}
+                    ))}
                   </div>
                 )}
                 
@@ -1249,24 +851,19 @@ export default function TaxSimulatorDashboard({
             </div>
           </div>
         </div>
-        )}
 
         {/* Workspace Revisione Visiva Modello F24 */}
-        {(internalTab === 'overview' || internalTab === 'f24_acconti' || internalTab === 'ravvedimento') && (
         <F24PreviewCanvas
           profile={profile}
           selectedYear={selectedYear}
           results={results}
           onAddF24Entries={onAddF24Entries}
           f24Files={f24Files}
-          defaultTab={internalTab === 'ravvedimento' ? 'ravvedimento' : (internalTab === 'f24_acconti' ? 'visual' : 'assisted')}
         />
-        )}
 
       </div>
  
       {/* Colonna Destra: Risultato Netto, Grafico e Quadro LM simulato */}
-      {(internalTab === 'overview' || internalTab === 'quadro_lm' || internalTab === 'quadro_rr') && (
       <div className="flex flex-col gap-6">
         
         {/* Card Risultato Netto - Dark Sleek Container */}
@@ -1357,7 +954,6 @@ export default function TaxSimulatorDashboard({
  
           <div className="space-y-3.5 font-mono text-xs">
             {/* Quadro LM - Sezione I */}
-            {(internalTab === 'overview' || internalTab === 'quadro_lm') && (
             <div className="p-3 bg-white rounded-2xl border border-slate-100">
               <div className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-50 pb-1.5">QUADRO LM - Regime Forfettario</div>
               
@@ -1386,28 +982,11 @@ export default function TaxSimulatorDashboard({
                   <span className="text-[10px] text-slate-500 font-bold">LM36 (Reddito Netto)</span>
                   <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.netTaxableIncome.toFixed(0)}</span>
                 </div>
-                
-                {/* Riconoscimento Acconti da F24 anno precedente in LM */}
-                {results.substituteTaxAdvancesDeducted !== undefined && results.substituteTaxAdvancesDeducted > 0 && (
-                  <div className="flex justify-between py-1 items-center bg-emerald-50/70 px-2 rounded-lg border border-emerald-200/60 my-1">
-                    <span className="text-[10px] text-emerald-800 font-bold flex items-center gap-1">
-                      <span>LM42 (Acconti già versati F24 {previousYearStr})</span>
-                    </span>
-                    <span className="font-bold text-emerald-700 font-mono">- € {results.substituteTaxAdvancesDeducted.toFixed(2)}</span>
-                  </div>
-                )}
-
                 <div className="py-2 border-t border-slate-100">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] text-slate-500 font-bold">LM39 col. 1 (Imposta Lorda)</span>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-[10px] text-slate-500 font-bold">LM39 col. 1 (Imposta Sostitutiva)</span>
                     <span className="font-bold text-rose-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40">€ {results.substituteTax.toFixed(2)}</span>
                   </div>
-                  {results.substituteTaxAdvancesDeducted !== undefined && results.substituteTaxAdvancesDeducted > 0 && (
-                    <div className="flex justify-between items-center mb-1.5 bg-rose-50/60 px-2 py-1 rounded-lg border border-rose-200/50">
-                      <span className="text-[10px] text-rose-900 font-extrabold">LM43 (Imposta Netta Residua a Debito)</span>
-                      <span className="font-extrabold text-rose-700 font-mono">€ {results.substituteTaxNetDue?.toFixed(2)}</span>
-                    </div>
-                  )}
                   {results.substituteTax > 0 ? (
                     <div className="bg-rose-50/40 p-2 rounded-xl border border-rose-200/40 space-y-1.5 mt-1">
                       <div className="text-[8px] font-black text-rose-600 uppercase tracking-wider flex items-center gap-1">
@@ -1417,30 +996,30 @@ export default function TaxSimulatorDashboard({
                       <div className="grid grid-cols-3 gap-1">
                         <button
                           type="button"
-                          onClick={() => generateF24PDF(profile, results.substituteTaxNetDue ?? results.substituteTax, 'imposta', 'saldo', selectedYear)}
+                          onClick={() => generateF24PDF(profile, results.substituteTax, 'imposta', 'saldo', selectedYear)}
                           className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-rose-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
-                          title="Genera F24 Saldo (Cod. 1792 - 30 Giugno)"
+                          title="Genera F24 Saldo"
                         >
-                          <span className="text-[7px] text-slate-500 uppercase font-bold">Saldo (1792)</span>
-                          <span className="font-mono text-[9px]">€ {(results.substituteTaxNetDue ?? results.substituteTax).toFixed(0)}</span>
+                          <span className="text-[7px] text-slate-500 uppercase font-bold">Saldo</span>
+                          <span className="font-mono text-[9px]">€ {results.substituteTax.toFixed(0)}</span>
                         </button>
                         <button
                           type="button"
-                          onClick={() => generateF24PDF(profile, results.substituteTaxAcconto1 ?? (results.substituteTax * 0.5), 'imposta', 'acconto1', selectedYear)}
+                          onClick={() => generateF24PDF(profile, results.substituteTax * 0.4, 'imposta', 'acconto1', selectedYear)}
                           className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-rose-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
-                          title="Genera F24 1° Acconto 50% (Cod. 1790 - 30 Giugno)"
+                          title="Genera F24 1° Acconto (40%)"
                         >
-                          <span className="text-[7px] text-slate-500 uppercase font-bold">I° Acc 50% (1790)</span>
-                          <span className="font-mono text-[9px]">€ {(results.substituteTaxAcconto1 ?? (results.substituteTax * 0.5)).toFixed(0)}</span>
+                          <span className="text-[7px] text-slate-500 uppercase font-bold">I° Acc (40%)</span>
+                          <span className="font-mono text-[9px]">€ {(results.substituteTax * 0.4).toFixed(0)}</span>
                         </button>
                         <button
                           type="button"
-                          onClick={() => generateF24PDF(profile, results.substituteTaxAcconto2 ?? (results.substituteTax * 0.5), 'imposta', 'acconto2', selectedYear)}
+                          onClick={() => generateF24PDF(profile, results.substituteTax * 0.6, 'imposta', 'acconto2', selectedYear)}
                           className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-rose-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
-                          title="Genera F24 2° Acconto 50% (Cod. 1791 - 30 Novembre in unica soluzione)"
+                          title="Genera F24 2° Acconto (60%)"
                         >
-                          <span className="text-[7px] text-slate-500 uppercase font-bold">II° Acc 50% (1791)</span>
-                          <span className="font-mono text-[9px]">€ {(results.substituteTaxAcconto2 ?? (results.substituteTax * 0.5)).toFixed(0)}</span>
+                          <span className="text-[7px] text-slate-500 uppercase font-bold">II° Acc (60%)</span>
+                          <span className="font-mono text-[9px]">€ {(results.substituteTax * 0.6).toFixed(0)}</span>
                         </button>
                       </div>
                     </div>
@@ -1450,10 +1029,8 @@ export default function TaxSimulatorDashboard({
                 </div>
               </div>
             </div>
-            )}
  
             {/* Quadro RR */}
-            {(internalTab === 'overview' || internalTab === 'quadro_rr') && (
             <div className="p-3 bg-white rounded-2xl border border-slate-100">
               <div className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-50 pb-1.5">QUADRO RR - Contributi Previdenziali</div>
               
@@ -1560,59 +1137,42 @@ export default function TaxSimulatorDashboard({
                       <span className="font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 font-mono">{(results.inpsGestioneSeparataRate ? results.inpsGestioneSeparataRate * 100 : 26.07).toFixed(2)}%</span>
                     </div>
                     <div className="py-2 border-t border-slate-50">
-                      <div className="flex justify-between items-center mb-1">
+                      <div className="flex justify-between items-center mb-1.5">
                         <span className="text-[10px] text-slate-500 font-bold">Contributo Dovuto (col. 5)</span>
                         <span className="font-bold text-blue-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/40 font-mono">€ {results.inpsGestioneSeparataDue?.toFixed(2)}</span>
                       </div>
-
-                      {/* Riconoscimento Acconti INPS PXX anno precedente */}
-                      {results.inpsAdvancesDeducted !== undefined && results.inpsAdvancesDeducted > 0 && (
-                        <>
-                          <div className="flex justify-between py-1 items-center bg-emerald-50/70 px-2 rounded-lg border border-emerald-200/60 my-1">
-                            <span className="text-[10px] text-emerald-800 font-bold">Acconti già versati F24 {previousYearStr} (PXX)</span>
-                            <span className="font-bold text-emerald-700 font-mono">- € {results.inpsAdvancesDeducted.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between items-center mb-1.5 bg-blue-50/60 px-2 py-1 rounded-lg border border-blue-200/50">
-                            <span className="text-[10px] text-blue-900 font-extrabold">Saldo Netto INPS Residuo a Debito</span>
-                            <span className="font-extrabold text-blue-700 font-mono">€ {results.inpsNetDue?.toFixed(2)}</span>
-                          </div>
-                        </>
-                      )}
-
                       {results.inpsGestioneSeparataDue && results.inpsGestioneSeparataDue > 0 ? (
                         <div className="bg-blue-50/40 p-2 rounded-xl border border-blue-200/40 space-y-1.5 mt-1">
-                          <div className="text-[8px] font-black text-blue-600 uppercase tracking-wider flex items-center justify-between">
-                            <span className="flex items-center gap-1">
-                              <FileText className="w-2.5 h-2.5 text-blue-500" />
-                              <span>F24 Gestione Separata (Ripartizione 40% / 60%)</span>
-                            </span>
+                          <div className="text-[8px] font-black text-blue-600 uppercase tracking-wider flex items-center gap-1">
+                            <FileText className="w-2.5 h-2.5 text-blue-500" />
+                            <span>Genera Modelli F24 Gestione Separata</span>
                           </div>
                           <div className="grid grid-cols-3 gap-1">
                             <button
                               type="button"
-                              onClick={() => generateF24PDF(profile, results.inpsNetDue ?? results.inpsGestioneSeparataDue ?? 0, 'contributi', 'saldo', selectedYear, 'PXX')}
+                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataDue || 0, 'contributi', 'saldo', selectedYear, 'INPS_GESTIONE_SEPARATA')}
                               className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
-                              title="Genera F24 Saldo Gestione Separata (Causale PXX - 30 Giugno)"
+                              title="Genera F24 Saldo"
                             >
-                              <span className="text-[7px] text-slate-500 uppercase font-bold">Saldo (PXX)</span>
-                              <span className="font-mono text-[9px]">€ {(results.inpsNetDue ?? results.inpsGestioneSeparataDue ?? 0).toFixed(0)}</span>
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">Saldo</span>
+                              <span className="font-mono text-[9px]">€ {results.inpsGestioneSeparataDue.toFixed(0)}</span>
                             </button>
                             <button
                               type="button"
-                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto1 || 0, 'contributi', 'acconto1', selectedYear, 'PXX')}
+                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto1 || 0, 'contributi', 'acconto1', selectedYear, 'INPS_GESTIONE_SEPARATA')}
                               className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
-                              title="Genera F24 1° Acconto 40% (Causale PXX - 30 Giugno)"
+                              title="Genera F24 I° Acconto (40%)"
                             >
-                              <span className="text-[7px] text-slate-500 uppercase font-bold">I° Acc 40% (PXX)</span>
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">I° Acc (40%)</span>
                               <span className="font-mono text-[9px]">€ {(results.inpsGestioneSeparataAcconto1 || 0).toFixed(0)}</span>
                             </button>
                             <button
                               type="button"
-                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto2 || 0, 'contributi', 'acconto2', selectedYear, 'PXX')}
+                              onClick={() => generateF24PDF(profile, results.inpsGestioneSeparataAcconto2 || 0, 'contributi', 'acconto2', selectedYear, 'INPS_GESTIONE_SEPARATA')}
                               className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
-                              title="Genera F24 2° Acconto 60% (Causale PXX - 30 Novembre in unica soluzione)"
+                              title="Genera F24 2° Acconto (40%)"
                             >
-                              <span className="text-[7px] text-slate-500 uppercase font-bold">II° Acc 60% (PXX)</span>
+                              <span className="text-[7px] text-slate-500 uppercase font-bold">II° Acc (40%)</span>
                               <span className="font-mono text-[9px]">€ {(results.inpsGestioneSeparataAcconto2 || 0).toFixed(0)}</span>
                             </button>
                           </div>
@@ -1643,7 +1203,7 @@ export default function TaxSimulatorDashboard({
                           </div>
                           <div className="grid grid-cols-3 gap-1">
                             <button
-                              type="button"
+                              type="button; "
                               onClick={() => generateF24PDF(profile, results.currentYearContributions, 'contributi', 'saldo', selectedYear, selectedFund.id)}
                               className="py-1 px-1.5 text-[8px] font-bold bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-200/50 rounded transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 shadow-sm"
                               title="Genera F24 Saldo"
@@ -1682,34 +1242,13 @@ export default function TaxSimulatorDashboard({
                 </div>
               </div>
             </div>
-            )}
  
           </div>
         </div>
+ 
       </div>
-      )}
 
-      </div>
-      )}
-
-      {/* MODALE ISTITUZIONALE ZUCCHETTI: Prospetto Analitico F24 (Tributi, Compensazioni, Netto) */}
-      {inspectedF24Doc && (
-        <F24DocumentBreakdownModal
-          document={inspectedF24Doc}
-          onClose={() => setInspectedF24Doc(null)}
-        />
-      )}
-
-      {/* COMMAND PALETTE (CTRL+K / CMD+K) */}
-      <CommandPaletteModal
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        onSelectTab={handleTabClick}
-        onTriggerPdfExport={handleGeneratePDFClick}
-        f24EntriesCount={f24Entries.length}
-        invoicesCount={invoices.length}
-      />
-
+    </div>
     </div>
   );
 }

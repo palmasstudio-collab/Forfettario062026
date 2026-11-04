@@ -14,46 +14,22 @@ import { AtecoCode, PensionFundConfig } from './types';
 // Logica per determinare il coefficiente forfettario in base alle disposizioni
 // dell'Agenzia delle Entrate per il regime forfettario (Legge 190/2014 e s.m.i.)
 export function calculateCoefficientByAteco(atecoCode: string): number {
-  if (!atecoCode) return 0.67;
-  const raw = atecoCode.replace(/[^0-9]/g, '');
-  if (raw.length < 2) return 0.67;
+  const code = atecoCode.replace(/[^0-9.]/g, '');
+  const prefix2 = parseInt(code.substring(0, 2), 10);
+  const prefix3part = code.split('.').slice(0, 2).join('.');
+  const prefix3 = parseFloat(prefix3part);
 
-  const prefix2 = parseInt(raw.substring(0, 2), 10);
-  const prefix4 = raw.substring(0, 4);
+  if (prefix2 >= 10 && prefix2 <= 11) return 0.40; // Industrie alimentari e delle bevande
+  if (prefix3 === 47.81) return 0.40;              // Commercio ambulante prodotti alimentari
+  if (prefix3 === 47.82 || prefix3 === 47.89) return 0.54; // Commercio ambulante altri
+  if (prefix3 === 46.1 || prefix3 === 46.10) return 0.62; // Intermediari del commercio
+  if (prefix2 >= 45 && prefix2 <= 47) return 0.40; // Commercio all'ingrosso e al dettaglio (residuo)
+  if ((prefix2 >= 41 && prefix2 <= 43) || prefix2 === 68) return 0.86; // Costruzioni e immobili
+  if (prefix2 >= 55 && prefix2 <= 56) return 0.40; // Servizi di alloggio e ristorazione
+  if ((prefix2 >= 64 && prefix2 <= 66) || (prefix2 >= 69 && prefix2 <= 75) || prefix2 === 85 || (prefix2 >= 86 && prefix2 <= 88)) return 0.78; // Professionisti, sanità, istruzione
+  if ((prefix2 >= 1 && prefix2 <= 3) || (prefix2 >= 5 && prefix2 <= 9) || (prefix2 >= 12 && prefix2 <= 33) || (prefix2 >= 35 && prefix2 <= 39) || (prefix2 >= 49 && prefix2 <= 53) || (prefix2 >= 58 && prefix2 <= 63) || (prefix2 >= 77 && prefix2 <= 82) || (prefix2 >= 90 && prefix2 <= 99)) return 0.67; // Altre attività
 
-  // Gruppo 3 - Commercio ambulante alimentari (47.81)
-  if (prefix4 === '4781') return 0.40;
-
-  // Gruppo 4 - Commercio ambulante non alimentari (47.82, 47.89)
-  if (prefix4 === '4782' || prefix4 === '4789') return 0.54;
-
-  // Gruppo 6 - Intermediari del commercio / Agenti e rappresentanti (46.1x)
-  if (raw.startsWith('461')) return 0.62;
-
-  // Gruppo 1 - Industrie alimentari e delle bevande (10-11)
-  if (prefix2 === 10 || prefix2 === 11) return 0.40;
-
-  // Gruppo 2 - Commercio all'ingrosso e al dettaglio (45, 46 eccetto 46.1, 47 eccetto ambulante 47.81/82/89)
-  if (prefix2 >= 45 && prefix2 <= 47) return 0.40;
-
-  // Gruppo 5 - Costruzioni e attività immobiliari (41, 42, 43, 68)
-  if ((prefix2 >= 41 && prefix2 <= 43) || prefix2 === 68) return 0.86;
-
-  // Gruppo 7 - Servizi di alloggio e di ristorazione (55, 56)
-  if (prefix2 === 55 || prefix2 === 56) return 0.40;
-
-  // Gruppo 8 - Attività professionali, scientifiche, tecniche, sanitarie, istruzione, finanziarie (64-66, 69-75, 85-88)
-  if (
-    (prefix2 >= 64 && prefix2 <= 66) ||
-    (prefix2 >= 69 && prefix2 <= 75) ||
-    prefix2 === 85 ||
-    (prefix2 >= 86 && prefix2 <= 88)
-  ) {
-    return 0.78;
-  }
-
-  // Gruppo 9 - Altre attività economiche (01-03, 05-09, 12-33, 35-39, 49-53, 58-63, 77-82, 90-99)
-  return 0.67;
+  return 0.67; // Valore di default
 }
 
 export function determineAtecoType(code: string): string {

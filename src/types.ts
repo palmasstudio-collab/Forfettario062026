@@ -39,8 +39,6 @@ export interface TaxInput {
   vatOpeningDate?: string;
   calculationYear?: number;
   inpsReduction35?: boolean;
-  substituteTaxAdvancesPaidForCurrentYear?: number; // Acconti imposta sostitutiva (1790, 1791) già pagati l'anno precedente per quest'anno
-  inpsAdvancesPaidForCurrentYear?: number; // Acconti INPS (PXX) già pagati l'anno precedente per quest'anno
 }
 
 export interface TaxReturnCalculation {
@@ -66,15 +64,6 @@ export interface TaxReturnCalculation {
   inpsGestioneSeparataAcconto1?: number;
   inpsGestioneSeparataAcconto2?: number;
   inpsGestioneSeparataAccontiTotale?: number;
-  substituteTaxSaldo?: number; // Saldo imposta sostitutiva anno precedente (Cod. 1792)
-  substituteTaxAcconto1?: number; // 1° Acconto 50% entro 30 Giugno (Cod. 1790)
-  substituteTaxAcconto2?: number; // 2° Acconto 50% entro 30 Novembre (Cod. 1791)
-  substituteTaxAccontiTotale?: number; // Totale acconti dovuti
-  // Dettagli acconti già versati rinvenuti da F24 anno precedente:
-  substituteTaxAdvancesDeducted?: number; // Somma di 1790 + 1791 già versati per l'anno corrente
-  inpsAdvancesDeducted?: number; // Somma di acconti PXX già versati per l'anno corrente
-  substituteTaxNetDue?: number; // Saldo netto imposta sostitutiva a debito dopo scomputo acconti
-  inpsNetDue?: number; // Saldo netto INPS a debito dopo scomputo acconti
 }
 
 export interface Invoice {
@@ -91,13 +80,6 @@ export interface Invoice {
   driveFileUrl?: string;
 }
 
-export interface SecondaryAtecoCode {
-  code: string;
-  description: string;
-  coefficient: number;
-  percentageShare: number; // e.g. 30 for 30% of total revenue
-}
-
 export interface BusinessProfile {
   fullName: string;
   vatNumber: string;
@@ -110,59 +92,15 @@ export interface BusinessProfile {
   inpsReduction35?: boolean;
   manualContributionsByYear?: Record<string, number>;
   useAutomaticF24ByYear?: Record<string, boolean>;
-  secondaryAtecoCodes?: SecondaryAtecoCode[];
-}
-
-export interface RavvedimentoInput {
-  taxCode: string;
-  originalDueDate: string; // YYYY-MM-DD
-  actualPaymentDate: string; // YYYY-MM-DD
-  originalAmount: number;
-  year: string;
-}
-
-export interface RavvedimentoResult {
-  daysLate: number;
-  penaltyCode: string;
-  penaltyRate: number; // e.g. 0.001 per day or 0.015
-  penaltyAmount: number;
-  interestCode: string;
-  annualInterestRate: number; // e.g. 0.025 for 2.5% in 2026
-  interestAmount: number;
-  totalToPay: number;
-  ravvedimentoType: 'sprint' | 'breve' | 'medio' | 'lungo' | 'ordinario';
-}
-
-export interface ReconciliationStatus {
-  category: 'IMPOSTA_SOSTITUTIVA' | 'INPS_GESTIONE_SEPARATA' | 'INPS_ARTIGIANI_COMMERCIANTI' | 'MARCA_BOLLO';
-  title: string;
-  taxCode: string;
-  dueAmount: number;
-  paidAmount: number;
-  difference: number; // dueAmount - paidAmount
-  status: 'RICONCILIATO' | 'A_DEBITO_PARZIALE' | 'NON_VERSATO' | 'ECCEDENZA_CREDITO';
-  details: string;
 }
 
 export interface F24Entry {
   id: string;
-  date: string; // The date of payment or entry (YYYY-MM-DD)
-  taxCode: string; // Codice Tributo e.g., 4001, 1792, 1790, 1791, PXX, P10, AP, CP ecc.
-  amount: number; // Importo netto versato o registrato
-  debtAmount?: number; // Importo a debito versato
-  creditAmount?: number; // Importo a credito compensato (Compensazione)
-  netAmount?: number; // Saldo netto del rigo (Debito - Credito)
-  section?: string; // Sezione ministeriale (Erario, INPS, Regioni, Enti Locali)
+  date: string; // The date of payment or entry
+  taxCode: string; // Codice Tributo e.g., 4001, 1792, AP, CP ecc.
+  amount: number; // Importo versato
   description?: string;
   source: string; // "Manuale" o "PDF"
-  fileName?: string; // Nome del file PDF di provenienza
-  driveFileId?: string;
-  isAcconto?: boolean; // Se è un acconto (1790, 1791, PXX acconto)
-  targetYear?: string; // Anno di competenza a cui si riferisce l'acconto (es. versato nel 2025 per il 2026)
-  accontoType?: '1_acconto' | '2_acconto' | 'saldo' | 'altro';
-  totalDebtF24?: number; // Totale debiti del modello F24 (Totale A)
-  totalCreditF24?: number; // Totale compensazioni del modello F24 (Totale B)
-  netDueF24?: number; // Netto effettivo da pagare / quietanzato del modello F24 (Saldo A - B)
 }
 
 export interface AccountingPosition {
@@ -177,6 +115,4 @@ export interface AccountingPosition {
   fattureEmesseFolderId?: string;
   f24FolderId?: string;
   fileGenericiFolderId?: string;
-  googleSheetId?: string;
-  googleSheetUrl?: string;
 }

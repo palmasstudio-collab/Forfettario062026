@@ -243,13 +243,8 @@ export function generateTaxAndInvoicePDF(
   drawQuadroRow('Reddito Imponibile Lordo', 'LM34', `€ ${results.grossTaxableIncome.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
   drawQuadroRow('Contributi previdenziali deducibili per cassa', 'LM35', `€ ${results.deductibleContributions.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
   drawQuadroRow('Reddito Imponibile Netto Autonomo', 'LM36', `€ ${results.netTaxableIncome.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
-  drawQuadroRow(`Imposta Sostitutiva Lorda Dovuta (${(results.taxRate * 100).toFixed(0)}%)`, 'LM39 col. 1', `€ ${results.substituteTax.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
+  drawQuadroRow(`Imposta Sostitutiva Dovuta (${(results.taxRate * 100).toFixed(0)}%)`, 'LM39 col. 1', `€ ${results.substituteTax.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
   
-  if (results.substituteTaxAdvancesDeducted && results.substituteTaxAdvancesDeducted > 0) {
-    drawQuadroRow('Acconti d\'imposta versati anno precedente (F24 Cod. 1790/1791)', 'LM42', `- € ${results.substituteTaxAdvancesDeducted.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
-    drawQuadroRow('Imposta Sostitutiva Netta a Debito Residua', 'LM43', `€ ${(results.substituteTaxNetDue ?? results.substituteTax).toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
-  }
-
   if (results.isSectionI) {
     drawQuadroRow('Reddito d\'impresa', 'RR2 col. 1', `€ ${results.rr2Col1?.toLocaleString('it-IT', { minimumFractionDigits: 2 }) || '0,00'}`);
     drawQuadroRow('Reddito minimale (riproporzionato se P.IVA aperta in corso d\'anno)', 'RR2 col. 2', `€ ${results.rr2Col2?.toLocaleString('it-IT', { minimumFractionDigits: 2 }) || '0,00'}`);
@@ -258,17 +253,26 @@ export function generateTaxAndInvoicePDF(
     const excessIncome = results.redditoEccedenteMinimale || 0;
     const excessContr = results.contributiEccedenteMinimale || 0;
     
+    // Output empty or 0 if Gross Taxable Income is <= the minimale
     drawQuadroRow('Reddito eccedente il minimale', 'Eccedenza col. 1', excessIncome > 0 ? `€ ${excessIncome.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : '0,00');
     drawQuadroRow('Contributi eccedenti il minimale', 'Eccedenza col. 2', excessContr > 0 ? `€ ${excessContr.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : '0,00');
+    
+    // Add Note about Installments
+    currentY += 3;
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.text('* Nota sulle scadenze dei Contributi IVS minimali (Quadro RR Sez. I):', marginX + 1, currentY);
+    currentY += 4;
+    doc.text('I contributi IVS calcolati sul minimale sono versati tipicamente in 4 rate paritetiche alle seguenti scadenze:', marginX + 1, currentY);
+    currentY += 4;
+    doc.setFont('Helvetica', 'italic');
+    doc.text('- 16 Maggio, 20 Agosto, 16 Novembre, e 16 Febbraio dell\'anno successivo.', marginX + 1, currentY);
+    currentY += 2;
   } else {
     drawQuadroRow(`Cassa di Appartenenza con aliquota ${(selectedFund.rate * 100).toFixed(2)}%`, 'RR Sez. II', selectedFund.id);
     drawQuadroRow('Base Imponibile dei Contributi Quadro RR', 'RR col. 4', `€ ${results.grossTaxableIncome.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
     drawQuadroRow(`Quota di Contribuzione Previdenziale Corrente`, 'RR col. 5', `€ ${results.currentYearContributions.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
-    
-    if (results.inpsAdvancesDeducted && results.inpsAdvancesDeducted > 0) {
-      drawQuadroRow('Acconti INPS PXX già versati anno precedente (F24)', 'RR Acconti', `- € ${results.inpsAdvancesDeducted.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
-      drawQuadroRow('Contributi Previdenziali Netti a Debito Residui', 'RR Netto', `€ ${(results.inpsNetDue ?? results.currentYearContributions).toLocaleString('it-IT', { minimumFractionDigits: 2 })}`);
-    }
   }
 
   // Footer visual template on page 1

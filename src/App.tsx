@@ -9,28 +9,10 @@ import BusinessProfileCard from './components/BusinessProfileCard';
 import TaxSimulatorDashboard from './components/TaxSimulatorDashboard';
 import AccountingPositionModal from './components/AccountingPositionModal';
 import DeletePositionModal from './components/DeletePositionModal';
-import DriveSearchModal from './components/DriveSearchModal';
 import ThemeSelector, { ThemeType } from './components/ThemeSelector';
-import { 
-  createAccountingPositionFolder, 
-  uploadF24Pdf, 
-  deleteDriveFile, 
-  uploadFirebaseBackupToDrive, 
-  findOrCreateFolder, 
-  uploadInvoiceXml, 
-  listDriveFolders, 
-  listFilesInFolder, 
-  downloadFileContent, 
-  renameDriveFile, 
-  resolveYearFolderAndSubfolder, 
-  verifyAndRecreateFolderStructure,
-  searchDriveForAccountingPositions,
-  importAccountingPositionFromDrive,
-  extractGoogleDriveFolderId
-} from './utils/googleDrive';
+import { createAccountingPositionFolder, uploadF24Pdf, deleteDriveFile, uploadFirebaseBackupToDrive, findOrCreateFolder, uploadInvoiceXml, listDriveFolders, listFilesInFolder, downloadFileContent, renameDriveFile, resolveYearFolderAndSubfolder, verifyAndRecreateFolderStructure } from './utils/googleDrive';
 import { parseInvoiceXml } from './utils/xmlInvoiceParser';
-import { syncInvoicesToGoogleSheet } from './utils/googleSheetsSync';
-import { extractF24DataFromPdf, extractDetailedF24Document } from './utils/pdfF24Parser';
+import { extractF24DataFromPdf } from './utils/pdfF24Parser';
 import { calculateTaxReturn } from './calculateTaxReturn';
 import { findAtecoCode, findPensionFund } from './taxData';
 import { safeAlert, safeConfirm } from './utils/safeWindow';
@@ -39,33 +21,27 @@ import {
   FileText, 
   Database, 
   RefreshCw, 
-  Menu, 
-  X, 
-  TrendingUp, 
-  CircleCheck, 
-  Lock, 
-  User, 
-  ExternalLink, 
-  PlusCircle, 
-  Trash2, 
-  Cloud, 
-  CloudOff, 
-  Folder, 
-  Share2, 
-  WifiOff, 
-  AlertTriangle, 
-  Sparkles, 
-  Calendar, 
-  FileCode, 
-  ChevronDown, 
-  ChevronUp, 
-  FolderPlus,
-  Search,
-  FolderSearch,
-  BookOpen,
-  ShieldCheck,
-  DollarSign,
-  Clock
+  Menu,
+  X,
+  TrendingUp,
+  CircleCheck,
+  Lock,
+  User,
+  ExternalLink,
+  PlusCircle,
+  Trash2,
+  Cloud,
+  CloudOff,
+  Folder,
+  Share2,
+  WifiOff,
+  AlertTriangle,
+  Sparkles,
+  Calendar,
+  FileCode,
+  ChevronDown,
+  ChevronUp,
+  FolderPlus
 } from 'lucide-react';
 
 const LOCAL_STORAGE_PROFILE_KEY = 'forfettario_profile_v1';
@@ -133,151 +109,41 @@ import { ErrorBoundary } from './ErrorBoundary';
 
 import { initAuth, googleSignIn, logout as firebaseLogout, getAccessToken } from './lib/firebaseAuth';
 
-export const DEFAULT_ACCOUNTING_FOLDER_ID = '19oSp4--stkguC2r25d2MfsV3PWUoVXfT';
-export const DEFAULT_ACCOUNTING_FOLDER_URL = 'https://drive.google.com/drive/folders/19oSp4--stkguC2r25d2MfsV3PWUoVXfT';
-
-export const VALERIA_MAROS_POSITION_ID = 'pos-valeria-maros-univoca';
-export const VALERIA_MAROS_FOLDER_ID = DEFAULT_ACCOUNTING_FOLDER_ID;
-export const VALERIA_MAROS_FOLDER_URL = DEFAULT_ACCOUNTING_FOLDER_URL;
-
-export const PERMANENT_MAROS_POSITION: AccountingPosition = {
-  id: VALERIA_MAROS_POSITION_ID,
-  name: 'Valeria Maros (Contabilità Ufficiale)',
-  profile: {
-    fullName: 'Valeria Maros',
-    vatNumber: '03847291048',
-    fiscalCode: 'MRSVLR88H50H501Z',
-    atecoCode: '70.22.09', // Consulenza aziendale e gestionale
-    pensionFund: 'INPS_GESTIONE_SEPARATA',
-    startYear: '2025',
-    isStartup: true,
-    inpsReduction35: false
-  },
-  driveFolderId: DEFAULT_ACCOUNTING_FOLDER_ID,
-  driveFolderUrl: DEFAULT_ACCOUNTING_FOLDER_URL,
-  invoices: [
-    {
-      id: 'inv-maros-1',
-      number: 'Fattura 01/2025',
-      date: '2025-04-12',
-      clientName: 'Nexia Consulting S.r.l.',
-      clientVat: 'IT09876543210',
-      amount: 2800.00,
-      isPaid: true,
-      hasStampDuty: true,
-      notes: 'Consulenza strategia aziendale e organizzazione processi'
-    },
-    {
-      id: 'inv-maros-2',
-      number: 'Fattura 02/2025',
-      date: '2025-09-20',
-      clientName: 'MediaStudio Hub',
-      clientVat: 'IT01239874561',
-      amount: 3400.00,
-      isPaid: true,
-      hasStampDuty: true,
-      notes: 'Coordinamento progetti digitali e revisione contrattualistica'
-    },
-    {
-      id: 'inv-maros-3',
-      number: 'Fattura 01/2026',
-      date: '2026-02-15',
-      clientName: 'Nexia Consulting S.r.l.',
-      clientVat: 'IT09876543210',
-      amount: 3200.00,
-      isPaid: true,
-      hasStampDuty: true,
-      notes: 'Consulenza direzionale Q1 2026'
-    },
-    {
-      id: 'inv-maros-4',
-      number: 'Fattura 02/2026',
-      date: '2026-05-10',
-      clientName: 'Omnia Solution S.p.A.',
-      clientVat: 'IT04561237890',
-      amount: 2150.00,
-      isPaid: true,
-      hasStampDuty: true,
-      notes: 'Attività di audit e formazione interna'
-    }
-  ],
-  f24Entries: [
-    {
-      id: 'f24-maros-2025-acconto1',
-      date: '2025-06-30',
-      taxCode: 'PXX',
-      amount: 46.00,
-      description: 'INPS Gestione Separata - 1° Acconto (40% versato a Giugno 2025)',
-      source: 'PDF',
-      isAcconto: true,
-      targetYear: '2026',
-      accontoType: '1_acconto'
-    },
-    {
-      id: 'f24-maros-2025-acconto2',
-      date: '2025-11-30',
-      taxCode: 'PXX',
-      amount: 68.00,
-      description: 'INPS Gestione Separata - 2° Acconto (60% versato a Novembre 2025)',
-      source: 'PDF',
-      isAcconto: true,
-      targetYear: '2026',
-      accontoType: '2_acconto'
-    }
-  ],
-  f24Files: [
-    {
-      id: 'f24-maros-file-1',
-      name: 'F24_ValeriaMaros_2025_AccontoPXX_46euro.pdf',
-      url: 'https://drive.google.com/file/d/f24-maros-file-1/view',
-      dateAdded: '2025-06-30'
-    },
-    {
-      id: 'f24-maros-file-2',
-      name: 'F24_ValeriaMaros_2025_SecondoAccontoPXX_68euro.pdf',
-      url: 'https://drive.google.com/file/d/f24-maros-file-2/view',
-      dateAdded: '2025-11-30'
-    }
-  ]
-};
-
+// In order to show the error boundary, I need to wrap the whole App layout in it... wait, it's better to wrap the main content area.
 const getInitialPositions = (): AccountingPosition[] => {
   const saved = localStorage.getItem(LOCAL_STORAGE_POSITIONS_KEY);
-  let loadedList: AccountingPosition[] = [];
-  
+  console.log("Loading positions from localStorage:", saved);
   if (saved && saved !== 'null' && saved !== 'undefined') {
     try {
-      loadedList = JSON.parse(saved);
+      return JSON.parse(saved);
     } catch (e) {
       console.error("Failed to parse saved positions:", e);
+      // Return empty array to prevent overwriting with demo data
+      return []; 
     }
   }
 
-  // Assicurati che Valeria Maros sia sempre ancorata e presente in modo univoco
-  const hasMaros = loadedList.some(
-    p => p.id === VALERIA_MAROS_POSITION_ID || p.profile?.fullName?.toLowerCase().includes('maros')
-  );
+  // Fallback migration of old single-profile (only if key didn't exist)
+  let oldProfile = DEFAULT_PROFILE;
+  try {
+    const savedProf = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
+    if (savedProf) oldProfile = JSON.parse(savedProf);
+  } catch (e) {}
 
-  if (!hasMaros) {
-    // Aggiungi Valeria Maros in cima
-    loadedList = [PERMANENT_MAROS_POSITION, ...loadedList.filter(p => p.id !== 'pos-default')];
-  } else {
-    // Garantisci che la posizione di Valeria Maros abbia sempre il driveFolderId univoco
-    loadedList = loadedList.map(p => {
-      if (p.id === VALERIA_MAROS_POSITION_ID || p.profile?.fullName?.toLowerCase().includes('maros')) {
-        const needsFolderUpdate = !p.driveFolderId || p.driveFolderId.includes('fallback') || p.driveFolderId.includes('mock');
-        return {
-          ...p,
-          id: VALERIA_MAROS_POSITION_ID,
-          driveFolderId: needsFolderUpdate ? DEFAULT_ACCOUNTING_FOLDER_ID : p.driveFolderId,
-          driveFolderUrl: needsFolderUpdate ? DEFAULT_ACCOUNTING_FOLDER_URL : p.driveFolderUrl
-        };
-      }
-      return p;
-    });
-  }
+  let oldInvoices = DEMO_INVOICES;
+  try {
+    const savedInvs = localStorage.getItem(LOCAL_STORAGE_INVOICES_KEY);
+    if (savedInvs) oldInvoices = JSON.parse(savedInvs);
+  } catch (e) {}
 
-  return loadedList.length > 0 ? loadedList : [PERMANENT_MAROS_POSITION];
+  return [
+    {
+      id: 'pos-default',
+      name: `Posizione (${oldProfile.fullName})`,
+      profile: oldProfile,
+      invoices: oldInvoices,
+    },
+  ];
 };
 
 const getInitialActivePositionId = (positions: AccountingPosition[]): string => {
@@ -287,9 +153,6 @@ const getInitialActivePositionId = (positions: AccountingPosition[]): string => 
       return saved;
     }
   }
-  // Di default attiva la posizione univoca di Valeria Maros
-  const marosPos = positions.find(p => p.id === VALERIA_MAROS_POSITION_ID || p.profile?.fullName?.toLowerCase().includes('maros'));
-  if (marosPos) return marosPos.id;
   return positions.length > 0 ? positions[0].id : '';
 };
 
@@ -309,74 +172,9 @@ export default function App() {
     return '2026';
   });
 
-  const [availableYears, setAvailableYears] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('forfettario_available_years_v1');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        } catch (e) {}
-      }
-    }
-    return ['2025', '2026'];
-  });
-
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('forfettario_selected_year_v1', selectedYear);
-    }
+    localStorage.setItem('forfettario_selected_year_v1', selectedYear);
   }, [selectedYear]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('forfettario_available_years_v1', JSON.stringify(availableYears));
-    }
-  }, [availableYears]);
-
-  const handleEnsureYear = (yr: string) => {
-    if (yr && /^\d{4}$/.test(yr) && !availableYears.includes(yr)) {
-      setAvailableYears(prev => [...prev, yr].sort());
-    }
-  };
-
-  const handleAddYear = async (newYearInput?: string) => {
-    let targetYear = newYearInput;
-    if (!targetYear) {
-      const currentMax = Math.max(...availableYears.map(y => parseInt(y, 10)).filter(Boolean));
-      const nextYearStr = String(isNaN(currentMax) ? 2027 : currentMax + 1);
-      const input = prompt(`Inserisci il nuovo esercizio fiscale da aggiungere alla contabilità (es. ${nextYearStr}):`, nextYearStr);
-      if (!input || !input.trim()) return;
-      targetYear = input.trim();
-    }
-
-    if (!/^\d{4}$/.test(targetYear)) {
-      safeAlert("Anno non valido. Inserisci un anno di 4 cifre (es. 2027).");
-      return;
-    }
-
-    if (!availableYears.includes(targetYear)) {
-      setAvailableYears(prev => [...prev, targetYear].sort());
-    }
-
-    setSelectedYear(targetYear);
-
-    const token = googleAccessTokenState;
-    const rootFolderId = activePosition?.driveFolderId || DEFAULT_ACCOUNTING_FOLDER_ID;
-    if (token && rootFolderId) {
-      addSyncLog(`📁 Inizializzazione cartelle per il nuovo esercizio ${targetYear} su Google Drive...`);
-      try {
-        await resolveYearFolderAndSubfolder(token, rootFolderId, targetYear, 'FATTURE EMESSE', true);
-        await resolveYearFolderAndSubfolder(token, rootFolderId, targetYear, 'F24', true);
-        await resolveYearFolderAndSubfolder(token, rootFolderId, targetYear, 'FILE GENERICI', true);
-        addSyncLog(`✅ Cartelle per l'esercizio ${targetYear} ("FATTURE EMESSE", "F24", "FILE GENERICI") pronte su Google Drive.`);
-      } catch (err: any) {
-        console.warn("Creazione cartelle nuovo anno su Drive:", err);
-      }
-    }
-
-    safeAlert(`Esercizio ${targetYear} aggiunto con successo alla contabilità!`);
-  };
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     dashboard: true,
@@ -404,39 +202,16 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isPositionModalOpen, setIsPositionModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isDriveSearchModalOpen, setIsDriveSearchModalOpen] = useState(false);
-  const [driveSearchInitialQuery, setDriveSearchInitialQuery] = useState('Valeria Maros');
   const [isCreatingDriveFolder, setIsCreatingDriveFolder] = useState(false);
   const [isRecreatingDriveFolder, setIsRecreatingDriveFolder] = useState(false);
-
-  const handlePositionImported = (newPos: AccountingPosition) => {
-    setPositions((prev) => {
-      const existingIdx = prev.findIndex(
-        (p) => p.id === newPos.id || (p.driveFolderId && p.driveFolderId === newPos.driveFolderId)
-      );
-      let updated: AccountingPosition[];
-      if (existingIdx >= 0) {
-        updated = [...prev];
-        updated[existingIdx] = newPos;
-      } else {
-        updated = [...prev, newPos];
-      }
-      return updated.filter((p) => !(p.id === 'pos-default' && p.invoices.length === 0));
-    });
-    setActivePositionId(newPos.id);
-    addSyncLog(`✅ Contabilità di "${newPos.profile.fullName}" importata con successo da Google Drive!`);
-  };
 
   // Aesthetic Themes
   const [theme, setTheme] = useState<ThemeType>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('forfettario_theme_v1') as ThemeType) || 'zucchetti';
+      return (localStorage.getItem('forfettario_theme_v1') as ThemeType) || 'vibrant';
     }
-    return 'zucchetti';
+    return 'vibrant';
   });
-
-  // Active ERP Module
-  const [activeModule, setActiveModule] = useState<string>('overview');
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -537,41 +312,15 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Automatic Drive check for Valeria Maros if Drive is connected and not already in positions
-  useEffect(() => {
-    if (googleAccessTokenState) {
-      const hasMaros = positions.some(
-        (p) => p.profile?.fullName?.toLowerCase().includes('maros') || p.name.toLowerCase().includes('maros')
-      );
-      if (!hasMaros) {
-        searchDriveForAccountingPositions(googleAccessTokenState, 'Valeria Maros')
-          .then(async (found) => {
-            if (found && found.length > 0) {
-              addSyncLog(`🔍 Trovata cartella su Google Drive per "${found[0].cleanedName}". Importazione automatica...`);
-              const imported = await importAccountingPositionFromDrive(googleAccessTokenState, found[0], selectedYear);
-              handlePositionImported(imported);
-            }
-          })
-          .catch((err) => {
-            console.warn("Auto-search Valeria Maros on Drive:", err);
-          });
-      }
-    }
-  }, [googleAccessTokenState]);
-
   const handleGoogleLogin = async () => {
     try {
       addSyncLog("Autenticazione con Google in corso...");
-      // Forza un token simulato valido per bypassare il controllo di dominio Firebase Auth in preview
-      const mockToken = 'mock-token-' + Math.random().toString(36).substring(2, 15);
-      const mockUser = { email: 'Palmasstudio@gmail.com', displayName: 'Manuel Palmas', uid: 'mock-uid-palmas' };
-      
-      setGoogleUser(mockUser);
-      setGoogleAccessTokenState(mockToken);
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('drive_access_token', mockToken);
+      const result = await googleSignIn();
+      if (result) {
+        setGoogleUser({ email: result.user.email, photoURL: result.user.photoURL, uid: result.user.uid });
+        setGoogleAccessTokenState(result.accessToken);
+        addSyncLog("✅ Google Drive connesso.");
       }
-      addSyncLog("✅ Google Drive connesso (Modalità Sandbox Integrata).");
     } catch (err: any) {
       console.error(err);
       safeAlert("Errore durante l'autenticazione: " + err.message);
@@ -586,45 +335,6 @@ export default function App() {
       addSyncLog("🔙 Disconnesso da Google Drive.");
     } catch (err: any) {
       safeAlert("Errore durante il logout: " + err.message);
-    }
-  };
-
-  const runGoogleDriveDiagnostics = async () => {
-    addSyncLog("🔍 [DIAGNOSTICA] Avvio test di verifica autenticazione Google Drive...");
-    const token = googleAccessTokenState || (typeof window !== 'undefined' ? sessionStorage.getItem('drive_access_token') : null);
-    
-    if (!token) {
-      addSyncLog("❌ [DIAGNOSTICA] Token Google Drive NON TROVATO. Lo stato di autenticazione non è inizializzato.");
-      safeAlert("Diagnostica Drive: Nessun token attivo trovato. Connettiti a Google Drive prima di eseguire il test.");
-      return;
-    }
-
-    const isMock = token.includes('mock-');
-    if (isMock) {
-      addSyncLog(`⚠️ [DIAGNOSTICA] Rilevato token di tipo 'Simulated auth token bypass' (Mock Token: ${token.substring(0, 15)}...).`);
-      addSyncLog("ℹ️ In modalità Sandbox, le chiamate REST a Google Drive vengono emulate localmente per prevenire errori di dominio non autorizzato.");
-      safeAlert(`Diagnostica Drive:\nToken attivo: SIMULATO (Mock Token)\nRiscontro: 'Simulated auth token bypass' attivo.`);
-      return;
-    }
-
-    addSyncLog(`✅ [DIAGNOSTICA] Trovato Token OAuth Reale (${token.substring(0, 8)}...). Esecuzione test REST API v3 verso la cartella radice ${DEFAULT_ACCOUNTING_FOLDER_ID}...`);
-    try {
-      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${DEFAULT_ACCOUNTING_FOLDER_ID}?fields=id,name,webViewLink`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        addSyncLog(`🎉 [DIAGNOSTICA] SUCCESSO! Connessione Google Drive stabilita. Cartella radice trovata: "${data.name}" (ID: ${data.id})`);
-        safeAlert(`Diagnostica Drive Completata con Successo!\nCartella verificata: ${data.name}\nID: ${data.id}`);
-      } else {
-        const errText = await res.text();
-        addSyncLog(`❌ [DIAGNOSTICA] Errore API Google Drive (${res.status}): ${errText}`);
-        safeAlert(`Diagnostica Drive: Errore API (${res.status}). Verifica la validità del token OAuth.`);
-      }
-    } catch (err: any) {
-      addSyncLog(`❌ [DIAGNOSTICA] Errore di rete durante la chiamata API: ${err.message || err}`);
-      safeAlert(`Diagnostica Drive: Errore di rete: ${err.message}`);
     }
   };
 
@@ -705,51 +415,6 @@ export default function App() {
     }
   };
 
-  const handleConnectCustomDriveFolder = async (folderInput: string) => {
-    const folderId = extractGoogleDriveFolderId(folderInput);
-    if (!folderId) {
-      safeAlert("Inserisci un link o ID di cartella Google Drive valido.");
-      return;
-    }
-
-    const folderUrl = `https://drive.google.com/drive/folders/${folderId}`;
-    addSyncLog(`🔗 Collegamento cartella Google Drive: ${folderId}...`);
-
-    let targetFattureId = '';
-    let targetF24Id = '';
-
-    const token = googleAccessTokenState;
-    if (token) {
-      try {
-        const resolvedFatture = await resolveYearFolderAndSubfolder(token, folderId, selectedYear, 'Fatture Emesse', true);
-        targetFattureId = resolvedFatture.subfolderId;
-        const resolvedF24 = await resolveYearFolderAndSubfolder(token, folderId, selectedYear, 'F24', true);
-        targetF24Id = resolvedF24.subfolderId;
-        addSyncLog(`✅ Sottocartelle "Anno ${selectedYear}/Fatture Emesse" e "F24" verificate con successo.`);
-      } catch (err: any) {
-        console.warn("Impossibile verificare immediatamente le sottocartelle:", err);
-      }
-    }
-
-    setPositions((prev) =>
-      prev.map((pos) => {
-        if (pos.id === activePositionId) {
-          return {
-            ...pos,
-            driveFolderId: folderId,
-            driveFolderUrl: folderUrl,
-            fattureEmesseFolderId: targetFattureId || pos.fattureEmesseFolderId,
-            f24FolderId: targetF24Id || pos.f24FolderId,
-          };
-        }
-        return pos;
-      })
-    );
-
-    addSyncLog(`✅ Cartella Google Drive collegata con successo: ${folderUrl}`);
-    safeAlert(`Cartella contabilità Google Drive collegata con successo!\n${folderUrl}`);
-  };
-
   const handleUploadInvoiceXmlToDrive = async (file: File, year?: string) => {
     if (!activePosition) {
       throw new Error("Nessuna posizione contabile attiva selezionata.");
@@ -760,49 +425,46 @@ export default function App() {
     }
     
     const uploadYear = year || selectedYear;
-    const targetFolderId = activePosition.driveFolderId || DEFAULT_ACCOUNTING_FOLDER_ID;
-
-    addSyncLog(`🔍 Risoluzione cartella "Anno ${uploadYear}/Fatture Emesse" nella cartella contabilità...`);
+    const posStartYear = activePosition.profile?.startYear || '2025';
+    addSyncLog(`🔍 Verifica preventiva obbligatoria dell'esistenza delle cartelle di archiviazione per "${activePosition.profile.fullName || 'Cliente'}"...`);
 
     try {
-      const resolved = await resolveYearFolderAndSubfolder(
+      // Verify existing structure or recreate if missing
+      const healedFolder = await verifyAndRecreateFolderStructure(
         token,
-        targetFolderId,
+        activePosition.name,
+        activePosition.profile.fullName,
+        activePosition.driveFolderId,
         uploadYear,
-        'Fatture Emesse',
-        true
+        undefined,
+        posStartYear
       );
-      
-      const invoicesFolderId = resolved.subfolderId;
 
-      addSyncLog(`📁 Salvataggio file XML "${file.name}" nella cartella Drive "Fatture Emesse"...`);
-      
-      const uploadResult = await uploadInvoiceXml(token, targetFolderId, file, invoicesFolderId, uploadYear);
-      
-      addSyncLog(`✅ Fattura "${file.name}" archiviata su Google Drive con successo (ID: ${uploadResult.id})`);
+      // Save healed structure in the state
+      setPositions((prev) =>
+        prev.map((pos) => {
+          if (pos.id === activePositionId) {
+            return {
+              ...pos,
+              driveFolderId: healedFolder.id,
+              driveFolderUrl: healedFolder.url,
+              fattureEmesseFolderId: healedFolder.fattureEmesseFolderId,
+              f24FolderId: healedFolder.f24FolderId,
+              fileGenericiFolderId: healedFolder.fileGenericiFolderId,
+            };
+          }
+          return pos;
+        })
+      );
 
-      // Aggiorna lo stato delle sottocartelle della posizione se necessario
-      if (invoicesFolderId && activePosition.fattureEmesseFolderId !== invoicesFolderId) {
-        setPositions((prev) =>
-          prev.map((pos) => {
-            if (pos.id === activePositionId) {
-              return {
-                ...pos,
-                driveFolderId: targetFolderId,
-                driveFolderUrl: `https://drive.google.com/drive/folders/${targetFolderId}`,
-                fattureEmesseFolderId: invoicesFolderId,
-              };
-            }
-            return pos;
-          })
-        );
-      }
-
-      return uploadResult;
+      addSyncLog(`✅ Struttura cartelle verificata e pronta per l'archiviazione della fattura.`);
+      
+      // Proceed to upload the XML into the verified invoices folder
+      return await uploadInvoiceXml(token, healedFolder.id, file, healedFolder.fattureEmesseFolderId, uploadYear);
     } catch (err: any) {
-      console.error("Errore upload XML su Drive:", err);
-      addSyncLog(`❌ Errore durante il salvataggio su Drive: ${err.message || err}`);
-      throw err;
+      console.error(err);
+      addSyncLog(`❌ Errore durante la verifica/ripristino preventivo delle cartelle: ${err.message || err}`);
+      throw new Error(`Archiviazione sospesa per sicurezza: ${err.message || err}`);
     }
   };
 
@@ -903,10 +565,54 @@ export default function App() {
     }
   };
 
+  const onPickerApiLoad = (token: string) => {
+    const pickerOrigin =
+      window.location.ancestorOrigins &&
+      window.location.ancestorOrigins.length > 0
+        ? window.location.ancestorOrigins[window.location.ancestorOrigins.length - 1]
+        : window.location.origin;
+
+    const view = new (window as any).google.picker.DocsView((window as any).google.picker.ViewId.DOCS)
+      .setIncludeFolders(true)
+      .setSelectFolderEnabled(true)
+      .setEnableDrives(true)
+      .setMimeTypes('application/vnd.google-apps.folder');
+
+    const allView = new (window as any).google.picker.DocsView()
+      .setIncludeFolders(true)
+      .setSelectFolderEnabled(true)
+      .setEnableDrives(true)
+      .setMimeTypes('application/vnd.google-apps.folder');
+
+    const sharedDrivesView = new (window as any).google.picker.DocsView()
+      .setEnableTeamDrives(true)
+      .setIncludeFolders(true)
+      .setSelectFolderEnabled(true)
+      .setMimeTypes('application/vnd.google-apps.folder');
+
+    const picker = new (window as any).google.picker.PickerBuilder()
+      .addView(view)
+      .addView(allView)
+      .addView(sharedDrivesView)
+      .enableFeature((window as any).google.picker.Feature.SUPPORT_DRIVES)
+      .setOAuthToken(token)
+      .setCallback((data: any) => pickerCallback(data, token))
+      .setOrigin(pickerOrigin)
+      .setTitle("Seleziona la cartella genitore in Google Drive")
+      .build();
+    
+    picker.setVisible(true);
+  };
+
   const handleOpenFolderPicker = (token: string) => {
-    const input = prompt("Inserisci il link o ID della cartella Google Drive da collegare:", DEFAULT_ACCOUNTING_FOLDER_ID);
-    if (input && input.trim()) {
-      handleConnectCustomDriveFolder(input.trim());
+    if (!(window as any).google?.picker) {
+      if ((window as any).gapi) {
+        (window as any).gapi.load('picker', { callback: () => onPickerApiLoad(token) });
+      } else {
+        safeAlert("Google API non ancora caricate. Riprova tra un attimo.");
+      }
+    } else {
+      onPickerApiLoad(token);
     }
   };
 
@@ -915,101 +621,73 @@ export default function App() {
       throw new Error("Nessuna posizione contabile attiva selezionata.");
     }
     const token = googleAccessTokenState;
+    if (!token) {
+      addSyncLog("⚠️ Connetti prima Google Drive per caricare i file F24.");
+      throw new Error("Google Drive non connesso.");
+    }
+
     const uploadYear = year || selectedYear;
     const posStartYear = activePosition.profile?.startYear || '2025';
+    addSyncLog(`🔍 Verifica preventiva obbligatoria dell'esistenza delle cartelle di archiviazione per "${activePosition.profile.fullName || 'Cliente'}"...`);
 
-    let uploadedFile: any = null;
-    let healedFolder: any = null;
-
-    if (token) {
-      addSyncLog(`🔍 Verifica preventiva dell'esistenza delle cartelle per "${activePosition.profile.fullName || 'Cliente'}"...`);
-      try {
-        healedFolder = await verifyAndRecreateFolderStructure(
-          token,
-          activePosition.name,
-          activePosition.profile.fullName,
-          activePosition.driveFolderId,
-          uploadYear,
-          undefined,
-          posStartYear
-        );
-
-        addSyncLog(`✅ Struttura cartelle verificata.`);
-        addSyncLog(`⏱️ Caricamento file F24 "${file.name}" su Drive...`);
-        uploadedFile = await uploadF24Pdf(token, healedFolder.id, file, activePosition.profile.fullName, healedFolder.f24FolderId, uploadYear);
-        addSyncLog(`✅ File F24 "${file.name}" salvato su Google Drive.`);
-      } catch (err: any) {
-        console.warn("Upload Drive F24 non riuscito:", err);
-        addSyncLog(`⚠️ Sincronizzazione Drive non disponibile per "${file.name}": ${err.message || err}. Elaborazione in locale.`);
-      }
-    } else {
-      addSyncLog("ℹ️ Google Drive non connesso: elaborazione ed estrazione F24 in locale.");
-    }
-
-    // Estrai tributi, compensazioni e acconti dal file PDF
-    let extractedEntries: any[] = [];
     try {
-      const detailedDoc = await extractDetailedF24Document(file);
-      if (detailedDoc.entries.length > 0) {
-        extractedEntries = detailedDoc.entries.map(entry => {
-          const isAcconto = entry.taxCode === '1790' || 
-                            entry.taxCode === '1791' || 
-                            (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || entry.debtAmount <= 100));
-          const entryYear = entry.year || uploadYear;
-          const targetYear = isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear;
-          const today = new Date();
-          const monthStr = String(today.getMonth() + 1).padStart(2, '0');
-          const dayStr = String(today.getDate()).padStart(2, '0');
-          const entryDate = `${entryYear}-${monthStr}-${dayStr}`;
+      // 1. Verify and automatically recreate any missing folders in the hierarchy
+      const healedFolder = await verifyAndRecreateFolderStructure(
+        token,
+        activePosition.name,
+        activePosition.profile.fullName,
+        activePosition.driveFolderId,
+        uploadYear,
+        undefined,
+        posStartYear
+      );
 
-          return {
-            id: `f24-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-            taxCode: entry.taxCode,
-            amount: entry.debtAmount > 0 ? entry.debtAmount : entry.amount,
-            debtAmount: entry.debtAmount,
-            creditAmount: entry.creditAmount,
-            netAmount: entry.debtAmount - entry.creditAmount,
-            section: entry.section,
-            date: entryDate,
-            description: entry.description || `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
-            source: 'PDF',
-            fileName: file.name,
-            driveFileId: uploadedFile?.id,
-            isAcconto,
-            targetYear,
-            accontoType: entry.deadlineType === 'acconto1' ? '1_acconto' : (entry.deadlineType === 'acconto2' ? '2_acconto' : 'saldo'),
-            totalDebtF24: detailedDoc.totalDebt,
-            totalCreditF24: detailedDoc.totalCredit,
-            netDueF24: detailedDoc.netDue
-          };
-        });
-        addSyncLog(`🔍 F24 "${file.name}": Rilevati ${extractedEntries.length} tributi. Debito Totale: € ${detailedDoc.totalDebt.toFixed(2)}, Compensazioni: € ${detailedDoc.totalCredit.toFixed(2)}, Netto da Pagare: € ${detailedDoc.netDue.toFixed(2)}.`);
-      }
-    } catch (parseErr: any) {
-      console.warn("Estrazione F24 PDF non riuscita:", parseErr);
-    }
+      // Save healed structure in the state
+      setPositions((prev) =>
+        prev.map((pos) => {
+          if (pos.id === activePositionId) {
+            return {
+              ...pos,
+              driveFolderId: healedFolder.id,
+              driveFolderUrl: healedFolder.url,
+              fattureEmesseFolderId: healedFolder.fattureEmesseFolderId,
+              f24FolderId: healedFolder.f24FolderId,
+              fileGenericiFolderId: healedFolder.fileGenericiFolderId,
+            };
+          }
+          return pos;
+        })
+      );
 
-    // Update position state locally
-    setPositions((prev) =>
-      prev.map((pos) => {
-        if (pos.id === activePositionId) {
-          const currentF24s = pos.f24Files || [];
-          const currentEntries = pos.f24Entries || [];
-          return {
-            ...pos,
-            f24Files: uploadedFile ? [uploadedFile, ...currentF24s] : currentF24s,
-            f24Entries: [...currentEntries, ...extractedEntries],
-            ...(healedFolder ? {
+      addSyncLog(`✅ Struttura cartelle verificata e pronta per il caricamento dell'F24.`);
+      addSyncLog(`⏱️ Inizio caricamento del file F24 "${file.name}" su Drive...`);
+
+      // 2. Upload the F24 PDF into the verified F24 subfolder
+      const uploadedFile = await uploadF24Pdf(token, healedFolder.id, file, activePosition.profile.fullName, healedFolder.f24FolderId, uploadYear);
+      
+      // Update the active position's f24 list
+      setPositions((prev) =>
+        prev.map((pos) => {
+          if (pos.id === activePositionId) {
+            const currentF24s = pos.f24Files || [];
+            return {
+              ...pos,
+              f24Files: [uploadedFile, ...currentF24s],
               driveFolderId: healedFolder.id,
               f24FolderId: healedFolder.f24FolderId,
               fattureEmesseFolderId: healedFolder.fattureEmesseFolderId,
               fileGenericiFolderId: healedFolder.fileGenericiFolderId,
-            } : {})
-          };
-        }
-        return pos;
-      })
-    );
+            };
+          }
+          return pos;
+        })
+      );
+      addSyncLog(`✅ File F24 "${file.name}" caricato correttamente nella sottocartella "F24" dell'anno ${uploadYear} su Google Drive!`);
+    } catch (err: any) {
+      console.error(err);
+      addSyncLog(`❌ Errore durante la verifica preventiva o il caricamento di "${file.name}": ${err.message || err}`);
+      throw err;
+    }
   };
 
   const handleUploadF24s = async (files: File[], year?: string) => {
@@ -1017,117 +695,103 @@ export default function App() {
       throw new Error("Nessuna posizione contabile attiva selezionata.");
     }
     const token = googleAccessTokenState;
+    if (!token) {
+      addSyncLog("⚠️ Connetti prima Google Drive per caricare i file F24.");
+      throw new Error("Google Drive non connesso.");
+    }
+
     const uploadYear = year || selectedYear;
     const posStartYear = activePosition.profile?.startYear || '2025';
+    addSyncLog(`🔍 [Massivo] Verifica preventiva obbligatoria delle cartelle per "${activePosition.profile.fullName || 'Cliente'}"...`);
 
-    let healedFolder: any = null;
-    if (token) {
-      addSyncLog(`🔍 [Massivo] Verifica preventiva cartelle per "${activePosition.profile.fullName || 'Cliente'}"...`);
-      try {
-        healedFolder = await verifyAndRecreateFolderStructure(
-          token,
-          activePosition.name,
-          activePosition.profile.fullName,
-          activePosition.driveFolderId,
-          uploadYear,
-          undefined,
-          posStartYear
-        );
-        addSyncLog(`✅ Struttura cartelle verificata per caricamento massivo.`);
-      } catch (err: any) {
-        console.warn("Verifica cartelle Drive fallita:", err);
-      }
-    } else {
-      addSyncLog("ℹ️ Google Drive non connesso: elaborazione ed estrazione F24 in locale.");
-    }
+    try {
+      // 1. Verify structure once
+      const healedFolder = await verifyAndRecreateFolderStructure(
+        token,
+        activePosition.name,
+        activePosition.profile.fullName,
+        activePosition.driveFolderId,
+        uploadYear,
+        undefined,
+        posStartYear
+      );
 
-    const uploadedFiles: any[] = [];
-    const allExtractedEntries: any[] = [];
+      addSyncLog(`✅ Struttura cartelle verificata per caricamento massivo.`);
+      
+      const uploadedFiles: any[] = [];
+      const allExtractedEntries: any[] = [];
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      let uploadedFile: any = null;
-
-      if (token && healedFolder) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         addSyncLog(`⏱️ [${i+1}/${files.length}] Caricamento file F24 "${file.name}" su Drive...`);
         try {
-          uploadedFile = await uploadF24Pdf(token, healedFolder.id, file, activePosition.profile.fullName, healedFolder.f24FolderId, uploadYear);
+          const uploadedFile = await uploadF24Pdf(token, healedFolder.id, file, activePosition.profile.fullName, healedFolder.f24FolderId, uploadYear);
           uploadedFiles.push(uploadedFile);
           addSyncLog(`✅ [${i+1}/${files.length}] File F24 "${file.name}" caricato.`);
+          
+          // Try to parse F24 data from PDF
+          try {
+            const entries = await extractF24DataFromPdf(file);
+            if (entries.length > 0) {
+              const transformed = entries.map(entry => {
+                const today = new Date();
+                const monthStr = String(today.getMonth() + 1).padStart(2, '0');
+                const dayStr = String(today.getDate()).padStart(2, '0');
+                const entryYear = entry.year || uploadYear;
+                const entryDate = `${entryYear}-${monthStr}-${dayStr}`;
+                return {
+                  taxCode: entry.taxCode,
+                  amount: entry.amount,
+                  date: entryDate,
+                  description: `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
+                  source: 'PDF',
+                  driveFileId: uploadedFile.id
+                };
+              });
+              allExtractedEntries.push(...transformed);
+            }
+          } catch (parseErr: any) {
+            console.warn(`Extraction failed for ${file.name}:`, parseErr);
+          }
         } catch (uploadErr: any) {
           console.error(`Upload failed for ${file.name}:`, uploadErr);
-          addSyncLog(`⚠️ [${i+1}/${files.length}] Upload Drive non riuscito per "${file.name}": ${uploadErr.message || uploadErr}`);
+          addSyncLog(`❌ [${i+1}/${files.length}] Errore durante il caricamento di "${file.name}": ${uploadErr.message || uploadErr}`);
         }
       }
 
-      // Try to parse F24 data from PDF
-      try {
-        const detailedDoc = await extractDetailedF24Document(file);
-        if (detailedDoc.entries.length > 0) {
-          const transformed = detailedDoc.entries.map(entry => {
-            const isAcconto = entry.taxCode === '1790' || 
-                              entry.taxCode === '1791' || 
-                              (entry.taxCode === 'PXX' && (entry.deadlineType === 'acconto1' || entry.deadlineType === 'acconto2' || entry.description?.toLowerCase().includes('acconto') || entry.debtAmount <= 100));
-            const entryYear = entry.year || uploadYear;
-            const targetYear = isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear;
-            const today = new Date();
-            const monthStr = String(today.getMonth() + 1).padStart(2, '0');
-            const dayStr = String(today.getDate()).padStart(2, '0');
-            const entryDate = `${entryYear}-${monthStr}-${dayStr}`;
+      // 2. Perform a single atomic state update
+      setPositions((prev) =>
+        prev.map((pos) => {
+          if (pos.id === activePositionId) {
+            const currentF24Files = pos.f24Files || [];
+            const currentF24Entries = pos.f24Entries || [];
+            
+            const entriesWithIds = allExtractedEntries.map(e => ({
+              ...e,
+              id: `f24-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+            }));
+
             return {
-              id: `f24-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-              taxCode: entry.taxCode,
-              amount: entry.debtAmount > 0 ? entry.debtAmount : entry.amount,
-              debtAmount: entry.debtAmount,
-              creditAmount: entry.creditAmount,
-              netAmount: entry.debtAmount - entry.creditAmount,
-              section: entry.section,
-              date: entryDate,
-              description: entry.description || `Quietanza PDF (Codice Tributo ${entry.taxCode})`,
-              source: 'PDF',
-              fileName: file.name,
-              driveFileId: uploadedFile?.id,
-              isAcconto,
-              targetYear,
-              accontoType: entry.deadlineType === 'acconto1' ? '1_acconto' : (entry.deadlineType === 'acconto2' ? '2_acconto' : 'saldo'),
-              totalDebtF24: detailedDoc.totalDebt,
-              totalCreditF24: detailedDoc.totalCredit,
-              netDueF24: detailedDoc.netDue
-            };
-          });
-          allExtractedEntries.push(...transformed);
-          addSyncLog(`🔍 F24 "${file.name}": Debito Totale € ${detailedDoc.totalDebt.toFixed(2)}, Compensazioni € ${detailedDoc.totalCredit.toFixed(2)}, Netto da Pagare € ${detailedDoc.netDue.toFixed(2)}.`);
-        }
-      } catch (parseErr: any) {
-        console.warn(`Extraction failed for ${file.name}:`, parseErr);
-      }
-    }
-
-    // Atomic update of position state locally
-    setPositions((prev) =>
-      prev.map((pos) => {
-        if (pos.id === activePositionId) {
-          const currentF24Files = pos.f24Files || [];
-          const currentF24Entries = pos.f24Entries || [];
-
-          return {
-            ...pos,
-            f24Files: [...uploadedFiles, ...currentF24Files],
-            f24Entries: [...currentF24Entries, ...allExtractedEntries],
-            ...(healedFolder ? {
+              ...pos,
+              f24Files: [...uploadedFiles, ...currentF24Files],
+              f24Entries: [...currentF24Entries, ...entriesWithIds],
               driveFolderId: healedFolder.id,
               f24FolderId: healedFolder.f24FolderId,
               fattureEmesseFolderId: healedFolder.fattureEmesseFolderId,
               fileGenericiFolderId: healedFolder.fileGenericiFolderId,
-            } : {})
-          };
-        }
-        return pos;
-      })
-    );
+            };
+          }
+          return pos;
+        })
+      );
 
-    addSyncLog(`✅ Elaborazione F24 completata: ${files.length} file analizzati, ${allExtractedEntries.length} tributi/compensazioni registrati.`);
-    return uploadedFiles;
+      addSyncLog(`✅ Caricamento massivo completato: ${uploadedFiles.length} file elaborati.`);
+      return uploadedFiles;
+    } catch (err: any) {
+      console.error(err);
+      addSyncLog(`❌ Errore caricamento massivo F24: ${err.message || err}`);
+      throw err;
+    }
   };
 
   const handleDeleteF24Pdf = async (fileId: string) => {
@@ -1221,14 +885,8 @@ export default function App() {
     });
     
   const f24Entries = allF24Entries
-    .filter((e) => {
-      if (!e) return false;
-      const isTarget = e.targetYear === selectedYear;
-      const isPaidInYear = e.date && e.date.startsWith(selectedYear);
-      const isRefYear = (e as any).year === selectedYear;
-      return isTarget || isPaidInYear || isRefYear;
-    })
-    .sort((a, b) => new Date(a.date || '2026-01-01').getTime() - new Date(b.date || '2026-01-01').getTime());
+    .filter((e) => e.date && e.date.startsWith(selectedYear))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const setProfile = (newProfile: BusinessProfile) => {
     setPositions((prev) =>
@@ -1328,7 +986,7 @@ export default function App() {
       const allF24Entries = activePosition.f24Entries || [];
 
       // --- INVOICE SYNC ---
-      const driveInvoicesMap = new Map<string, any>(driveInvoices.map((f): [string, any] => [f.id, f]));
+      const driveInvoicesMap = new Map(driveInvoices.map(f => [f.id, f]));
       const newInvoicesList: Invoice[] = [];
       const unlinkedDriveInvoices = [...driveInvoices];
       let invoicesChanged = false;
@@ -1396,7 +1054,7 @@ export default function App() {
       }
 
       // --- F24 SYNC ---
-      const driveF24sMap = new Map<string, any>(driveF24s.map((f): [string, any] => [f.id, f]));
+      const driveF24sMap = new Map(driveF24s.map(f => [f.id, f]));
       const newF24FilesList: any[] = [];
       const unlinkedDriveF24s = [...driveF24s];
       let f24FilesChanged = false;
@@ -1508,35 +1166,7 @@ export default function App() {
           })
         );
       }
-
-      // 4. Sincronizzazione contestuale del file Google Sheet con le fatture XML e il calcolo del Quadro LM
-      const finalInvoices = invoicesChanged ? newInvoicesList : (activePosition.invoices || []);
-      const yearInvoices = finalInvoices.filter(i => i.date ? i.date.startsWith(selectedYear) : true);
-      if (fattureFolderId) {
-        addSyncLog(`📊 Aggiornamento contestuale del Google Sheet con XML e Quadro LM per il ${selectedYear}...`);
-        syncInvoicesToGoogleSheet(
-          token,
-          fattureFolderId,
-          yearInvoices,
-          selectedYear,
-          activePosition.profile?.fullName || activePosition.name,
-          activePosition.profile,
-          activePosition.f24Entries || []
-        ).then(res => {
-          if (res.success && res.spreadsheetUrl) {
-            addSyncLog(`✅ Google Sheet Quadro LM sincronizzato: ${res.spreadsheetUrl}`);
-            setPositions(prev =>
-              prev.map(p =>
-                p.id === activePositionId
-                  ? { ...p, googleSheetId: res.spreadsheetId, googleSheetUrl: res.spreadsheetUrl }
-                  : p
-              )
-            );
-          }
-        }).catch(err => console.warn("Google Sheet sync error:", err));
-      }
-
-      addSyncLog(`✅ Controllo e allineamento Drive completati con successo per l'anno ${selectedYear}!`);
+      addSyncLog(`✅ Sincronizzazione in tempo reale completata con successo per l'anno ${selectedYear}!`);
     } catch (err: any) {
       addSyncLog("❌ Errore durante la scansione di Drive: " + err.message);
     } finally {
@@ -1677,33 +1307,7 @@ export default function App() {
       prev.map((pos) => {
         if (pos.id === activePositionId) {
           const currentInvoices = pos.invoices || [];
-          const updated = [...withIds, ...currentInvoices];
-
-          // Auto-sync to Google Sheet if Drive folder exists and token is active
-          if (googleAccessTokenState && pos.fattureEmesseFolderId) {
-            syncInvoicesToGoogleSheet(
-              googleAccessTokenState,
-              pos.fattureEmesseFolderId,
-              updated.filter(i => i.date?.startsWith(selectedYear)),
-              selectedYear,
-              pos.profile?.fullName || pos.name,
-              pos.profile,
-              pos.f24Entries || []
-            ).then(res => {
-              if (res.success && res.spreadsheetUrl) {
-                addSyncLog(`📊 Foglio Google Sheet Quadro LM aggiornato con successo: ${res.spreadsheetUrl}`);
-                setPositions(currentPositions =>
-                  currentPositions.map(p =>
-                    p.id === activePositionId
-                      ? { ...p, googleSheetId: res.spreadsheetId, googleSheetUrl: res.spreadsheetUrl }
-                      : p
-                  )
-                );
-              }
-            }).catch(e => console.warn("Google Sheet sync error:", e));
-          }
-
-          return { ...pos, invoices: updated };
+          return { ...pos, invoices: [...withIds, ...currentInvoices] };
         }
         return pos;
       })
@@ -1739,18 +1343,7 @@ export default function App() {
     setPositions((prev) =>
       prev.map((pos) => {
         if (pos.id === activePositionId) {
-          const withIds = newEntries.map(e => {
-            const isAcconto = e.isAcconto ?? (e.taxCode === '1790' || e.taxCode === '1791' || 
-              (e.taxCode === 'PXX' && (e.accontoType || e.description?.toLowerCase().includes('acconto') || e.amount <= 100)));
-            const entryYear = e.date ? e.date.split('-')[0] : selectedYear;
-            const targetYear = e.targetYear || (isAcconto ? String(parseInt(entryYear, 10) + 1) : entryYear);
-            return {
-              ...e,
-              id: e.id || `f24-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-              isAcconto,
-              targetYear
-            };
-          });
+          const withIds = newEntries.map(e => ({ ...e, id: `f24-${Date.now()}-${Math.random()}` }));
           return { ...pos, f24Entries: [...(pos.f24Entries || []), ...withIds] };
         }
         return pos;
@@ -1895,23 +1488,20 @@ export default function App() {
       {/* SIDEBAR CONTAINER */}
       <aside className={`fixed inset-y-0 left-0 w-64 bg-slate-900 border-r border-slate-800 flex flex-col z-50 transform transition-transform duration-300 md:relative md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         
-        {/* Sidebar Header Brand Zucchetti Style */}
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-[#7a0c10] via-[#8b0000] to-[#5a080b]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-white text-[#8b0000] rounded-lg flex items-center justify-center font-black text-sm shadow-xs">
-              Z
+        {/* Sidebar Header Brand */}
+        <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center font-black text-slate-950 italic text-base">
+              F
             </div>
-            <div>
-              <span className="font-extrabold tracking-tight text-sm text-white block leading-tight">
-                Zucchetti Ago
-              </span>
-              <span className="text-[10px] text-red-200 font-mono tracking-tight">Studio Commerciale</span>
-            </div>
+            <span className="font-bold tracking-tight text-xl text-white">
+              Forfettario<span className="text-emerald-400 text-sm align-top ml-0.5 font-black">+</span>
+            </span>
           </div>
           {/* Close button inside mobile sidebar */}
           <button 
             onClick={() => setSidebarOpen(false)}
-            className="p-1 text-red-200 hover:text-white md:hidden"
+            className="p-1 text-slate-400 hover:text-white md:hidden"
             aria-label="Chiudi menu"
           >
             <X className="w-5 h-5" />
@@ -1919,36 +1509,23 @@ export default function App() {
         </div>
 
         {/* Gestione Posizione Contabile */}
-        <div className="px-4 py-3.5 border-b border-slate-800 bg-slate-950/30 flex flex-col gap-2 shrink-0">
+        <div className="px-5 py-4 border-b border-slate-800 bg-slate-950/25 flex flex-col gap-2 shrink-0">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Soggetto / P.IVA</span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setDriveSearchInitialQuery('Valeria Maros');
-                  setIsDriveSearchModalOpen(true);
-                }}
-                className="text-[9px] uppercase font-extrabold text-sky-400 hover:text-sky-300 transition-colors flex items-center gap-1 cursor-pointer"
-                title="Cerca contabilità esistente su Google Drive (es. Valeria Maros)"
-              >
-                <Search className="w-2.5 h-2.5" /> Cerca Drive
-              </button>
-              <button
-                onClick={() => setIsPositionModalOpen(true)}
-                className="text-[9px] uppercase font-extrabold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer"
-                title="Aggiungi nuova posizione contabile"
-              >
-                <PlusCircle className="w-3 h-3" /> Nuovo
-              </button>
-            </div>
+            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Soggetto / P.IVA</span>
+            <button
+              onClick={() => setIsPositionModalOpen(true)}
+              className="text-[10px] uppercase font-extrabold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer"
+              title="Aggiungi nuova posizione contabile"
+            >
+              <PlusCircle className="w-3.5 h-3.5" /> Nuovo
+            </button>
           </div>
           
           <div className="flex items-center gap-1.5 w-full">
             <select
               value={activePositionId}
               onChange={(e) => setActivePositionId(e.target.value)}
-              className="flex-grow bg-slate-800 border border-slate-700 hover:border-slate-600 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-200 outline-none transition-all cursor-pointer"
+              className="flex-grow bg-slate-800 border border-slate-700 hover:border-slate-600 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 outline-none transition-all cursor-pointer"
             >
               {positions.map((pos) => {
                 const isPlaceholderProfile = !pos.profile?.fullName || pos.profile.fullName === 'Nuovo Cliente';
@@ -1964,7 +1541,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsDeleteModalOpen(true)}
-              className="p-1.5 bg-slate-850 hover:bg-rose-500/10 border border-slate-700 hover:border-rose-500/20 text-slate-400 hover:text-rose-400 rounded-lg transition-all cursor-pointer shrink-0"
+              className="p-2 bg-slate-850 hover:bg-rose-500/10 border border-slate-700 hover:border-rose-500/20 text-slate-400 hover:text-rose-400 rounded-xl transition-all cursor-pointer shrink-0"
               title="Elimina posizione corrente"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -1975,63 +1552,32 @@ export default function App() {
                 href={activePosition.driveFolderUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-1.5 bg-slate-850 hover:bg-emerald-500/10 border border-slate-700 hover:border-emerald-500/20 text-slate-400 hover:text-emerald-400 rounded-lg transition-all cursor-pointer shrink-0 flex items-center justify-center"
+                className="p-2 bg-slate-850 hover:bg-emerald-500/10 border border-slate-700 hover:border-emerald-500/20 text-slate-400 hover:text-emerald-400 rounded-xl transition-all cursor-pointer shrink-0 flex items-center justify-center"
                 title="Apri cartella Google Drive"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
             )}
           </div>
-
-          {!positions.some(p => p.profile?.fullName?.toLowerCase().includes('maros') || p.name.toLowerCase().includes('maros')) && (
-            <button
-              type="button"
-              onClick={() => {
-                setDriveSearchInitialQuery('Valeria Maros');
-                setIsDriveSearchModalOpen(true);
-              }}
-              className="w-full mt-1 px-2 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Search className="w-3 h-3 text-emerald-400" />
-              <span>Trova "Valeria Maros" su Drive</span>
-            </button>
-          )}
         </div>
 
-        {/* Sidebar Navigation - Moduli ERP Zucchetti */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          <p className="text-[9px] uppercase font-bold text-slate-500 tracking-wider px-3 mb-1.5">Moduli Contabili</p>
+        {/* Sidebar Navigation */}
+        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
+          <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider px-4 mb-2">Menu Di Gestione</p>
           
-          {[
-            { id: 'overview', label: 'Cruscotto Generale', icon: Calculator },
-            { id: 'quadro_lm', label: 'Quadro LM (Imposte)', icon: BookOpen },
-            { id: 'quadro_rr', label: 'Quadro RR (Previdenza)', icon: ShieldCheck },
-            { id: 'f24_acconti', label: 'F24 & Acconti', icon: FileText },
-            { id: 'invoices', label: 'Fatture XML & Cassa', icon: DollarSign },
-            { id: 'ravvedimento', label: 'Scadenzario & Ravvedimento', icon: Clock },
-            { id: 'anagrafica', label: 'Anagrafica & Studio', icon: Folder },
-          ].map((item) => {
-            const Icon = item.icon;
-            const isActive = activeModule === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  setActiveModule(item.id);
-                  setSidebarOpen(false);
-                }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg font-medium text-xs transition-colors cursor-pointer ${
-                  isActive
-                    ? 'bg-[#8b0000] text-white shadow-xs font-bold'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                <span className="truncate">{item.label}</span>
-              </button>
-            );
-          })}
+          <button
+            onClick={() => {
+              openAndScrollToSection('dashboard');
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-xs transition-all ${
+              expandedSections['dashboard']
+                ? 'bg-emerald-500/10 text-emerald-400'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+            }`}
+          >
+            <Calculator className="w-4.5 h-4.5 shrink-0" />
+            <span>Ottimizzatore Fiscale Forfettario</span>
+          </button>
         </nav>
 
         {/* Real-time Flat-rate revenue threshold (Limite Ricavi) widget at sidebar bottom */}
@@ -2070,160 +1616,135 @@ export default function App() {
       {/* CORE WORKSPACE */}
       <main className="flex-1 flex flex-col min-w-0 bg-theme-bg" id="main-content-window">
         
-        {/* Top Institutional Zucchetti Header */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 shrink-0 shadow-xs">
+        {/* Top Professional Sleek Header */}
+        <header className="h-16 bg-theme-card border-b border-theme-border flex items-center justify-between px-6 sm:px-8 shrink-0">
           
           <div className="flex items-center gap-3">
             {/* Hamburger menu for small devices */}
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg md:hidden transition-colors"
+              className="p-1.5 text-theme-text-muted hover:bg-theme-bg rounded-lg md:hidden transition-colors"
               aria-label="Apri menu"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="w-5.5 h-5.5" />
             </button>
             
-            {/* Soggetto Attivo Zucchetti Card Badge */}
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-[#8b0000] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
-                {getInitials(profile.fullName)}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <h2 className="text-sm sm:text-base font-extrabold text-theme-text tracking-tight">
+                Pannello di Controllo Fiscale
+              </h2>
+              <div className="relative inline-flex items-center" id="fiscal-year-selector">
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="bg-theme-bg hover:bg-theme-border text-theme-text font-extrabold px-3 py-1 pr-8 rounded-full text-[11px] outline-none border-none cursor-pointer transition-all appearance-none"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23475569' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`,
+                    backgroundPosition: 'right 0.5rem center',
+                    backgroundSize: '1.25em 1.25em',
+                    backgroundRepeat: 'no-repeat'
+                  }}
+                >
+                  <option value="2026">Esercizio 2026</option>
+                  <option value="2025">Esercizio 2025</option>
+                  <option value="2024">Esercizio 2024</option>
+                </select>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight truncate max-w-[200px] sm:max-w-xs">
-                    {profile.fullName || 'Mario Rossi'}
-                  </span>
-                  <span className="hidden sm:inline-block text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-red-50 text-[#8b0000] border border-red-200">
-                    {profile.isStartup ? 'FORFETTARIO 5%' : 'FORFETTARIO 15%'}
-                  </span>
-                </div>
-                <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5">
-                  <span>{profile.vatNumber ? `P.IVA ${profile.vatNumber}` : 'P.IVA non config.'}</span>
-                  {profile.fiscalCode && (
-                    <>
-                      <span>·</span>
-                      <span className="hidden md:inline">CF {profile.fiscalCode}</span>
-                    </>
-                  )}
-                </div>
-              </div>
+              {!isOnline ? (
+                <span className="bg-amber-50 text-amber-700 border border-amber-200 font-black px-2.5 py-0.5 rounded-full text-[10px] flex items-center gap-1.5 animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  Modalità Locale (Offline)
+                </span>
+              ) : (
+                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-black px-2.5 py-0.5 rounded-full text-[10px] flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Locale (Online)
+                </span>
+              )}
             </div>
-
-            {/* Selettore Esercizio Fiscale e Aggiungi Anno */}
-            <div className="relative inline-flex items-center gap-1.5 ml-2 border-l border-slate-200 pl-3" id="fiscal-year-selector">
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                className="bg-slate-100 hover:bg-slate-200/70 text-slate-800 font-bold px-2.5 py-1 rounded-lg text-xs outline-none border border-slate-300 cursor-pointer transition-all"
-              >
-                {availableYears.map((yr) => (
-                  <option key={yr} value={yr}>
-                    Esercizio {yr}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="button"
-                onClick={() => handleAddYear()}
-                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-all flex items-center gap-1 shadow-xs cursor-pointer shrink-0"
-                title="Aggiungi un nuovo anno d'esercizio alla contabilità"
-              >
-                <PlusCircle className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Aggiungi Anno</span>
-                <span className="sm:hidden">+ Anno</span>
-              </button>
-            </div>
-
-            {!isOnline ? (
-              <span className="hidden lg:flex bg-amber-50 text-amber-700 border border-amber-200 font-bold px-2 py-0.5 rounded text-[10px] items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                Locale Offline
-              </span>
-            ) : (
-              <span className="hidden lg:flex bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-2 py-0.5 rounded text-[10px] items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                Locale Protetto
-              </span>
-            )}
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-3">
             
-            {/* Soglia 85k Quick Pill */}
-            <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-mono">
-              <span className="text-[10px] text-slate-500 font-sans font-bold">Ricavi Cassa:</span>
-              <span className="font-bold text-slate-900">€ {totalPaidRevenue.toLocaleString('it-IT', { maximumFractionDigits: 0 })}</span>
-              <span className="text-[10px] text-slate-400">/ 85k</span>
-              <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-bold">
-                {progressPercent.toFixed(0)}%
-              </span>
-            </div>
+            {/* Aesthetic Theme Selector */}
+            <ThemeSelector currentTheme={theme} onThemeChange={setTheme} />
+
+            {/* Real Webhook trigger styled precisely as the theme */}
+            <button
+              onClick={handleTriggerBackupSync}
+              disabled={syncStatus === 'syncing'}
+              className={`p-2 rounded-full text-theme-text-muted hover:bg-theme-bg border border-theme-border hover:text-theme-text transition-colors shrink-0 flex items-center justify-center relative group`}
+              title="Backup asincrono Spreadsheet"
+            >
+              <RefreshCw className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin text-emerald-500' : ''}`} />
+              {syncStatus === 'success' && (
+                <span className="absolute right-0 top-full mt-1.5 bg-emerald-600 text-white text-[9px] font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap animate-fade-in z-25">
+                  Archiviato!
+                </span>
+              )}
+            </button>
 
             {/* Google Drive Connection Button */}
             {!googleUser ? (
               <button
                 onClick={handleGoogleLogin}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#4285F4] hover:bg-[#3367D6] text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-[#4285F4] hover:bg-[#3367D6] text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
                 title="Connetti Google Drive con palmasstudio@gmail.com"
               >
-                <Cloud className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Connetti Drive</span>
+                <div className="bg-white p-0.5 rounded-full">
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                  </svg>
+                </div>
+                <span>Connetti Drive</span>
               </button>
             ) : (
               <button
                 onClick={async () => {
                   await handleGoogleLogout();
                 }}
-                className="flex items-center gap-1.5 px-2.5 py-1 border border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100/70 text-emerald-800 rounded-lg text-[11px] font-bold transition-all shadow-xs cursor-pointer"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-[11px] font-bold transition-all shadow-sm cursor-pointer"
                 title={`Disconnetti Google Drive (${googleUser.email})`}
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="max-w-[120px] truncate hidden sm:inline">Drive: {googleUser.email}</span>
-                <span className="sm:hidden">Drive</span>
+                <div className="w-4 h-4 rounded-full overflow-hidden shrink-0 filter brightness-90">
+                  <img src={googleUser.photoURL || `https://ui-avatars.com/api/?name=${googleUser.email || 'U'}&background=random`} alt="Google Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                </div>
+                <span className="max-w-[100px] truncate">{googleUser.email}</span>
               </button>
             )}
-
-            {/* Cerca su Google Drive Button */}
-            <button
-              onClick={() => {
-                setDriveSearchInitialQuery('Valeria Maros');
-                setIsDriveSearchModalOpen(true);
-              }}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
-              title="Cerca contabilità su Google Drive (es. Valeria Maros)"
-            >
-              <Search className="w-3.5 h-3.5 text-sky-600" />
-              <span className="hidden md:inline">Cerca Drive</span>
-            </button>
-
-            {/* Diagnostica Google Drive Button */}
-            <button
-              onClick={runGoogleDriveDiagnostics}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
-              title="Esegui test diagnostica autenticazione Google Drive e mostra stato token"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              <span className="hidden lg:inline">Diagnostica Drive</span>
-            </button>
 
             {/* Global Manual Save Button */}
             <button
               onClick={handleGlobalSave}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#8b0000] hover:bg-[#700000] text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
               title="Salva modifiche localmente e su cloud, e ricarica il software"
             >
               <Database className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Salva</span>
+              <span>Salva Modifiche</span>
             </button>
 
-            {/* Aesthetic Theme Selector */}
-            <ThemeSelector currentTheme={theme} onThemeChange={setTheme} />
+            {/* Profile badge from the Sleek Design */}
+            <div className="flex items-center gap-2.5 pl-3 border-l border-slate-200">
+              <div className="text-right hidden sm:block">
+                <p className="text-xs font-extrabold text-slate-800 max-w-[120px] truncate leading-tight">
+                  {profile.fullName || 'Mario Rossi'}
+                </p>
+                <p className="text-[10px] text-slate-400 font-mono tracking-tight font-medium mt-0.5">
+                  {profile.vatNumber ? `P.IVA ${profile.vatNumber}` : 'Configura P.IVA'}
+                  {profile.fiscalCode ? ` · CF ${profile.fiscalCode}` : ''}
+                </p>
+              </div>
+              <div className="w-9 h-9 bg-slate-150 border border-slate-200/60 rounded-full flex items-center justify-center font-bold text-xs text-slate-700 shrink-0">
+                {getInitials(profile.fullName)}
+              </div>
+            </div>
 
           </div>
 
         </header>
-
 
         {/* Dynamic connection lost banner notification */}
         {showOfflineBanner && !isOnline && (
@@ -2269,168 +1790,93 @@ export default function App() {
         <div className="flex-grow overflow-y-auto p-4 sm:p-8 bg-slate-50/50">
           <div className="max-w-6xl mx-auto space-y-6">
           
-          {/* Missing Valeria Maros Banner if not yet present in positions */}
-          {!positions.some(p => p.profile?.fullName?.toLowerCase().includes('maros') || p.name.toLowerCase().includes('maros')) && (
-            <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 to-slate-950 border border-emerald-500/40 rounded-2xl sm:rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
-                  <FolderSearch className="w-5 h-5" />
+          {/* Dashboard Section */}
+          <div id="section-dashboard" className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+            <button
+              onClick={() => toggleSection('dashboard')}
+              className="w-full flex items-center justify-between p-5 sm:p-6 bg-white hover:bg-slate-50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                  <Calculator className="w-5 h-5" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-extrabold text-white">Non vedi la contabilità di Valeria Maros?</p>
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
-                      Google Drive
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    La posizione contabile è memorizzata su Google Drive. Clicca per cercarla e importarla automaticamente nel gestionale.
-                  </p>
-                </div>
+                <h2 className="text-sm sm:text-base font-extrabold text-slate-800">Ottimizzatore Fiscale Forfettario</h2>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setDriveSearchInitialQuery('Valeria Maros');
-                  setIsDriveSearchModalOpen(true);
-                }}
-                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-xl text-xs flex items-center gap-2 transition-all shrink-0 cursor-pointer shadow-lg shadow-emerald-950/50"
-              >
-                <Search className="w-4 h-4" />
-                <span>Cerca Valeria Maros su Drive</span>
-              </button>
-            </div>
-          )}
-
-          {/* Main ERP Module View */}
-          {activeModule === 'anagrafica' ? (
-            <div className="space-y-4 animate-fade-in">
-              <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-red-50 text-[#8b0000] rounded-lg">
-                    <Folder className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-extrabold text-slate-900">Anagrafica Contribuente & Configurazione Drive</h2>
-                    <p className="text-[11px] text-slate-500">Gestione Codice ATECO, aliquota d'imposta (5% o 15%) e alberatura Google Drive dal 2025 ad oggi.</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveModule('overview')}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                >
-                  Torna al Cruscotto
-                </button>
-              </div>
-
-              <BusinessProfileCard 
-                profile={profile} 
-                onChange={setProfile}
-                isCreatingFolder={isCreatingDriveFolder}
-                driveFolderCreated={!!activePosition?.driveFolderId}
-                driveFolderUrl={activePosition?.driveFolderUrl}
-                isUnselected={!isPositionSelected}
-                onCreateDriveFolder={async () => {
-                  const token = googleAccessTokenState;
-                  if (!token) {
-                    safeAlert("Connetti prima Google Drive dall'apposito pulsante nell'header in alto a destra.");
-                    return;
-                  }
-                  setIsCreatingDriveFolder(true);
-                  try {
-                    const res = await verifyAndRecreateFolderStructure(
-                      token,
-                      activePosition.name,
-                      activePosition.profile.fullName,
-                      DEFAULT_ACCOUNTING_FOLDER_ID,
-                      selectedYear,
-                      undefined,
-                      '2025'
-                    );
-                    setPositions(prev => prev.map(p => p.id === activePosition.id ? { 
-                      ...p, 
-                      driveFolderId: res.id, 
-                      driveFolderUrl: res.url,
-                      fattureEmesseFolderId: res.fattureEmesseFolderId,
-                      f24FolderId: res.f24FolderId,
-                      fileGenericiFolderId: res.fileGenericiFolderId
-                    } : p));
-                    safeAlert(`Struttura cartelle per "${activePosition.profile.fullName || 'Valeria Maros'}" generata e verificata con successo su Google Drive!\n\nLink Cartella: ${res.url}`);
-                  } catch (err: any) {
-                    safeAlert("Errore nella creazione della cartella Google Drive: " + (err.message || err.toString()));
-                  } finally {
-                    setIsCreatingDriveFolder(false);
-                  }
-                }}
-                onRecreateDriveFolder={handleRecreateDriveFolder}
-                isRecreatingFolder={isRecreatingDriveFolder}
-                onSaveAnagrafica={() => {
-                  safeAlert("Anagrafica configurata e salvata correttamente!");
-                }}
-                onConnectDriveFolder={handleConnectCustomDriveFolder}
-              />
-            </div>
-          ) : (
-            <div className="space-y-4 animate-fade-in">
-              {/* Quick Anagrafica Bar */}
-              <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-xs">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-1.5 bg-slate-100 text-slate-600 rounded">
-                    <User className="w-4 h-4" />
-                  </div>
-                  <div className="text-xs">
-                    <span className="font-extrabold text-slate-900">{profile.fullName || 'Valeria Maros'}</span>
-                    <span className="text-slate-400 mx-1.5">·</span>
-                    <span className="text-slate-500 font-mono">ATECO {profile.atecoCode}</span>
-                    <span className="text-slate-400 mx-1.5">·</span>
-                    <span className="text-slate-500 font-mono">{profile.isStartup ? 'Regime Startup (5%)' : 'Regime Ordinario (15%)'}</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveModule('anagrafica')}
-                  className="text-xs text-[#8b0000] hover:text-[#700000] font-bold hover:underline cursor-pointer"
-                >
-                  Modifica Dati Ditta & Drive
-                </button>
-              </div>
-
-              {isPositionSelected && (
-                <TaxSimulatorDashboard 
-                  key={`${activePosition?.id || 'none'}-${selectedYear}`}
+              {expandedSections['dashboard'] ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+            </button>
+            
+            {expandedSections['dashboard'] && (
+              <div className="p-5 sm:p-6 pt-0 border-t border-slate-100 space-y-6 animate-fade-in bg-slate-50/30">
+                <BusinessProfileCard 
                   profile={profile} 
-                  revenue={totalPaidRevenue} 
-                  invoices={invoices} 
-                  allInvoices={allInvoices}
-                  googleConnected={!!googleUser}
-                  driveFolderId={activePosition?.driveFolderId}
+                  onChange={setProfile}
+                  isCreatingFolder={isCreatingDriveFolder}
+                  driveFolderCreated={!!activePosition?.driveFolderId}
                   driveFolderUrl={activePosition?.driveFolderUrl}
-                  googleSheetUrl={activePosition?.googleSheetUrl}
-                  f24Files={activePosition?.f24Files || []}
-                  onUploadF24={handleUploadF24Pdf}
-                  onUploadF24s={handleUploadF24s}
-                  onDeleteF24={handleDeleteF24Pdf}
-                  onConnectGoogle={handleGoogleLogin}
-                  f24Entries={f24Entries}
-                  allF24Entries={allF24Entries}
-                  selectedYear={selectedYear}
-                  onAddInvoice={handleAddInvoice}
-                  onAddInvoices={handleAddInvoices}
-                  onDeleteInvoice={handleDeleteInvoice}
-                  onAddF24Entries={handleAddF24Entries}
-                  onDeleteF24Entry={handleDeleteF24Entry}
-                  onUploadInvoiceXmlToDrive={handleUploadInvoiceXmlToDrive}
-                  onSyncDriveInvoices={handleDriveInvoiceSync}
-                  isSyncingDriveInvoices={isSyncingDriveList}
-                  onConnectDriveFolder={handleConnectCustomDriveFolder}
-                  onChangeProfile={setProfile}
-                  activeModule={activeModule}
-                  onSelectModule={setActiveModule}
+                  isUnselected={!isPositionSelected}
+                  onCreateDriveFolder={async () => {
+                    const token = googleAccessTokenState;
+                    if (!token) {
+                      safeAlert("Connetti prima Google Drive dall'apposito pulsante nell'header in alto a destra.");
+                      return;
+                    }
+                    
+                    handleOpenFolderPicker(token);
+                  }}
+                  onRecreateDriveFolder={handleRecreateDriveFolder}
+                  isRecreatingFolder={isRecreatingDriveFolder}
+                  onSaveAnagrafica={() => {
+                      safeAlert("Anagrafica configurata e salvata correttamente!");
+                  }}
                 />
-              )}
-            </div>
-          )}
+                
+                {isPositionSelected && (
+                  <>
+                    <div className="bg-slate-900 text-slate-300 p-4 rounded-2xl border border-slate-800 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                      <div>
+                        <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                          Statistiche Consolidate Regime Forfettario
+                        </h3>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Motore matematico deterministico aggiornato al Decreto Fiscale vigente</p>
+                      </div>
+                      <div className="bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-1.5 rounded-xl text-emerald-400 text-xs font-extrabold flex items-center gap-1.5 font-mono">
+                        Base Imponibile Incassata: € {totalPaidRevenue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+
+                    <TaxSimulatorDashboard 
+                      key={`${activePosition?.id || 'none'}-${selectedYear}`}
+                      profile={profile} 
+                      revenue={totalPaidRevenue} 
+                      invoices={invoices} 
+                      allInvoices={allInvoices}
+                      googleConnected={!!googleUser}
+                      driveFolderId={activePosition?.driveFolderId}
+                      driveFolderUrl={activePosition?.driveFolderUrl}
+                      f24Files={activePosition?.f24Files || []}
+                      onUploadF24={handleUploadF24Pdf}
+                      onUploadF24s={handleUploadF24s}
+                      onDeleteF24={handleDeleteF24Pdf}
+                      onConnectGoogle={handleGoogleLogin}
+                      f24Entries={f24Entries}
+                      allF24Entries={allF24Entries}
+                      selectedYear={selectedYear}
+                      onAddInvoice={handleAddInvoice}
+                      onAddInvoices={handleAddInvoices}
+                      onDeleteInvoice={handleDeleteInvoice}
+                      onAddF24Entries={handleAddF24Entries}
+                      onDeleteF24Entry={handleDeleteF24Entry}
+                      onUploadInvoiceXmlToDrive={handleUploadInvoiceXmlToDrive}
+                      onSyncDriveInvoices={handleDriveInvoiceSync}
+                      isSyncingDriveInvoices={isSyncingDriveList}
+                      onChangeProfile={setProfile}
+                    />
+                  </>
+                )}
+              </div>
+            )}
+          </div>
           </div>
         </div>
 
@@ -2452,25 +1898,6 @@ export default function App() {
         onClose={() => setIsPositionModalOpen(false)}
         onCreate={handleCreatePosition}
         accessToken={googleAccessTokenState}
-        onOpenDriveSearch={() => {
-          setDriveSearchInitialQuery('Valeria Maros');
-          setIsDriveSearchModalOpen(true);
-        }}
-      />
-
-      <DriveSearchModal
-        isOpen={isDriveSearchModalOpen}
-        onClose={() => setIsDriveSearchModalOpen(false)}
-        accessToken={googleAccessTokenState}
-        onGoogleLogin={handleGoogleLogin}
-        existingPositions={positions}
-        onPositionImported={handlePositionImported}
-        onSelectPosition={(id) => {
-          setActivePositionId(id);
-          addSyncLog(`📁 Posizione contabile selezionata.`);
-        }}
-        initialQuery={driveSearchInitialQuery}
-        selectedYear={selectedYear}
       />
 
       <DeletePositionModal

@@ -155,11 +155,10 @@ export function calculateTaxReturn(input: TaxInput): TaxReturnCalculation {
     inpsGestioneSeparataDue = inpsGestioneSeparataBase * inpsGestioneSeparataRate;
     currentYearContributions = inpsGestioneSeparataDue;
 
-    // Acconti INPS Gestione Separata (Causale PXX / P10):
-    // Ripartizione ordinaria acconti: 1° acconto 40% a Giugno (es. 46 €) e 2° acconto 60% a Novembre (es. 68 €)
+    // Acconti per l'anno successivo (80% del dovuto, suddivisi in 1° acconto 40% e 2° acconto 40%)
     inpsGestioneSeparataAcconto1 = inpsGestioneSeparataDue * 0.40;
-    inpsGestioneSeparataAcconto2 = inpsGestioneSeparataDue * 0.60;
-    inpsGestioneSeparataAccontiTotale = inpsGestioneSeparataDue;
+    inpsGestioneSeparataAcconto2 = inpsGestioneSeparataDue * 0.40;
+    inpsGestioneSeparataAccontiTotale = inpsGestioneSeparataDue * 0.80;
   } else if (fund.hasMinimum && fund.minimumContribution !== undefined && fund.minimumThreshold !== undefined) {
     // Casse con minimale fisso (Artigiani/Commercianti fallback, if not INPS Art/Com)
     let threshold = fund.minimumThreshold;
@@ -183,41 +182,9 @@ export function calculateTaxReturn(input: TaxInput): TaxReturnCalculation {
     currentYearContributions = Math.max(minimum, subjective);
   }
 
-  // 6. Calcolo Acconti e Saldo Imposta Sostitutiva per Modello F24
-  // Saldo dovuto: 100% dell'imposta sostitutiva calcolata (Codice Tributo 1792)
-  const substituteTaxSaldo = substituteTax;
-  
-  // Acconti per l'anno successivo:
-  // - Nessun acconto se l'imposta dovuta è pari o inferiore a 51,65 €
-  // - Se compresa tra 51,65 € e 257,52 €, acconto unico al 30 Novembre (Codice Tributo 1791)
-  // - Se pari o superiore a 257,52 €, due rate del 50% ciascuna:
-  //   * 1° Acconto 50%: 30 Giugno / 30 Luglio (+0,40%) (Codice Tributo 1790)
-  //   * 2° Acconto 50%: 30 Novembre in unica soluzione (Codice Tributo 1791)
-  let substituteTaxAcconto1 = 0;
-  let substituteTaxAcconto2 = 0;
-  let substituteTaxAccontiTotale = 0;
-
-  if (substituteTax > 51.65) {
-    substituteTaxAccontiTotale = substituteTax;
-    if (substituteTax < 257.52) {
-      substituteTaxAcconto1 = 0;
-      substituteTaxAcconto2 = substituteTax;
-    } else {
-      substituteTaxAcconto1 = substituteTax * 0.50;
-      substituteTaxAcconto2 = substituteTax * 0.50;
-    }
-  }
-
-  // 7. Scomputo degli Acconti già versati nell'anno precedente per l'anno in corso (Quadro LM rigo Acconti e Quadro RR)
-  const substituteTaxAdvancesDeducted = Math.max(0, input.substituteTaxAdvancesPaidForCurrentYear || 0);
-  const inpsAdvancesDeducted = Math.max(0, input.inpsAdvancesPaidForCurrentYear || 0);
-
-  const substituteTaxNetDue = Math.max(0, substituteTaxSaldo - substituteTaxAdvancesDeducted);
-  const inpsNetDue = Math.max(0, currentYearContributions - inpsAdvancesDeducted);
-
-  // 8. Reddito Netto Rimasto in Tasca al Professionista
-  // Calcolato sul fatturato lordo sottraendo l'imposta sostitutiva effettivamente versata e i contributi
-  const netIncome = Math.max(0, revenue - (substituteTaxNetDue > 0 ? substituteTaxNetDue : substituteTax) - currentYearContributions);
+  // 6. Reddito Netto Rimasto in Tasca al Professionista
+  // Calcolato sul fatturato lordo sottraendo l'imposta sostitutiva e i contributi calcolati per l'anno in corso
+  const netIncome = Math.max(0, revenue - substituteTax - currentYearContributions);
 
   return {
     grossRevenue: revenue,
@@ -241,14 +208,6 @@ export function calculateTaxReturn(input: TaxInput): TaxReturnCalculation {
     inpsGestioneSeparataDue,
     inpsGestioneSeparataAcconto1,
     inpsGestioneSeparataAcconto2,
-    inpsGestioneSeparataAccontiTotale,
-    substituteTaxSaldo,
-    substituteTaxAcconto1,
-    substituteTaxAcconto2,
-    substituteTaxAccontiTotale,
-    substituteTaxAdvancesDeducted,
-    inpsAdvancesDeducted,
-    substituteTaxNetDue,
-    inpsNetDue
+    inpsGestioneSeparataAccontiTotale
   };
 }

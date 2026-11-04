@@ -20,7 +20,6 @@ interface BusinessProfileCardProps {
   isRecreatingFolder?: boolean;
   onSaveAnagrafica?: () => void;
   isUnselected?: boolean;
-  onConnectDriveFolder?: (urlOrId: string) => Promise<void> | void;
 }
 
 export default function BusinessProfileCard({ 
@@ -33,11 +32,9 @@ export default function BusinessProfileCard({
   onRecreateDriveFolder,
   isRecreatingFolder = false,
   onSaveAnagrafica,
-  isUnselected = false,
-  onConnectDriveFolder
+  isUnselected = false
 }: BusinessProfileCardProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [manualDriveInput, setManualDriveInput] = useState('');
   const [showAtecoDropdown, setShowAtecoDropdown] = useState(false);
   const [isAtecoFocused, setIsAtecoFocused] = useState(false);
   const [isImportingAteco, setIsImportingAteco] = useState(false);
@@ -284,59 +281,6 @@ export default function BusinessProfileCard({
               Il <strong>Coefficiente di Redditività</strong> decide a monte la percentuale imponibile di ricavo. Es. per programmatori (ATECO 62.01.00) è il <strong>67%</strong>, ovvero viene considerata una spesa teorica del 33% senza bisogno di giustificativi fiscali.
             </span>
           </p>
-
-          {/* Sezione Attività Secondaria Multi-ATECO */}
-          <div className="mt-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-800">Attività Secondaria (Multi-ATECO)</span>
-              {profile.secondaryAtecoCodes && profile.secondaryAtecoCodes.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => handleUpdateField('secondaryAtecoCodes', [])}
-                  className="text-[10px] text-red-600 font-bold hover:underline"
-                >
-                  Rimuovi Attività Secondaria
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => handleUpdateField('secondaryAtecoCodes', [{ code: '47.91.10', description: 'E-commerce', coefficient: 0.40, percentageShare: 30 }])}
-                  className="text-[10px] bg-[#8b0000] text-white font-bold px-2 py-1 rounded hover:bg-red-900 transition-colors"
-                >
-                  + Aggiungi Codice ATECO Secondario
-                </button>
-              )}
-            </div>
-
-            {profile.secondaryAtecoCodes && profile.secondaryAtecoCodes.length > 0 && (
-              <div className="space-y-2 text-xs font-mono">
-                {profile.secondaryAtecoCodes.map((sec, i) => (
-                  <div key={i} className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-xl border border-slate-200">
-                    <span className="font-bold text-slate-900">{sec.code} - {sec.description}</span>
-                    <div className="flex items-center gap-2 font-sans">
-                      <span className="text-[10px] text-slate-500">Quota Incassi:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max="99"
-                        value={sec.percentageShare}
-                        onChange={(e) => {
-                          const updated = [...(profile.secondaryAtecoCodes || [])];
-                          updated[i].percentageShare = Math.min(99, Math.max(1, parseInt(e.target.value, 10) || 10));
-                          handleUpdateField('secondaryAtecoCodes', updated);
-                        }}
-                        className="w-14 px-2 py-1 border border-slate-300 rounded font-bold font-mono text-center text-xs"
-                      />
-                      <span className="font-bold text-slate-700">%</span>
-                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
-                        Coeff. {(sec.coefficient * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Cassa Previdenziale */}
@@ -481,31 +425,6 @@ export default function BusinessProfileCard({
             (Clicca "Creazione Cartella Drive" per generare l'albero di directory prima di poter confermare l'anagrafica)
           </p>
         )}
-
-        {/* Input collegamento manuale Cartella Drive o Link esistente */}
-        <div className="mt-3 pt-3 border-t border-slate-200/80 flex flex-col sm:flex-row items-center gap-2">
-          <input
-            type="text"
-            disabled={isUnselected}
-            placeholder="Incolla link o ID cartella Drive (es. 19oSp4--stkguC2r25d2MfsV3PWUoVXfT)..."
-            value={manualDriveInput}
-            onChange={(e) => setManualDriveInput(e.target.value)}
-            className="flex-1 w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 disabled:opacity-50"
-          />
-          <button
-            type="button"
-            disabled={isUnselected || !manualDriveInput.trim()}
-            onClick={() => {
-              if (onConnectDriveFolder && manualDriveInput.trim()) {
-                onConnectDriveFolder(manualDriveInput.trim());
-                setManualDriveInput('');
-              }
-            }}
-            className="w-full sm:w-auto px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-xl transition-all shadow-xs shrink-0 cursor-pointer"
-          >
-            Collega Cartella
-          </button>
-        </div>
       </div>
 
     </div>

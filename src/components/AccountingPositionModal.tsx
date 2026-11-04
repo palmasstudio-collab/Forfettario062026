@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { BusinessProfile, PensionFundType } from '../types';
 import { ATECO_CODES, PENSION_FUNDS, findAtecoCode } from '../taxData';
 import { X, Search, Info, HelpCircle, Briefcase, PlusCircle, FolderPlus, Loader2, Check, ExternalLink, ShieldAlert, FolderTree, FolderOpen } from 'lucide-react';
-import { createAccountingPositionFolder, CreatedFolderResult } from '../utils/googleDrive';
+import { createAccountingPositionFolder } from '../utils/googleDrive';
 import { safeAlert } from '../utils/safeWindow';
 
 interface AccountingPositionModalProps {
@@ -21,10 +21,9 @@ interface AccountingPositionModalProps {
     fileGenericiFolderId?: string;
   }) => void;
   accessToken: string | null;
-  onOpenDriveSearch?: () => void;
 }
 
-export default function AccountingPositionModal({ isOpen, onClose, onCreate, accessToken, onOpenDriveSearch }: AccountingPositionModalProps) {
+export default function AccountingPositionModal({ isOpen, onClose, onCreate, accessToken }: AccountingPositionModalProps) {
   // Step model state: 'details' then 'destination'
   const [step, setStep] = useState<'details' | 'destination'>('details');
 
@@ -45,8 +44,8 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
   const [isAtecoFocused, setIsAtecoFocused] = useState(false);
 
   // Google Drive destination folder state
-  const [parentFolderId, setParentFolderId] = useState('19oSp4--stkguC2r25d2MfsV3PWUoVXfT');
-  const [selectedParentFolderName, setSelectedParentFolderName] = useState('ALTRO-FORFETTARIO MAROS VALERIA');
+  const [parentFolderId, setParentFolderId] = useState('');
+  const [selectedParentFolderName, setSelectedParentFolderName] = useState('');
   const [isPickerLoading, setIsPickerLoading] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [folderCreated, setFolderCreated] = useState(false);
@@ -84,8 +83,8 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
 
       // Reset step flow
       setStep('details');
-      setParentFolderId('19oSp4--stkguC2r25d2MfsV3PWUoVXfT');
-      setSelectedParentFolderName('ALTRO-FORFETTARIO MAROS VALERIA');
+      setParentFolderId('');
+      setSelectedParentFolderName('');
       setIsPickerLoading(false);
       setIsCreatingFolder(false);
       setFolderCreated(false);
@@ -105,70 +104,91 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
   };
 
   const handleOpenParentFolderPicker = () => {
-    const input = prompt("Inserisci il link o l'ID della cartella Google Drive di destinazione:", parentFolderId || "19oSp4--stkguC2r25d2MfsV3PWUoVXfT");
-    if (input && input.trim()) {
-      const extractedId = input.includes('/folders/') ? (input.match(/\/folders\/([a-zA-Z0-9_-]+)/)?.[1] || input.trim()) : input.trim();
-      setParentFolderId(extractedId);
-      setSelectedParentFolderName(`Cartella ID: ${extractedId}`);
+    setIsPickerLoading(true);
+    const token = accessToken || 'mock-access-token-palmasstudio';
+    
+    const onPickerLoad = () => {
+      const pickerOrigin =
+        window.location.ancestorOrigins &&
+        window.location.ancestorOrigins.length > 0
+          ? window.location.ancestorOrigins[window.location.ancestorOrigins.length - 1]
+          : window.location.origin;
+
+      const view = new (window as any).google.picker.DocsView((window as any).google.picker.ViewId.DOCS)
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(true)
+        .setEnableDrives(true)
+        .setMimeTypes('application/vnd.google-apps.folder');
+
+      const allView = new (window as any).google.picker.DocsView()
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(true)
+        .setEnableDrives(true)
+        .setMimeTypes('application/vnd.google-apps.folder');
+
+      const sharedDrivesView = new (window as any).google.picker.DocsView()
+        .setEnableTeamDrives(true)
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(true)
+        .setMimeTypes('application/vnd.google-apps.folder');
+
+      const picker = new (window as any).google.picker.PickerBuilder()
+        .addView(view)
+        .addView(allView)
+        .addView(sharedDrivesView)
+        .enableFeature((window as any).google.picker.Feature.SUPPORT_DRIVES)
+        .setOAuthToken(token)
+        .setCallback((data: any) => {
+          if (data.action === (window as any).google.picker.Action.PICKED) {
+            const folder = data.docs[0];
+            setParentFolderId(folder.id);
+            setSelectedParentFolderName(folder.name);
+          }
+          if (data.action === (window as any).google.picker.Action.CANCEL || data.action === (window as any).google.picker.Action.PICKED) {
+            setIsPickerLoading(false);
+          }
+        })
+        .setOrigin(pickerOrigin)
+        .setTitle("Seleziona la cartella genitore in Google Drive")
+        .build();
+      
+      picker.setVisible(true);
+    };
+
+    if (!(window as any).google?.picker) {
+      if ((window as any).gapi) {
+        (window as any).gapi.load('picker', { callback: onPickerLoad });
+      } else {
+        safeAlert("Google API non ancora caricate. Riprova tra un attimo.");
+        setIsPickerLoading(false);
+      }
+    } else {
+      onPickerLoad();
     }
   };
 
-  const handleCreateFolder = async (): Promise<CreatedFolderResult | null> => {
-    if (!accessToken || accessToken.includes('mock-')) {
-      setErrorCreatingFolder("Autenticazione richiesta: Connetti prima il tuo account Google Drive per creare la cartella.");
-      return null;
-    }
+  const handleCreateFolder = async () => {
     setIsCreatingFolder(true);
     setErrorCreatingFolder('');
     try {
-      const folderResult = await createAccountingPositionFolder(accessToken, name.trim(), fullName.trim(), parentFolderId.trim() || '19oSp4--stkguC2r25d2MfsV3PWUoVXfT', startYear, startYear);
+      // Access token matching connected account simulation if missing, as required
+      const token = accessToken || 'mock-access-token-palmasstudio';
+      const folderResult = await createAccountingPositionFolder(token, name.trim(), fullName.trim(), parentFolderId.trim(), startYear, startYear);
       setCreatedFolderId(folderResult.id);
       setCreatedFolderUrl(folderResult.url);
       setCreatedFattureEmesseFolderId(folderResult.fattureEmesseFolderId);
       setCreatedF24FolderId(folderResult.f24FolderId);
       setCreatedFileGenericiFolderId(folderResult.fileGenericiFolderId);
       setFolderCreated(true);
-      return folderResult;
     } catch (err: any) {
       console.error(err);
       setErrorCreatingFolder(err.message || String(err));
-      return null;
     } finally {
       setIsCreatingFolder(false);
     }
   };
 
-  const handleFinalSubmit = async () => {
-    let folderInfo = folderCreated ? {
-      id: createdFolderId,
-      url: createdFolderUrl,
-      fattureEmesseFolderId: createdFattureEmesseFolderId,
-      f24FolderId: createdF24FolderId,
-      fileGenericiFolderId: createdFileGenericiFolderId
-    } : undefined;
-
-    if (!folderInfo) {
-      const generated = await handleCreateFolder();
-      if (generated) {
-        folderInfo = {
-          id: generated.id,
-          url: generated.url,
-          fattureEmesseFolderId: generated.fattureEmesseFolderId,
-          f24FolderId: generated.f24FolderId,
-          fileGenericiFolderId: generated.fileGenericiFolderId
-        };
-      } else {
-        const fallbackId = parentFolderId.trim() || '19oSp4--stkguC2r25d2MfsV3PWUoVXfT';
-        folderInfo = {
-          id: fallbackId,
-          url: `https://drive.google.com/drive/folders/${fallbackId}`,
-          fattureEmesseFolderId: fallbackId,
-          f24FolderId: fallbackId,
-          fileGenericiFolderId: fallbackId
-        };
-      }
-    }
-
+  const handleFinalSubmit = () => {
     const newProfile: BusinessProfile = {
       fullName: fullName.trim() || 'Senza Nome',
       vatNumber: vatNumber.trim() || '00000000000',
@@ -180,6 +200,14 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
       vatOpeningDate: vatOpeningDate || undefined,
       inpsReduction35
     };
+
+    const folderInfo = folderCreated ? {
+      id: createdFolderId,
+      url: createdFolderUrl,
+      fattureEmesseFolderId: createdFattureEmesseFolderId,
+      f24FolderId: createdF24FolderId,
+      fileGenericiFolderId: createdFileGenericiFolderId
+    } : undefined;
 
     onCreate(name.trim(), newProfile, folderInfo);
     onClose();
@@ -220,26 +248,6 @@ export default function AccountingPositionModal({ isOpen, onClose, onCreate, acc
         {/* Form Container (Scrollable) */}
         <div className="flex-1 overflow-y-auto p-6 sm:p-8">
           
-          {onOpenDriveSearch && (
-            <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold text-slate-800">Hai già una cartella cliente su Google Drive?</p>
-                <p className="text-[11px] text-slate-500">Cerca automaticamente tra le cartelle su Drive (es. Valeria Maros) per importare fatture e dati.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenDriveSearch();
-                }}
-                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer shadow-sm flex items-center gap-1.5"
-              >
-                <Search className="w-3.5 h-3.5" />
-                <span>Cerca su Drive</span>
-              </button>
-            </div>
-          )}
-
           <form onSubmit={(e) => { e.preventDefault(); handleFinalSubmit(); }} className="space-y-6">
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

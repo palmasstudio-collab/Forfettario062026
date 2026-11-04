@@ -2,24 +2,16 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Palette, Check, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-export type ThemeType = 'zucchetti' | 'vibrant' | 'swiss' | 'cosmic' | 'editorial' | 'retro';
+export type ThemeType = 'vibrant' | 'swiss' | 'cosmic' | 'editorial' | 'retro';
 
 interface ThemeOption {
   id: ThemeType;
   name: string;
   description: string;
-  previewUrl?: string;
-  colorHex?: string;
+  previewUrl: string;
 }
 
 const THEMES: ThemeOption[] = [
-  {
-    id: 'zucchetti',
-    name: 'Zucchetti ERP Classic',
-    description: 'Design istituzionale Ago Infinity / Omnia: bordeaux, alta densità e precisione.',
-    colorHex: '#8b0000',
-    previewUrl: '/src/assets/images/minimalist_swiss_preview_1783440713659.jpg'
-  },
   {
     id: 'vibrant',
     name: 'Modern Vibrant',
